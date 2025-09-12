@@ -258,42 +258,7 @@
             APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxzq-iDY4y5wyFV2bvaReNJ1N4fv_0xcqPn4zNYBdwUGI5QR8HKc0TcxA11thIgJL4z8g/exec',
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com'
         };
-
-        // API呼び出し関数（開発モード用のモック）
-        const apiCall = async (endpoint, method = 'GET', data = null) => {
-            // 開発モード: ローカルストレージを使用
-            console.log('API Call:', endpoint, method, data);
-            
-            // モックデータの処理
-            const mockData = JSON.parse(localStorage.getItem('wikiPages') || '[]');
-            
-            switch (endpoint) {
-                case 'getPages':
-                    return { pages: mockData.map(p => ({ id: p.id, title: p.title, updatedAt: p.updatedAt })) };
-                
-                case 'getPage':
-                    const page = mockData.find(p => p.id === data.id);
-                    return page ? { page } : { error: 'Page not found' };
-                
-                case 'savePage':
-                    const existingIndex = mockData.findIndex(p => p.id === data.id);
-                    const updatedAt = new Date().toISOString();
-                    const pageData = { ...data, updatedAt };
-                    
-                    if (existingIndex >= 0) {
-                        mockData[existingIndex] = pageData;
-                    } else {
-                        mockData.push(pageData);
-                    }
-                    
-                    localStorage.setItem('wikiPages', JSON.stringify(mockData));
-                    return { success: true, updatedAt };
-                
-                default:
-                    return { error: 'Invalid action' };
-            }
-        };
-
+        
         const API_URL = CONFIG.APPS_SCRIPT_URL;
 
         const apiCall = async (endpoint, method = 'GET', data = null) => {
