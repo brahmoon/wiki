@@ -1,0 +1,215 @@
+# .github/workflows/sync-wiki.yml
+name: Sync Wiki from Google Sheets
+
+on:
+  schedule:
+    # 毎時間実行（UTC時間）
+    - cron: '0 * * * *'
+  workflow_dispatch: # 手動実行も可能
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/sync-wiki.yml'
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        npm init -y
+        npm install axios
+
+    - name: Fetch data from Apps Script API
+      env:
+        APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+      run: |
+        cat > fetch-data.js << 'EOF'
+        const axios = require('axios');
+        const fs = require('fs');
+        const path = require('path');
+
+        async function fetchAndGenerateFiles() {
+          try {
+            const url = process.env.APPS_SCRIPT_URL + '?action=getAllPagesForExport';
+            console.log('Fetching data from:', url);
+            
+            const response = await axios.get(url);
+            const data = response.data;
+            
+            if (!data.pages || data.pages.length === 0) {
+              console.log('No pages found');
+              return;
+            }
+            
+            console.log(`Found ${data.pages.length} pages`);
+            
+            // pages ディレクトリを作成
+            const pagesDir = './pages';
+            if (!fs.existsSync(pagesDir)) {
+              fs.mkdirSync(pagesDir, { recursive: true });
+            }
+            
+            // 各ページをMarkdownファイルとして保存
+            const pageIndex = [];
+            
+            for (const page of data.pages) {
+              const filename = `${page.id}.md`;
+              const filepath = path.join(pagesDir, filename);
+              
+              const markdown = `# ${page.title || '無題'}
+
+${page.content || ''}
+
+---
+*最終更新: ${page.updatedAt}*
+`;
+              
+              fs.writeFileSync(filepath, markdown, 'utf8');
+              console.log(`Generated: ${filepath}`);
+              
+              pageIndex.push({
+                id: page.id,
+                title: page.title || '無題',
+                filename: filename,
+                updatedAt: page.updatedAt
+              });
+            }
+            
+            // インデックスページを生成
+            const indexMarkdown = `# Wiki ページ一覧
+
+${pageIndex.map(page => 
+  `- [${page.title}](./pages/${page.filename}) *(更新: ${new Date(page.updatedAt).toLocaleDateString('ja-JP')})*`
+).join('\n')}
+
+---
+*最終同期: ${new Date().toISOString()}*
+`;
+            
+            fs.writeFileSync('./README.md', indexMarkdown, 'utf8');
+            console.log('Generated: README.md');
+            
+            // データファイルも保存（フロントエンドでの読み込み用）
+            const dataFile = {
+              pages: pageIndex,
+              lastSync: new Date().toISOString()
+            };
+            
+            fs.writeFileSync('./data/pages.json', JSON.stringify(dataFile, null, 2), 'utf8');
+            console.log('Generated: data/pages.json');
+            
+            console.log('Sync completed successfully');
+            
+          } catch (error) {
+            console.error('Error:', error.message);
+            process.exit(1);
+          }
+        }
+
+        fetchAndGenerateFiles();
+        EOF
+        
+        # dataディレクトリを作成
+        mkdir -p data
+        
+        # スクリプトを実行
+        node fetch-data.js
+        
+    - name: Generate static site
+      run: |
+        # 静的サイト用のHTMLを生成
+        cat > index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Notion風Wiki</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 40px 20px;
+                    line-height: 1.6;
+                    color: #37352f;
+                }
+                h1 { color: #2383e2; }
+                a { color: #2383e2; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+                .meta { color: #666; font-size: 0.9em; }
+                .edit-link {
+                    display: inline-block;
+                    margin-top: 20px;
+                    padding: 10px 20px;
+                    background: #2383e2;
+                    color: white;
+                    border-radius: 4px;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="content">
+                <!-- README.mdの内容がここに挿入される -->
+            </div>
+            <a href="./edit.html" class="edit-link">編集モードで開く</a>
+            
+            <script>
+                // README.mdを読み込んでHTMLに変換
+                fetch('./README.md')
+                    .then(response => response.text())
+                    .then(markdown => {
+                        // 簡単なMarkdown to HTML変換
+                        const html = markdown
+                            .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                            .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                            .replace(/^\- \[(.+?)\]\((.+?)\) \*\((.+?)\)\*/gm, '<li><a href="$2">$1</a> <span class="meta">($3)</span></li>')
+                            .replace(/^\*(.+?)\*$/gm, '<p class="meta">$1</p>')
+                            .replace(/^---$/gm, '<hr>')
+                            .replace(/\n\n/g, '</p><p>')
+                            .replace(/^(.+)$/gm, '<p>$1</p>')
+                            .replace(/<p><li>/g, '<ul><li>')
+                            .replace(/<\/li><\/p>/g, '</li></ul>');
+                        
+                        document.getElementById('content').innerHTML = html;
+                    });
+            </script>
+        </body>
+        </html>
+        EOF
+        
+        # 編集モード用のHTMLファイルをコピー（実際のフロントエンド）
+        # 注意: 実際の使用時は、フロントエンドのHTMLファイルを edit.html として配置する
+        echo "<!-- 編集モード用ファイル（実際のフロントエンドをここに配置） -->" > edit.html
+        
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # 変更があるかチェック
+        if git diff --quiet && git diff --staged --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+        
+        git add .
+        git commit -m "Auto-sync wiki pages from Google Sheets [$(date)]"
+        git push
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: github.ref == 'refs/heads/main'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./
