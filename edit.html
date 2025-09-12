@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion風Wiki</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #fff;
+            color: #37352f;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            width: 240px;
+            background: #f7f6f3;
+            border-right: 1px solid #e9e9e7;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #e9e9e7;
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #37352f;
+        }
+        
+        .page-list {
+            list-style: none;
+        }
+        
+        .page-item {
+            padding: 4px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #37352f;
+            transition: background 0.1s;
+        }
+        
+        .page-item:hover {
+            background: #e9e9e7;
+        }
+        
+        .page-item.active {
+            background: #2383e2;
+            color: white;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            height: 60px;
+            border-bottom: 1px solid #e9e9e7;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #d3d2ce;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.1s;
+        }
+        
+        .btn:hover {
+            background: #f7f6f3;
+        }
+        
+        .btn-primary {
+            background: #2383e2;
+            color: white;
+            border-color: #2383e2;
+        }
+        
+        .btn-primary:hover {
+            background: #1a6bc2;
+        }
+        
+        .editor-container {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+        
+        .editor {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        
+        .page-title {
+            font-size: 40px;
+            font-weight: 700;
+            border: none;
+            outline: none;
+            width: 100%;
+            margin-bottom: 20px;
+            color: #37352f;
+            background: transparent;
+        }
+        
+        .page-title::placeholder {
+            color: #9b9a97;
+        }
+        
+        .editor-content {
+            font-size: 16px;
+            line-height: 1.5;
+            border: none;
+            outline: none;
+            width: 100%;
+            min-height: 400px;
+            resize: vertical;
+            font-family: inherit;
+            background: transparent;
+        }
+        
+        .editor-content::placeholder {
+            color: #9b9a97;
+        }
+        
+        .viewer-content {
+            font-size: 16px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 20px;
+        }
+        
+        .status-message {
+            padding: 10px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .new-page-form {
+            display: flex;
+            gap: 10px;
+            padding: 20px;
+            border-top: 1px solid #e9e9e7;
+        }
+        
+        .new-page-input {
+            flex: 1;
+            padding: 6px 12px;
+            border: 1px solid #d3d2ce;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 設定 - 実際の使用時は環境変数などで管理
+        const CONFIG = {
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxzq-iDY4y5wyFV2bvaReNJ1N4fv_0xcqPn4zNYBdwUGI5QR8HKc0TcxA11thIgJL4z8g/exec',
+            CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com'
+        };
+
+        // Google Auth初期化
+        const initGoogleAuth = () => {
+            return new Promise((resolve) => {
+                gapi.load('auth2', () => {
+                    gapi.auth2.init({
+                        client_id: CONFIG.CLIENT_ID
+                    }).then(() => {
+                        resolve(gapi.auth2.getAuthInstance());
+                    });
+                });
+            });
+        };
+
+        // API呼び出し関数
+        const apiCall = async (endpoint, method = 'GET', data = null) => {
+            const authInstance = gapi.auth2.getAuthInstance();
+            if (!authInstance.isSignedIn.get()) {
+                throw new Error('ログインが必要です');
+            }
+
+            const token = authInstance.currentUser.get().getAuthResponse().access_token;
+            
+            const url = new URL(CONFIG.APPS_SCRIPT_URL);
+            url.searchParams.set('action', endpoint);
+            
+            const options = {
+                method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (data && method !== 'GET') {
+                options.body = JSON.stringify(data);
+            } else if (data && method === 'GET') {
+                Object.keys(data).forEach(key => {
+                    url.searchParams.set(key, data[key]);
+                });
+            }
+
+            const response = await fetch(url.toString(), options);
+            if (!response.ok) {
+                throw new Error(`API エラー: ${response.status}`);
+            }
+            return response.json();
+        };
+
+        // メインアプリコンポーネント
+        function WikiApp() {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [authInstance, setAuthInstance] = useState(null);
+            const [pages, setPages] = useState([]);
+            const [currentPage, setCurrentPage] = useState(null);
+            const [isEditing, setIsEditing] = useState(false);
+            const [title, setTitle] = useState('');
+            const [content, setContent] = useState('');
+            const [statusMessage, setStatusMessage] = useState('');
+            const [newPageTitle, setNewPageTitle] = useState('');
+
+            // 初期化
+            useEffect(() => {
+                initGoogleAuth().then(auth => {
+                    setAuthInstance(auth);
+                    setIsAuthenticated(auth.isSignedIn.get());
+                    
+                    // サインイン状態の変更を監視
+                    auth.isSignedIn.listen(setIsAuthenticated);
+                });
+            }, []);
+
+            // ページリスト読み込み
+            const loadPages = async () => {
+                try {
+                    const result = await apiCall('getPages');
+                    setPages(result.pages || []);
+                } catch (error) {
+                    console.error('ページ読み込みエラー:', error);
+                    setStatusMessage('ページの読み込みに失敗しました');
+                }
+            };
+
+            // 認証後にページ読み込み
+            useEffect(() => {
+                if (isAuthenticated) {
+                    loadPages();
+                }
+            }, [isAuthenticated]);
+
+            // ページ読み込み
+            const loadPage = async (pageId) => {
+                try {
+                    const result = await apiCall('getPage', 'GET', { id: pageId });
+                    setCurrentPage(result.page);
+                    setTitle(result.page.title || '');
+                    setContent(result.page.content || '');
+                    setIsEditing(false);
+                } catch (error) {
+                    console.error('ページ読み込みエラー:', error);
+                    setStatusMessage('ページの読み込みに失敗しました');
+                }
+            };
+
+            // ページ保存
+            const savePage = async () => {
+                try {
+                    const pageData = {
+                        id: currentPage?.id || Date.now().toString(),
+                        title: title,
+                        content: content
+                    };
+
+                    const result = await apiCall('savePage', 'POST', pageData);
+                    
+                    if (result.success) {
+                        setStatusMessage('保存しました');
+                        setTimeout(() => setStatusMessage(''), 3000);
+                        
+                        // ページリストを更新
+                        await loadPages();
+                        
+                        // 新規ページの場合は現在のページを更新
+                        if (!currentPage) {
+                            setCurrentPage(pageData);
+                        }
+                        
+                        setIsEditing(false);
+                    }
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                    setStatusMessage('保存に失敗しました');
+                    setTimeout(() => setStatusMessage(''), 3000);
+                }
+            };
+
+            // 新規ページ作成
+            const createNewPage = () => {
+                if (!newPageTitle.trim()) return;
+                
+                setCurrentPage(null);
+                setTitle(newPageTitle);
+                setContent('');
+                setIsEditing(true);
+                setNewPageTitle('');
+            };
+
+            // ログイン
+            const signIn = () => {
+                if (authInstance) {
+                    authInstance.signIn();
+                }
+            };
+
+            // ログアウト
+            const signOut = () => {
+                if (authInstance) {
+                    authInstance.signOut();
+                }
+            };
+
+            if (!isAuthenticated) {
+                return (
+                    <div className="app-container">
+                        <div className="login-container">
+                            <h1>Notion風Wiki</h1>
+                            <p>編集するにはGoogleアカウントでログインしてください</p>
+                            <button className="btn btn-primary" onClick={signIn}>
+                                Googleでログイン
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="app-container">
+                    {/* サイドバー */}
+                    <div className="sidebar">
+                        <div className="sidebar-header">
+                            <div className="sidebar-title">ページ一覧</div>
+                        </div>
+                        
+                        <ul className="page-list">
+                            {pages.map(page => (
+                                <li 
+                                    key={page.id}
+                                    className={`page-item ${currentPage?.id === page.id ? 'active' : ''}`}
+                                    onClick={() => loadPage(page.id)}
+                                >
+                                    {page.title || '無題'}
+                                </li>
+                            ))}
+                        </ul>
+                        
+                        <div className="new-page-form">
+                            <input
+                                type="text"
+                                className="new-page-input"
+                                placeholder="新しいページタイトル"
+                                value={newPageTitle}
+                                onChange={(e) => setNewPageTitle(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && createNewPage()}
+                            />
+                            <button className="btn btn-primary" onClick={createNewPage}>
+                                追加
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* メインコンテンツ */}
+                    <div className="main-content">
+                        {/* ヘッダー */}
+                        <div className="header">
+                            <div className="header-title">
+                                {currentPage ? (isEditing ? '編集中' : currentPage.title || '無題') : '新規ページ'}
+                            </div>
+                            <div className="header-actions">
+                                {currentPage && !isEditing && (
+                                    <button className="btn" onClick={() => setIsEditing(true)}>
+                                        編集
+                                    </button>
+                                )}
+                                {isEditing && (
+                                    <>
+                                        <button className="btn" onClick={() => setIsEditing(false)}>
+                                            キャンセル
+                                        </button>
+                                        <button className="btn btn-primary" onClick={savePage}>
+                                            保存
+                                        </button>
+                                    </>
+                                )}
+                                <button className="btn" onClick={signOut}>
+                                    ログアウト
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* ステータスメッセージ */}
+                        {statusMessage && (
+                            <div className={`status-message ${statusMessage.includes('失敗') ? 'status-error' : 'status-success'}`}>
+                                {statusMessage}
+                            </div>
+                        )}
+
+                        {/* エディター/ビューアー */}
+                        <div className="editor-container">
+                            <div className="editor">
+                                {isEditing ? (
+                                    <>
+                                        <input
+                                            type="text"
+                                            className="page-title"
+                                            placeholder="無題"
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                        />
+                                        <textarea
+                                            className="editor-content"
+                                            placeholder="何か書いてみましょう..."
+                                            value={content}
+                                            onChange={(e) => setContent(e.target.value)}
+                                        />
+                                    </>
+                                ) : currentPage ? (
+                                    <>
+                                        <h1 className="page-title">{currentPage.title || '無題'}</h1>
+                                        <div className="viewer-content">{currentPage.content || 'コンテンツがありません'}</div>
+                                    </>
+                                ) : (
+                                    <div className="viewer-content">ページを選択するか、新しいページを作成してください。</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // アプリをレンダリング
+        ReactDOM.render(<WikiApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
