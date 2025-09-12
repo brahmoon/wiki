@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notion風Wiki</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <style>
         * {
@@ -206,301 +203,398 @@
             border-radius: 4px;
             font-size: 12px;
         }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <!-- 初期ローディング状態 -->
+        <div class="app-container">
+            <div class="login-container">
+                <h1>Notion風Wiki</h1>
+                <p>初期化中...</p>
+            </div>
+        </div>
+    </div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-
+    <script>
         // 設定 - 実際の使用時は環境変数などで管理
         const CONFIG = {
             APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxzq-iDY4y5wyFV2bvaReNJ1N4fv_0xcqPn4zNYBdwUGI5QR8HKc0TcxA11thIgJL4z8g/exec',
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com'
         };
 
-        // Google Auth初期化
-        const initGoogleAuth = () => {
-            return new Promise((resolve) => {
-                gapi.load('auth2', () => {
-                    gapi.auth2.init({
-                        client_id: CONFIG.CLIENT_ID
-                    }).then(() => {
-                        resolve(gapi.auth2.getAuthInstance());
+        // アプリケーションの状態管理
+        class WikiApp {
+            constructor() {
+                this.isAuthenticated = false;
+                this.authInstance = null;
+                this.pages = [];
+                this.currentPage = null;
+                this.isEditing = false;
+                this.title = '';
+                this.content = '';
+                this.statusMessage = '';
+                this.newPageTitle = '';
+                
+                this.init();
+            }
+
+            async init() {
+                try {
+                    await this.initGoogleAuth();
+                    this.render();
+                } catch (error) {
+                    console.error('初期化エラー:', error);
+                    this.showError('初期化に失敗しました');
+                }
+            }
+
+            async initGoogleAuth() {
+                return new Promise((resolve) => {
+                    gapi.load('auth2', async () => {
+                        try {
+                            this.authInstance = await gapi.auth2.init({
+                                client_id: CONFIG.CLIENT_ID
+                            });
+                            
+                            this.isAuthenticated = this.authInstance.isSignedIn.get();
+                            
+                            // サインイン状態の変更を監視
+                            this.authInstance.isSignedIn.listen((isSignedIn) => {
+                                this.isAuthenticated = isSignedIn;
+                                if (isSignedIn) {
+                                    this.loadPages();
+                                }
+                                this.render();
+                            });
+
+                            if (this.isAuthenticated) {
+                                this.loadPages();
+                            }
+                            
+                            resolve();
+                        } catch (error) {
+                            console.error('Google Auth初期化エラー:', error);
+                            resolve();
+                        }
                     });
                 });
-            });
-        };
-
-        // API呼び出し関数
-        const apiCall = async (endpoint, method = 'GET', data = null) => {
-            const authInstance = gapi.auth2.getAuthInstance();
-            if (!authInstance.isSignedIn.get()) {
-                throw new Error('ログインが必要です');
             }
 
-            const token = authInstance.currentUser.get().getAuthResponse().access_token;
-            
-            const url = new URL(CONFIG.APPS_SCRIPT_URL);
-            url.searchParams.set('action', endpoint);
-            
-            const options = {
-                method,
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+            async apiCall(endpoint, method = 'GET', data = null) {
+                if (!this.authInstance || !this.authInstance.isSignedIn.get()) {
+                    throw new Error('ログインが必要です');
                 }
-            };
 
-            if (data && method !== 'GET') {
-                options.body = JSON.stringify(data);
-            } else if (data && method === 'GET') {
-                Object.keys(data).forEach(key => {
-                    url.searchParams.set(key, data[key]);
-                });
+                const token = this.authInstance.currentUser.get().getAuthResponse().access_token;
+                
+                const url = new URL(CONFIG.APPS_SCRIPT_URL);
+                url.searchParams.set('action', endpoint);
+                
+                const options = {
+                    method,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (data && method !== 'GET') {
+                    options.body = JSON.stringify(data);
+                } else if (data && method === 'GET') {
+                    Object.keys(data).forEach(key => {
+                        url.searchParams.set(key, data[key]);
+                    });
+                }
+
+                const response = await fetch(url.toString(), options);
+                if (!response.ok) {
+                    throw new Error(`API エラー: ${response.status}`);
+                }
+                return response.json();
             }
 
-            const response = await fetch(url.toString(), options);
-            if (!response.ok) {
-                throw new Error(`API エラー: ${response.status}`);
-            }
-            return response.json();
-        };
-
-        // メインアプリコンポーネント
-        function WikiApp() {
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
-            const [authInstance, setAuthInstance] = useState(null);
-            const [pages, setPages] = useState([]);
-            const [currentPage, setCurrentPage] = useState(null);
-            const [isEditing, setIsEditing] = useState(false);
-            const [title, setTitle] = useState('');
-            const [content, setContent] = useState('');
-            const [statusMessage, setStatusMessage] = useState('');
-            const [newPageTitle, setNewPageTitle] = useState('');
-
-            // 初期化
-            useEffect(() => {
-                initGoogleAuth().then(auth => {
-                    setAuthInstance(auth);
-                    setIsAuthenticated(auth.isSignedIn.get());
-                    
-                    // サインイン状態の変更を監視
-                    auth.isSignedIn.listen(setIsAuthenticated);
-                });
-            }, []);
-
-            // ページリスト読み込み
-            const loadPages = async () => {
+            async loadPages() {
                 try {
-                    const result = await apiCall('getPages');
-                    setPages(result.pages || []);
+                    const result = await this.apiCall('getPages');
+                    this.pages = result.pages || [];
+                    this.render();
                 } catch (error) {
                     console.error('ページ読み込みエラー:', error);
-                    setStatusMessage('ページの読み込みに失敗しました');
+                    this.showError('ページの読み込みに失敗しました');
                 }
-            };
+            }
 
-            // 認証後にページ読み込み
-            useEffect(() => {
-                if (isAuthenticated) {
-                    loadPages();
-                }
-            }, [isAuthenticated]);
-
-            // ページ読み込み
-            const loadPage = async (pageId) => {
+            async loadPage(pageId) {
                 try {
-                    const result = await apiCall('getPage', 'GET', { id: pageId });
-                    setCurrentPage(result.page);
-                    setTitle(result.page.title || '');
-                    setContent(result.page.content || '');
-                    setIsEditing(false);
+                    const result = await this.apiCall('getPage', 'GET', { id: pageId });
+                    this.currentPage = result.page;
+                    this.title = result.page.title || '';
+                    this.content = result.page.content || '';
+                    this.isEditing = false;
+                    this.render();
                 } catch (error) {
                     console.error('ページ読み込みエラー:', error);
-                    setStatusMessage('ページの読み込みに失敗しました');
+                    this.showError('ページの読み込みに失敗しました');
                 }
-            };
+            }
 
-            // ページ保存
-            const savePage = async () => {
+            async savePage() {
                 try {
                     const pageData = {
-                        id: currentPage?.id || Date.now().toString(),
-                        title: title,
-                        content: content
+                        id: this.currentPage?.id || Date.now().toString(),
+                        title: this.title,
+                        content: this.content
                     };
 
-                    const result = await apiCall('savePage', 'POST', pageData);
+                    const result = await this.apiCall('savePage', 'POST', pageData);
                     
                     if (result.success) {
-                        setStatusMessage('保存しました');
-                        setTimeout(() => setStatusMessage(''), 3000);
+                        this.showSuccess('保存しました');
                         
-                        // ページリストを更新
-                        await loadPages();
+                        await this.loadPages();
                         
-                        // 新規ページの場合は現在のページを更新
-                        if (!currentPage) {
-                            setCurrentPage(pageData);
+                        if (!this.currentPage) {
+                            this.currentPage = pageData;
                         }
                         
-                        setIsEditing(false);
+                        this.isEditing = false;
+                        this.render();
                     }
                 } catch (error) {
                     console.error('保存エラー:', error);
-                    setStatusMessage('保存に失敗しました');
-                    setTimeout(() => setStatusMessage(''), 3000);
+                    this.showError('保存に失敗しました');
                 }
-            };
-
-            // 新規ページ作成
-            const createNewPage = () => {
-                if (!newPageTitle.trim()) return;
-                
-                setCurrentPage(null);
-                setTitle(newPageTitle);
-                setContent('');
-                setIsEditing(true);
-                setNewPageTitle('');
-            };
-
-            // ログイン
-            const signIn = () => {
-                if (authInstance) {
-                    authInstance.signIn();
-                }
-            };
-
-            // ログアウト
-            const signOut = () => {
-                if (authInstance) {
-                    authInstance.signOut();
-                }
-            };
-
-            if (!isAuthenticated) {
-                return (
-                    <div className="app-container">
-                        <div className="login-container">
-                            <h1>Notion風Wiki</h1>
-                            <p>編集するにはGoogleアカウントでログインしてください</p>
-                            <button className="btn btn-primary" onClick={signIn}>
-                                Googleでログイン
-                            </button>
-                        </div>
-                    </div>
-                );
             }
 
-            return (
-                <div className="app-container">
-                    {/* サイドバー */}
-                    <div className="sidebar">
-                        <div className="sidebar-header">
-                            <div className="sidebar-title">ページ一覧</div>
-                        </div>
-                        
-                        <ul className="page-list">
-                            {pages.map(page => (
-                                <li 
-                                    key={page.id}
-                                    className={`page-item ${currentPage?.id === page.id ? 'active' : ''}`}
-                                    onClick={() => loadPage(page.id)}
-                                >
-                                    {page.title || '無題'}
-                                </li>
-                            ))}
-                        </ul>
-                        
-                        <div className="new-page-form">
-                            <input
-                                type="text"
-                                className="new-page-input"
-                                placeholder="新しいページタイトル"
-                                value={newPageTitle}
-                                onChange={(e) => setNewPageTitle(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && createNewPage()}
-                            />
-                            <button className="btn btn-primary" onClick={createNewPage}>
-                                追加
-                            </button>
-                        </div>
-                    </div>
+            createNewPage() {
+                if (!this.newPageTitle.trim()) return;
+                
+                this.currentPage = null;
+                this.title = this.newPageTitle;
+                this.content = '';
+                this.isEditing = true;
+                this.newPageTitle = '';
+                this.render();
+            }
 
-                    {/* メインコンテンツ */}
-                    <div className="main-content">
-                        {/* ヘッダー */}
-                        <div className="header">
-                            <div className="header-title">
-                                {currentPage ? (isEditing ? '編集中' : currentPage.title || '無題') : '新規ページ'}
+            signIn() {
+                if (this.authInstance) {
+                    this.authInstance.signIn();
+                }
+            }
+
+            signOut() {
+                if (this.authInstance) {
+                    this.authInstance.signOut();
+                }
+            }
+
+            showSuccess(message) {
+                this.statusMessage = message;
+                this.render();
+                setTimeout(() => {
+                    this.statusMessage = '';
+                    this.render();
+                }, 3000);
+            }
+
+            showError(message) {
+                this.statusMessage = `エラー: ${message}`;
+                this.render();
+                setTimeout(() => {
+                    this.statusMessage = '';
+                    this.render();
+                }, 3000);
+            }
+
+            render() {
+                const root = document.getElementById('root');
+                
+                if (!this.isAuthenticated) {
+                    root.innerHTML = `
+                        <div class="app-container">
+                            <div class="login-container">
+                                <h1>Notion風Wiki</h1>
+                                <p>編集するにはGoogleアカウントでログインしてください</p>
+                                <button class="btn btn-primary" id="signin-btn">
+                                    Googleでログイン
+                                </button>
                             </div>
-                            <div className="header-actions">
-                                {currentPage && !isEditing && (
-                                    <button className="btn" onClick={() => setIsEditing(true)}>
-                                        編集
-                                    </button>
-                                )}
-                                {isEditing && (
-                                    <>
-                                        <button className="btn" onClick={() => setIsEditing(false)}>
-                                            キャンセル
-                                        </button>
-                                        <button className="btn btn-primary" onClick={savePage}>
-                                            保存
-                                        </button>
-                                    </>
-                                )}
-                                <button className="btn" onClick={signOut}>
-                                    ログアウト
+                        </div>
+                    `;
+                    
+                    document.getElementById('signin-btn').onclick = () => this.signIn();
+                    return;
+                }
+
+                root.innerHTML = `
+                    <div class="app-container">
+                        <!-- サイドバー -->
+                        <div class="sidebar">
+                            <div class="sidebar-header">
+                                <div class="sidebar-title">ページ一覧</div>
+                            </div>
+                            
+                            <ul class="page-list">
+                                ${this.pages.map(page => `
+                                    <li class="page-item ${this.currentPage?.id === page.id ? 'active' : ''}" 
+                                        data-page-id="${page.id}">
+                                        ${this.escapeHtml(page.title || '無題')}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                            
+                            <div class="new-page-form">
+                                <input
+                                    type="text"
+                                    class="new-page-input"
+                                    placeholder="新しいページタイトル"
+                                    id="new-page-input"
+                                />
+                                <button class="btn btn-primary" id="add-page-btn">
+                                    追加
                                 </button>
                             </div>
                         </div>
 
-                        {/* ステータスメッセージ */}
-                        {statusMessage && (
-                            <div className={`status-message ${statusMessage.includes('失敗') ? 'status-error' : 'status-success'}`}>
-                                {statusMessage}
+                        <!-- メインコンテンツ -->
+                        <div class="main-content">
+                            <!-- ヘッダー -->
+                            <div class="header">
+                                <div class="header-title">
+                                    ${this.currentPage ? (this.isEditing ? '編集中' : this.escapeHtml(this.currentPage.title || '無題')) : '新規ページ'}
+                                </div>
+                                <div class="header-actions">
+                                    ${this.currentPage && !this.isEditing ? 
+                                        '<button class="btn" id="edit-btn">編集</button>' : ''}
+                                    ${this.isEditing ? `
+                                        <button class="btn" id="cancel-btn">キャンセル</button>
+                                        <button class="btn btn-primary" id="save-btn">保存</button>
+                                    ` : ''}
+                                    <button class="btn" id="signout-btn">ログアウト</button>
+                                </div>
                             </div>
-                        )}
 
-                        {/* エディター/ビューアー */}
-                        <div className="editor-container">
-                            <div className="editor">
-                                {isEditing ? (
-                                    <>
+                            <!-- ステータスメッセージ -->
+                            ${this.statusMessage ? `
+                                <div class="status-message ${this.statusMessage.includes('エラー') ? 'status-error' : 'status-success'}">
+                                    ${this.escapeHtml(this.statusMessage)}
+                                </div>
+                            ` : ''}
+
+                            <!-- エディター/ビューアー -->
+                            <div class="editor-container">
+                                <div class="editor">
+                                    ${this.isEditing ? `
                                         <input
                                             type="text"
-                                            className="page-title"
+                                            class="page-title"
                                             placeholder="無題"
-                                            value={title}
-                                            onChange={(e) => setTitle(e.target.value)}
+                                            id="title-input"
+                                            value="${this.escapeHtml(this.title)}"
                                         />
                                         <textarea
-                                            className="editor-content"
+                                            class="editor-content"
                                             placeholder="何か書いてみましょう..."
-                                            value={content}
-                                            onChange={(e) => setContent(e.target.value)}
-                                        />
-                                    </>
-                                ) : currentPage ? (
-                                    <>
-                                        <h1 className="page-title">{currentPage.title || '無題'}</h1>
-                                        <div className="viewer-content">{currentPage.content || 'コンテンツがありません'}</div>
-                                    </>
-                                ) : (
-                                    <div className="viewer-content">ページを選択するか、新しいページを作成してください。</div>
-                                )}
+                                            id="content-textarea"
+                                        >${this.escapeHtml(this.content)}</textarea>
+                                    ` : this.currentPage ? `
+                                        <h1 class="page-title">${this.escapeHtml(this.currentPage.title || '無題')}</h1>
+                                        <div class="viewer-content">${this.escapeHtml(this.currentPage.content || 'コンテンツがありません')}</div>
+                                    ` : `
+                                        <div class="viewer-content">ページを選択するか、新しいページを作成してください。</div>
+                                    `}
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            );
+                `;
+
+                // イベントリスナーを設定
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // ページリストのクリック
+                document.querySelectorAll('.page-item').forEach(item => {
+                    item.onclick = () => {
+                        const pageId = item.getAttribute('data-page-id');
+                        this.loadPage(pageId);
+                    };
+                });
+
+                // 新規ページ作成
+                const newPageInput = document.getElementById('new-page-input');
+                const addPageBtn = document.getElementById('add-page-btn');
+                
+                if (newPageInput && addPageBtn) {
+                    newPageInput.onkeypress = (e) => {
+                        if (e.key === 'Enter') {
+                            this.newPageTitle = newPageInput.value;
+                            this.createNewPage();
+                        }
+                    };
+                    
+                    addPageBtn.onclick = () => {
+                        this.newPageTitle = newPageInput.value;
+                        this.createNewPage();
+                    };
+                }
+
+                // ヘッダーボタン
+                const editBtn = document.getElementById('edit-btn');
+                const cancelBtn = document.getElementById('cancel-btn');
+                const saveBtn = document.getElementById('save-btn');
+                const signoutBtn = document.getElementById('signout-btn');
+
+                if (editBtn) editBtn.onclick = () => {
+                    this.isEditing = true;
+                    this.render();
+                };
+
+                if (cancelBtn) cancelBtn.onclick = () => {
+                    this.isEditing = false;
+                    this.title = this.currentPage?.title || '';
+                    this.content = this.currentPage?.content || '';
+                    this.render();
+                };
+
+                if (saveBtn) saveBtn.onclick = () => this.savePage();
+                if (signoutBtn) signoutBtn.onclick = () => this.signOut();
+
+                // エディター要素
+                const titleInput = document.getElementById('title-input');
+                const contentTextarea = document.getElementById('content-textarea');
+
+                if (titleInput) {
+                    titleInput.oninput = (e) => {
+                        this.title = e.target.value;
+                    };
+                }
+
+                if (contentTextarea) {
+                    contentTextarea.oninput = (e) => {
+                        this.content = e.target.value;
+                    };
+                }
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
         }
 
-        // アプリをレンダリング
-        ReactDOM.render(<WikiApp />, document.getElementById('root'));
+        // アプリケーションを起動
+        document.addEventListener('DOMContentLoaded', () => {
+            new WikiApp();
+        });
     </script>
 </body>
 </html>
