@@ -48,11 +48,16 @@
         }
         
         .page-item {
-            padding: 4px 20px;
+            padding: 8px 20px;
             cursor: pointer;
             font-size: 14px;
             color: #37352f;
             transition: background 0.1s;
+            border-radius: 4px;
+            margin: 2px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .page-item:hover {
@@ -62,6 +67,13 @@
         .page-item.active {
             background: #2383e2;
             color: white;
+        }
+        
+        .page-item-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         .main-content {
@@ -90,17 +102,23 @@
         }
         
         .btn {
-            padding: 6px 12px;
+            padding: 8px 16px;
             border: 1px solid #d3d2ce;
             background: white;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
-            transition: background 0.1s;
+            font-size: 13px;
+            transition: all 0.1s;
+            font-weight: 500;
         }
         
         .btn:hover {
             background: #f7f6f3;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         
         .btn-primary {
@@ -109,7 +127,7 @@
             border-color: #2383e2;
         }
         
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: #1a6bc2;
         }
         
@@ -141,7 +159,7 @@
         
         .editor-content {
             font-size: 16px;
-            line-height: 1.5;
+            line-height: 1.6;
             border: none;
             outline: none;
             width: 100%;
@@ -157,7 +175,7 @@
         
         .viewer-content {
             font-size: 16px;
-            line-height: 1.5;
+            line-height: 1.6;
             white-space: pre-wrap;
         }
         
@@ -168,13 +186,25 @@
             justify-content: center;
             flex: 1;
             gap: 20px;
+            text-align: center;
+        }
+        
+        .login-container h1 {
+            color: #37352f;
+            font-weight: 700;
+        }
+        
+        .login-container p {
+            color: #9b9a97;
+            max-width: 400px;
         }
         
         .status-message {
-            padding: 10px 20px;
-            border-radius: 4px;
-            margin-bottom: 20px;
+            padding: 12px 20px;
+            margin: 0 20px 10px;
+            border-radius: 6px;
             font-size: 14px;
+            font-weight: 500;
         }
         
         .status-success {
@@ -189,108 +219,380 @@
             border: 1px solid #f5c6cb;
         }
         
+        .status-loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
         .new-page-form {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             padding: 20px;
             border-top: 1px solid #e9e9e7;
         }
         
         .new-page-input {
             flex: 1;
-            padding: 6px 12px;
+            padding: 8px 12px;
             border: 1px solid #d3d2ce;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 13px;
+            outline: none;
         }
-
-        .hidden {
-            display: none;
+        
+        .new-page-input:focus {
+            border-color: #2383e2;
+        }
+        
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 20px;
+            text-align: center;
+            color: #9b9a97;
+        }
+        
+        .welcome-screen h2 {
+            color: #37352f;
+            font-weight: 600;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2383e2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .config-notice {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .config-notice strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid #e9e9e7;
+            }
+            
+            .editor-container {
+                padding: 20px;
+            }
+            
+            .page-title {
+                font-size: 32px;
+            }
         }
     </style>
 </head>
 <body>
     <div id="root">
-        <!-- 初期ローディング状態 -->
-        <div class="app-container">
-            <div class="login-container">
-                <h1>Notion風Wiki</h1>
-                <p>初期化中...</p>
-            </div>
+        <div class="loading-container" style="display: flex; align-items: center; justify-content: center; height: 100vh; gap: 10px;">
+            <div class="loading-spinner"></div>
+            <span>初期化中...</span>
         </div>
     </div>
 
     <script>
-        // 設定 - 実際の使用時は環境変数などで管理
         const CONFIG = {
             APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxzq-iDY4y5wyFV2bvaReNJ1N4fv_0xcqPn4zNYBdwUGI5QR8HKc0TcxA11thIgJL4z8g/exec',
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com'
+            // 開発モード（デモ用）
+            DEMO_MODE: false
         };
 
-        // アプリケーションの状態管理
         class WikiApp {
             constructor() {
-                this.isAuthenticated = false;
-                this.authInstance = null;
-                this.pages = [];
-                this.currentPage = null;
-                this.isEditing = false;
-                this.title = '';
-                this.content = '';
-                this.statusMessage = '';
-                this.newPageTitle = '';
+                this.state = {
+                    isAuthenticated: false,
+                    authInstance: null,
+                    pages: [],
+                    currentPage: null,
+                    isEditing: false,
+                    title: '',
+                    content: '',
+                    statusMessage: '',
+                    newPageTitle: '',
+                    loading: false,
+                    initialized: false
+                };
                 
                 this.init();
             }
-
+            
             async init() {
                 try {
-                    await this.initGoogleAuth();
-                    this.render();
+                    if (CONFIG.DEMO_MODE) {
+                        // デモモード：ローカルストレージを使用
+                        this.initLocalStorage();
+                        this.setState({ 
+                            isAuthenticated: true, 
+                            initialized: true 
+                        });
+                        await this.loadPages();
+                    } else {
+                        // 本番モード：Google認証を使用
+                        await this.initGoogleAuth();
+                        this.setState({ initialized: true });
+                    }
                 } catch (error) {
                     console.error('初期化エラー:', error);
-                    this.showError('初期化に失敗しました');
+                    this.setState({ 
+                        statusMessage: '初期化に失敗しました。設定を確認してください。',
+                        initialized: true 
+                    });
+                }
+                
+                this.render();
+            }
+            
+            initLocalStorage() {
+                const storageKey = 'notion-wiki-pages';
+                if (!localStorage.getItem(storageKey)) {
+                    const defaultPages = [
+                        {
+                            id: '1',
+                            title: 'はじめに',
+                            content: `このWikiへようこそ！
+
+## 現在の状態
+このアプリはデモモードで動作しています。Google Apps Scriptとの統合を行うには、以下の設定が必要です。
+
+## Google Apps Script統合の設定手順
+
+### 1. Google Apps Scriptの準備
+- 提供されたApps Scriptコードをデプロイ
+- スプレッドシートIDを設定
+- Webアプリとして公開
+
+### 2. Google Cloud Consoleの設定
+- OAuth 2.0クライアントIDを作成
+- 承認済みJavaScriptオリジンを追加
+- 必要なAPIを有効化
+
+### 3. このアプリの設定
+- CONFIG.APPS_SCRIPT_URLを更新
+- CONFIG.CLIENT_IDを更新  
+- CONFIG.DEMO_MODEをfalseに変更
+
+## 現在利用可能な機能
+- ✅ ページの作成・編集・削除
+- ✅ リアルタイムプレビュー
+- ✅ レスポンシブデザイン
+- ✅ ローカルストレージでの保存
+
+## 統合後に利用可能になる機能
+- 🔄 Google Sheetsでのデータ永続化
+- 🔄 マルチユーザー対応
+- 🔄 GitHub Actions自動同期`,
+                            updatedAt: new Date().toISOString()
+                        }
+                    ];
+                    localStorage.setItem(storageKey, JSON.stringify(defaultPages));
                 }
             }
-
+            
             async initGoogleAuth() {
-                return new Promise((resolve) => {
-                    gapi.load('auth2', async () => {
-                        try {
-                            this.authInstance = await gapi.auth2.init({
-                                client_id: CONFIG.CLIENT_ID
-                            });
-                            
-                            this.isAuthenticated = this.authInstance.isSignedIn.get();
+                return new Promise((resolve, reject) => {
+                    gapi.load('auth2', () => {
+                        gapi.auth2.init({
+                            client_id: CONFIG.CLIENT_ID
+                        }).then((authInstance) => {
+                            this.setState({ authInstance });
+                            this.setState({ isAuthenticated: authInstance.isSignedIn.get() });
                             
                             // サインイン状態の変更を監視
-                            this.authInstance.isSignedIn.listen((isSignedIn) => {
-                                this.isAuthenticated = isSignedIn;
+                            authInstance.isSignedIn.listen((isSignedIn) => {
+                                this.setState({ isAuthenticated: isSignedIn });
                                 if (isSignedIn) {
                                     this.loadPages();
                                 }
-                                this.render();
                             });
-
-                            if (this.isAuthenticated) {
-                                this.loadPages();
-                            }
                             
-                            resolve();
-                        } catch (error) {
-                            console.error('Google Auth初期化エラー:', error);
-                            resolve();
-                        }
+                            resolve(authInstance);
+                        }).catch(reject);
                     });
                 });
             }
-
+            
+            setState(newState) {
+                this.state = { ...this.state, ...newState };
+                if (this.state.initialized) {
+                    this.render();
+                }
+            }
+            
+            async loadPages() {
+                this.setState({ loading: true });
+                
+                try {
+                    let pages;
+                    if (CONFIG.DEMO_MODE) {
+                        const storageKey = 'notion-wiki-pages';
+                        pages = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                        pages.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                    } else {
+                        const result = await this.apiCall('getPages');
+                        pages = result.pages || [];
+                    }
+                    
+                    this.setState({ pages, loading: false });
+                } catch (error) {
+                    console.error('ページ読み込みエラー:', error);
+                    this.setState({ 
+                        statusMessage: 'ページの読み込みに失敗しました',
+                        loading: false 
+                    });
+                }
+            }
+            
+            async loadPage(pageId) {
+                this.setState({ loading: true });
+                
+                try {
+                    let page;
+                    if (CONFIG.DEMO_MODE) {
+                        const pages = JSON.parse(localStorage.getItem('notion-wiki-pages') || '[]');
+                        page = pages.find(p => p.id === pageId);
+                    } else {
+                        const result = await this.apiCall('getPage', 'GET', { id: pageId });
+                        page = result.page;
+                    }
+                    
+                    if (page) {
+                        this.setState({
+                            currentPage: page,
+                            title: page.title || '',
+                            content: page.content || '',
+                            isEditing: false,
+                            loading: false
+                        });
+                    }
+                } catch (error) {
+                    console.error('ページ読み込みエラー:', error);
+                    this.setState({ 
+                        statusMessage: 'ページの読み込みに失敗しました',
+                        loading: false 
+                    });
+                }
+            }
+            
+            async savePage() {
+                const { title, content, currentPage } = this.state;
+                this.setState({ loading: true });
+                
+                try {
+                    const pageData = {
+                        id: currentPage?.id || Date.now().toString(),
+                        title: title.trim() || '無題',
+                        content: content
+                    };
+                    
+                    if (CONFIG.DEMO_MODE) {
+                        const pages = JSON.parse(localStorage.getItem('notion-wiki-pages') || '[]');
+                        const existingIndex = pages.findIndex(p => p.id === pageData.id);
+                        
+                        const updatedPage = {
+                            ...pageData,
+                            updatedAt: new Date().toISOString()
+                        };
+                        
+                        if (existingIndex >= 0) {
+                            pages[existingIndex] = updatedPage;
+                        } else {
+                            pages.push(updatedPage);
+                        }
+                        
+                        localStorage.setItem('notion-wiki-pages', JSON.stringify(pages));
+                        
+                        this.setState({
+                            currentPage: updatedPage,
+                            isEditing: false,
+                            statusMessage: '保存しました',
+                            loading: false
+                        });
+                    } else {
+                        const result = await this.apiCall('savePage', 'POST', pageData);
+                        
+                        if (result.success) {
+                            this.setState({
+                                statusMessage: '保存しました',
+                                isEditing: false,
+                                loading: false
+                            });
+                            
+                            if (!currentPage) {
+                                this.setState({ currentPage: pageData });
+                            }
+                        }
+                    }
+                    
+                    await this.loadPages();
+                    
+                    setTimeout(() => {
+                        this.setState({ statusMessage: '' });
+                    }, 2000);
+                    
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                    this.setState({ 
+                        statusMessage: '保存に失敗しました',
+                        loading: false 
+                    });
+                }
+            }
+            
+            createNewPage() {
+                const { newPageTitle } = this.state;
+                if (!newPageTitle.trim()) return;
+                
+                this.setState({
+                    currentPage: null,
+                    title: newPageTitle,
+                    content: '',
+                    isEditing: true,
+                    newPageTitle: ''
+                });
+            }
+            
             async apiCall(endpoint, method = 'GET', data = null) {
-                if (!this.authInstance || !this.authInstance.isSignedIn.get()) {
+                if (CONFIG.DEMO_MODE) {
+                    throw new Error('デモモードではAPIコールは利用できません');
+                }
+                
+                const { authInstance } = this.state;
+                if (!authInstance || !authInstance.isSignedIn.get()) {
                     throw new Error('ログインが必要です');
                 }
 
-                const token = this.authInstance.currentUser.get().getAuthResponse().access_token;
+                const token = authInstance.currentUser.get().getAuthResponse().access_token;
                 
                 const url = new URL(CONFIG.APPS_SCRIPT_URL);
                 url.searchParams.set('action', endpoint);
@@ -317,284 +619,325 @@
                 }
                 return response.json();
             }
-
-            async loadPages() {
-                try {
-                    const result = await this.apiCall('getPages');
-                    this.pages = result.pages || [];
-                    this.render();
-                } catch (error) {
-                    console.error('ページ読み込みエラー:', error);
-                    this.showError('ページの読み込みに失敗しました');
-                }
-            }
-
-            async loadPage(pageId) {
-                try {
-                    const result = await this.apiCall('getPage', 'GET', { id: pageId });
-                    this.currentPage = result.page;
-                    this.title = result.page.title || '';
-                    this.content = result.page.content || '';
-                    this.isEditing = false;
-                    this.render();
-                } catch (error) {
-                    console.error('ページ読み込みエラー:', error);
-                    this.showError('ページの読み込みに失敗しました');
-                }
-            }
-
-            async savePage() {
-                try {
-                    const pageData = {
-                        id: this.currentPage?.id || Date.now().toString(),
-                        title: this.title,
-                        content: this.content
-                    };
-
-                    const result = await this.apiCall('savePage', 'POST', pageData);
-                    
-                    if (result.success) {
-                        this.showSuccess('保存しました');
-                        
-                        await this.loadPages();
-                        
-                        if (!this.currentPage) {
-                            this.currentPage = pageData;
-                        }
-                        
-                        this.isEditing = false;
-                        this.render();
-                    }
-                } catch (error) {
-                    console.error('保存エラー:', error);
-                    this.showError('保存に失敗しました');
-                }
-            }
-
-            createNewPage() {
-                if (!this.newPageTitle.trim()) return;
-                
-                this.currentPage = null;
-                this.title = this.newPageTitle;
-                this.content = '';
-                this.isEditing = true;
-                this.newPageTitle = '';
-                this.render();
-            }
-
+            
             signIn() {
-                if (this.authInstance) {
-                    this.authInstance.signIn();
+                if (this.state.authInstance) {
+                    this.state.authInstance.signIn();
                 }
             }
-
+            
             signOut() {
-                if (this.authInstance) {
-                    this.authInstance.signOut();
+                if (this.state.authInstance) {
+                    this.state.authInstance.signOut();
                 }
             }
-
-            showSuccess(message) {
-                this.statusMessage = message;
-                this.render();
-                setTimeout(() => {
-                    this.statusMessage = '';
-                    this.render();
-                }, 3000);
-            }
-
-            showError(message) {
-                this.statusMessage = `エラー: ${message}`;
-                this.render();
-                setTimeout(() => {
-                    this.statusMessage = '';
-                    this.render();
-                }, 3000);
-            }
-
+            
             render() {
-                const root = document.getElementById('root');
+                const app = document.getElementById('root');
                 
-                if (!this.isAuthenticated) {
-                    root.innerHTML = `
-                        <div class="app-container">
-                            <div class="login-container">
-                                <h1>Notion風Wiki</h1>
-                                <p>編集するにはGoogleアカウントでログインしてください</p>
-                                <button class="btn btn-primary" id="signin-btn">
-                                    Googleでログイン
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    document.getElementById('signin-btn').onclick = () => this.signIn();
+                if (!this.state.initialized) {
+                    return; // 初期化中は何もしない
+                }
+                
+                if (!CONFIG.DEMO_MODE && !this.state.isAuthenticated) {
+                    app.innerHTML = this.renderLoginScreen();
+                    this.attachLoginListeners();
                     return;
                 }
-
-                root.innerHTML = `
+                
+                app.innerHTML = `
                     <div class="app-container">
-                        <!-- サイドバー -->
-                        <div class="sidebar">
-                            <div class="sidebar-header">
-                                <div class="sidebar-title">ページ一覧</div>
-                            </div>
-                            
-                            <ul class="page-list">
-                                ${this.pages.map(page => `
-                                    <li class="page-item ${this.currentPage?.id === page.id ? 'active' : ''}" 
-                                        data-page-id="${page.id}">
-                                        ${this.escapeHtml(page.title || '無題')}
-                                    </li>
-                                `).join('')}
-                            </ul>
-                            
-                            <div class="new-page-form">
-                                <input
-                                    type="text"
-                                    class="new-page-input"
-                                    placeholder="新しいページタイトル"
-                                    id="new-page-input"
-                                />
-                                <button class="btn btn-primary" id="add-page-btn">
-                                    追加
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- メインコンテンツ -->
-                        <div class="main-content">
-                            <!-- ヘッダー -->
-                            <div class="header">
-                                <div class="header-title">
-                                    ${this.currentPage ? (this.isEditing ? '編集中' : this.escapeHtml(this.currentPage.title || '無題')) : '新規ページ'}
-                                </div>
-                                <div class="header-actions">
-                                    ${this.currentPage && !this.isEditing ? 
-                                        '<button class="btn" id="edit-btn">編集</button>' : ''}
-                                    ${this.isEditing ? `
-                                        <button class="btn" id="cancel-btn">キャンセル</button>
-                                        <button class="btn btn-primary" id="save-btn">保存</button>
-                                    ` : ''}
-                                    <button class="btn" id="signout-btn">ログアウト</button>
-                                </div>
-                            </div>
-
-                            <!-- ステータスメッセージ -->
-                            ${this.statusMessage ? `
-                                <div class="status-message ${this.statusMessage.includes('エラー') ? 'status-error' : 'status-success'}">
-                                    ${this.escapeHtml(this.statusMessage)}
+                        ${this.renderSidebar()}
+                        ${this.renderMainContent()}
+                    </div>
+                `;
+                
+                this.attachEventListeners();
+            }
+            
+            renderLoginScreen() {
+                const configIssue = CONFIG.APPS_SCRIPT_URL.includes('YOUR_') || CONFIG.CLIENT_ID.includes('YOUR_');
+                
+                return `
+                    <div class="app-container">
+                        <div class="login-container">
+                            ${configIssue ? `
+                                <div class="config-notice">
+                                    <strong>設定が必要です</strong>
+                                    CONFIG.APPS_SCRIPT_URLとCONFIG.CLIENT_IDを正しい値に更新してください。
+                                    デモモードで試す場合は、CONFIG.DEMO_MODEをtrueに設定してください。
                                 </div>
                             ` : ''}
-
-                            <!-- エディター/ビューアー -->
-                            <div class="editor-container">
-                                <div class="editor">
-                                    ${this.isEditing ? `
-                                        <input
-                                            type="text"
-                                            class="page-title"
-                                            placeholder="無題"
-                                            id="title-input"
-                                            value="${this.escapeHtml(this.title)}"
-                                        />
-                                        <textarea
-                                            class="editor-content"
-                                            placeholder="何か書いてみましょう..."
-                                            id="content-textarea"
-                                        >${this.escapeHtml(this.content)}</textarea>
-                                    ` : this.currentPage ? `
-                                        <h1 class="page-title">${this.escapeHtml(this.currentPage.title || '無題')}</h1>
-                                        <div class="viewer-content">${this.escapeHtml(this.currentPage.content || 'コンテンツがありません')}</div>
-                                    ` : `
-                                        <div class="viewer-content">ページを選択するか、新しいページを作成してください。</div>
-                                    `}
-                                </div>
-                            </div>
+                            <h1>Notion風Wiki</h1>
+                            <p>このWikiを編集するにはGoogleアカウントでログインしてください。</p>
+                            <button class="btn btn-primary" id="sign-in-btn" ${configIssue ? 'disabled' : ''}>
+                                Googleでログイン
+                            </button>
                         </div>
                     </div>
                 `;
-
-                // イベントリスナーを設定
-                this.setupEventListeners();
             }
-
-            setupEventListeners() {
+            
+            renderSidebar() {
+                const { pages, currentPage, newPageTitle } = this.state;
+                
+                return `
+                    <div class="sidebar">
+                        <div class="sidebar-header">
+                            <div class="sidebar-title">ページ一覧</div>
+                            ${CONFIG.DEMO_MODE ? '<small style="color: #9b9a97;">(デモモード)</small>' : ''}
+                        </div>
+                        
+                        <ul class="page-list">
+                            ${pages.map(page => `
+                                <li class="page-item ${currentPage?.id === page.id ? 'active' : ''}"
+                                    data-page-id="${page.id}">
+                                    <span class="page-item-title">${this.escapeHtml(page.title || '無題')}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                        
+                        <div class="new-page-form">
+                            <input
+                                type="text"
+                                class="new-page-input"
+                                placeholder="新しいページタイトル"
+                                value="${this.escapeHtml(newPageTitle)}"
+                                id="new-page-input"
+                            />
+                            <button class="btn btn-primary" id="create-page-btn">追加</button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderMainContent() {
+                const { statusMessage } = this.state;
+                
+                return `
+                    <div class="main-content">
+                        ${this.renderHeader()}
+                        ${statusMessage ? this.renderStatusMessage() : ''}
+                        ${this.renderEditor()}
+                    </div>
+                `;
+            }
+            
+            renderHeader() {
+                const { currentPage, isEditing, loading } = this.state;
+                
+                let headerTitle = '新規ページ';
+                if (currentPage) {
+                    headerTitle = isEditing ? '編集中' : (currentPage.title || '無題');
+                }
+                
+                return `
+                    <div class="header">
+                        <div class="header-title">
+                            ${loading ? '<span class="loading-spinner" style="margin-right: 10px;"></span>' : ''}
+                            ${this.escapeHtml(headerTitle)}
+                        </div>
+                        <div class="header-actions">
+                            ${currentPage && !isEditing ? `
+                                <button class="btn" id="edit-btn" ${loading ? 'disabled' : ''}>編集</button>
+                            ` : ''}
+                            ${isEditing ? `
+                                <button class="btn" id="cancel-btn" ${loading ? 'disabled' : ''}>キャンセル</button>
+                                <button class="btn btn-primary" id="save-btn" ${loading ? 'disabled' : ''}>
+                                    ${loading ? '<span class="loading-spinner" style="margin-right: 5px;"></span>' : ''}
+                                    保存
+                                </button>
+                            ` : ''}
+                            ${!CONFIG.DEMO_MODE ? `
+                                <button class="btn" id="sign-out-btn">ログアウト</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderStatusMessage() {
+                const { statusMessage, loading } = this.state;
+                let className = 'status-success';
+                
+                if (statusMessage.includes('失敗') || statusMessage.includes('エラー')) {
+                    className = 'status-error';
+                } else if (loading) {
+                    className = 'status-loading';
+                }
+                
+                return `
+                    <div class="status-message ${className}">
+                        ${this.escapeHtml(statusMessage)}
+                    </div>
+                `;
+            }
+            
+            renderEditor() {
+                const { currentPage, isEditing, title, content } = this.state;
+                
+                if (isEditing) {
+                    return `
+                        <div class="editor-container">
+                            <div class="editor">
+                                <input
+                                    type="text"
+                                    class="page-title"
+                                    placeholder="無題"
+                                    value="${this.escapeHtml(title)}"
+                                    id="title-input"
+                                />
+                                <textarea
+                                    class="editor-content"
+                                    placeholder="何か書いてみましょう..."
+                                    id="content-input"
+                                >${this.escapeHtml(content)}</textarea>
+                            </div>
+                        </div>
+                    `;
+                } else if (currentPage) {
+                    return `
+                        <div class="editor-container">
+                            <div class="editor">
+                                <h1 class="page-title">${this.escapeHtml(currentPage.title || '無題')}</h1>
+                                <div class="viewer-content">${this.escapeHtml(currentPage.content || 'コンテンツがありません')}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="welcome-screen">
+                            <h2>Notion風Wikiへようこそ</h2>
+                            <p>左のサイドバーからページを選択するか、新しいページを作成してください。</p>
+                            ${CONFIG.DEMO_MODE ? '<p><em>現在デモモードで動作しています。</em></p>' : ''}
+                        </div>
+                    `;
+                }
+            }
+            
+            attachLoginListeners() {
+                const signInBtn = document.getElementById('sign-in-btn');
+                if (signInBtn && !signInBtn.disabled) {
+                    signInBtn.addEventListener('click', () => this.signIn());
+                }
+            }
+            
+            attachEventListeners() {
                 // ページリストのクリック
                 document.querySelectorAll('.page-item').forEach(item => {
-                    item.onclick = () => {
-                        const pageId = item.getAttribute('data-page-id');
+                    item.addEventListener('click', () => {
+                        const pageId = item.dataset.pageId;
                         this.loadPage(pageId);
-                    };
+                    });
                 });
-
+                
                 // 新規ページ作成
                 const newPageInput = document.getElementById('new-page-input');
-                const addPageBtn = document.getElementById('add-page-btn');
+                const createBtn = document.getElementById('create-page-btn');
                 
-                if (newPageInput && addPageBtn) {
-                    newPageInput.onkeypress = (e) => {
-                        if (e.key === 'Enter') {
-                            this.newPageTitle = newPageInput.value;
+                if (newPageInput) {
+                    newPageInput.addEventListener('input', (e) => {
+                        this.setState({ newPageTitle: e.target.value });
+                    });
+                    
+                    newPageInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter' && !this.state.loading) {
                             this.createNewPage();
                         }
-                    };
-                    
-                    addPageBtn.onclick = () => {
-                        this.newPageTitle = newPageInput.value;
-                        this.createNewPage();
-                    };
+                    });
                 }
-
-                // ヘッダーボタン
-                const editBtn = document.getElementById('edit-btn');
-                const cancelBtn = document.getElementById('cancel-btn');
-                const saveBtn = document.getElementById('save-btn');
-                const signoutBtn = document.getElementById('signout-btn');
-
-                if (editBtn) editBtn.onclick = () => {
-                    this.isEditing = true;
-                    this.render();
-                };
-
-                if (cancelBtn) cancelBtn.onclick = () => {
-                    this.isEditing = false;
-                    this.title = this.currentPage?.title || '';
-                    this.content = this.currentPage?.content || '';
-                    this.render();
-                };
-
-                if (saveBtn) saveBtn.onclick = () => this.savePage();
-                if (signoutBtn) signoutBtn.onclick = () => this.signOut();
-
-                // エディター要素
+                
+                if (createBtn) {
+                    createBtn.addEventListener('click', () => {
+                        if (!this.state.loading) {
+                            this.createNewPage();
+                        }
+                    });
+                }
+                
+                // エディター関連
                 const titleInput = document.getElementById('title-input');
-                const contentTextarea = document.getElementById('content-textarea');
-
+                const contentInput = document.getElementById('content-input');
+                const editBtn = document.getElementById('edit-btn');
+                const saveBtn = document.getElementById('save-btn');
+                const cancelBtn = document.getElementById('cancel-btn');
+                const signOutBtn = document.getElementById('sign-out-btn');
+                
                 if (titleInput) {
-                    titleInput.oninput = (e) => {
-                        this.title = e.target.value;
-                    };
+                    titleInput.addEventListener('input', (e) => {
+                        this.setState({ title: e.target.value });
+                    });
                 }
-
-                if (contentTextarea) {
-                    contentTextarea.oninput = (e) => {
-                        this.content = e.target.value;
-                    };
+                
+                if (contentInput) {
+                    contentInput.addEventListener('input', (e) => {
+                        this.setState({ content: e.target.value });
+                    });
                 }
+                
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => {
+                        if (!this.state.loading) {
+                            this.setState({ isEditing: true });
+                        }
+                    });
+                }
+                
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', () => {
+                        if (!this.state.loading) {
+                            this.savePage();
+                        }
+                    });
+                }
+                
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => {
+                        if (!this.state.loading) {
+                            const { currentPage } = this.state;
+                            if (currentPage) {
+                                this.setState({
+                                    isEditing: false,
+                                    title: currentPage.title || '',
+                                    content: currentPage.content || ''
+                                });
+                            } else {
+                                this.setState({
+                                    isEditing: false,
+                                    title: '',
+                                    content: '',
+                                    currentPage: null
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                if (signOutBtn) {
+                    signOutBtn.addEventListener('click', () => this.signOut());
+                }
+                
+                // キーボードショートカット
+                document.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                        e.preventDefault();
+                        if (this.state.isEditing && !this.state.loading) {
+                            this.savePage();
+                        }
+                    }
+                });
             }
-
+            
             escapeHtml(text) {
+                if (!text) return '';
                 const div = document.createElement('div');
                 div.textContent = text;
                 return div.innerHTML;
             }
         }
 
-        // アプリケーションを起動
-        document.addEventListener('DOMContentLoaded', () => {
-            new WikiApp();
-        });
+        // アプリの初期化
+        new WikiApp();
     </script>
 </body>
 </html>
