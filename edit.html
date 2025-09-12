@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notion風Wiki</title>
-    <script src="https://apis.google.com/js/api.js"></script>
+    <!-- 新しいGoogle Identity Services API -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         * {
             margin: 0;
@@ -283,11 +284,35 @@
             margin-bottom: 20px;
             border-radius: 6px;
             border: 1px solid #ffeaa7;
+            max-width: 600px;
         }
         
         .config-notice strong {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .config-notice code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .user-info img {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
         }
         
         @media (max-width: 768px) {
@@ -309,6 +334,10 @@
             .page-title {
                 font-size: 32px;
             }
+            
+            .user-info {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -319,8 +348,12 @@
             <span>初期化中...</span>
         </div>
     </div>
+    
+    <!-- Google Sign-In button container -->
+    <div id="g_id_signin" style="display: none;"></div>
 
     <script>
+        // 設定 - 実際の使用時は自分の値に変更してください
         const CONFIG = {
             APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxzq-iDY4y5wyFV2bvaReNJ1N4fv_0xcqPn4zNYBdwUGI5QR8HKc0TcxA11thIgJL4z8g/exec',
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com',
@@ -332,7 +365,8 @@
             constructor() {
                 this.state = {
                     isAuthenticated: false,
-                    authInstance: null,
+                    accessToken: null,
+                    userInfo: null,
                     pages: [],
                     currentPage: null,
                     isEditing: false,
@@ -365,7 +399,7 @@
                 } catch (error) {
                     console.error('初期化エラー:', error);
                     this.setState({ 
-                        statusMessage: '初期化に失敗しました。設定を確認してください。',
+                        statusMessage: 'アプリケーションの初期化に失敗しました。設定を確認してください。',
                         initialized: true 
                     });
                 }
@@ -379,39 +413,98 @@
                     const defaultPages = [
                         {
                             id: '1',
-                            title: 'はじめに',
-                            content: `このWikiへようこそ！
+                            title: 'はじめに - Google Apps Script統合ガイド',
+                            content: `# Notion風Wiki - Google Apps Script統合ガイド
 
-## 現在の状態
-このアプリはデモモードで動作しています。Google Apps Scriptとの統合を行うには、以下の設定が必要です。
+このWikiアプリケーションをGoogle Apps Scriptと統合するための完全なセットアップガイドです。
 
-## Google Apps Script統合の設定手順
+## 🚀 現在の状態
+- ✅ **デモモード**: ローカルストレージで動作中
+- 🔄 **統合準備完了**: Apps Scriptとの連携可能
+
+## 📋 統合手順
 
 ### 1. Google Apps Scriptの準備
-- 提供されたApps Scriptコードをデプロイ
-- スプレッドシートIDを設定
-- Webアプリとして公開
 
-### 2. Google Cloud Consoleの設定
-- OAuth 2.0クライアントIDを作成
-- 承認済みJavaScriptオリジンを追加
-- 必要なAPIを有効化
+#### 1-1. 新しいプロジェクトを作成
+1. [Google Apps Script](https://script.google.com/) にアクセス
+2. 「新しいプロジェクト」をクリック
+3. プロジェクト名を「Notion風Wiki API」に変更
 
-### 3. このアプリの設定
-- CONFIG.APPS_SCRIPT_URLを更新
-- CONFIG.CLIENT_IDを更新  
-- CONFIG.DEMO_MODEをfalseに変更
+#### 1-2. 提供されたコードをコピー
+提供された Apps Script コードをそのまま貼り付けてください：
+- doGet関数
+- doPost関数 
+- getOrCreateSpreadsheet関数
+- その他すべての関数
 
-## 現在利用可能な機能
-- ✅ ページの作成・編集・削除
-- ✅ リアルタイムプレビュー
-- ✅ レスポンシブデザイン
-- ✅ ローカルストレージでの保存
+#### 1-3. スプレッドシートIDを設定
+\`\`\`javascript
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
+\`\`\`
 
-## 統合後に利用可能になる機能
-- 🔄 Google Sheetsでのデータ永続化
-- 🔄 マルチユーザー対応
-- 🔄 GitHub Actions自動同期`,
+### 2. Google Cloudコンソールの設定
+
+#### 2-1. プロジェクトの作成
+1. [Google Cloud Console](https://console.cloud.google.com/) にアクセス
+2. 新しいプロジェクトを作成
+3. プロジェクト名: 「Notion Wiki」
+
+#### 2-2. APIの有効化
+以下のAPIを有効化してください：
+- Google Sheets API
+- Google Drive API
+
+#### 2-3. OAuth2.0クライアントID作成
+1. 「認証情報」→「認証情報を作成」→「OAuth クライアントID」
+2. アプリケーションの種類: 「ウェブアプリケーション」
+3. 承認済みJavaScriptオリジン: 
+   - \`http://localhost:8000\` (開発用)
+   - \`https://yourusername.github.io\` (本番用)
+4. 生成されたクライアントIDをメモ
+
+### 3. Apps Scriptデプロイ
+
+#### 3-1. Webアプリとして公開
+1. 「デプロイ」→「新しいデプロイ」
+2. 種類: 「ウェブアプリ」
+3. 実行ユーザー: 「自分」
+4. アクセスできるユーザー: 「すべてのユーザー」
+5. 「デプロイ」をクリック
+6. 生成されたURLをメモ
+
+### 4. このアプリの設定
+
+\`\`\`javascript
+const CONFIG = {
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
+    CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID',
+    DEMO_MODE: false  // 本番モードに変更
+};
+\`\`\`
+
+## 🔧 トラブルシューティング
+
+### よくある問題
+1. **CORS エラー**: Apps Scriptの「すべてのユーザー」設定を確認
+2. **認証エラー**: クライアントIDとオリジンURLを確認
+3. **スプレッドシートエラー**: IDが正しいか確認
+
+### テスト方法
+1. Apps ScriptでtestAPI()関数を実行
+2. ブラウザでネットワークタブを確認
+3. コンソールエラーをチェック
+
+## 📈 今後の機能拡張
+
+統合完了後、以下の機能を追加予定：
+- 🔍 全文検索
+- 🏷️ タグ機能
+- 📝 Markdownレンダリング
+- 📊 編集履歴
+- 👥 マルチユーザー編集権限
+
+統合に関する質問があれば、GitHubのIssuesでお気軽にお聞きください！`,
                             updatedAt: new Date().toISOString()
                         }
                     ];
@@ -420,26 +513,61 @@
             }
             
             async initGoogleAuth() {
-                return new Promise((resolve, reject) => {
-                    gapi.load('auth2', () => {
-                        gapi.auth2.init({
-                            client_id: CONFIG.CLIENT_ID
-                        }).then((authInstance) => {
-                            this.setState({ authInstance });
-                            this.setState({ isAuthenticated: authInstance.isSignedIn.get() });
-                            
-                            // サインイン状態の変更を監視
-                            authInstance.isSignedIn.listen((isSignedIn) => {
-                                this.setState({ isAuthenticated: isSignedIn });
-                                if (isSignedIn) {
-                                    this.loadPages();
-                                }
-                            });
-                            
-                            resolve(authInstance);
-                        }).catch(reject);
+                return new Promise((resolve) => {
+                    // Google Identity Services の初期化
+                    window.google.accounts.id.initialize({
+                        client_id: CONFIG.CLIENT_ID,
+                        callback: (response) => {
+                            this.handleCredentialResponse(response);
+                        }
                     });
+
+                    // OAuth2 の初期化
+                    this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+                        client_id: CONFIG.CLIENT_ID,
+                        scope: 'https://www.googleapis.com/auth/spreadsheets',
+                        callback: (tokenResponse) => {
+                            this.handleTokenResponse(tokenResponse);
+                        }
+                    });
+
+                    resolve();
                 });
+            }
+            
+            handleCredentialResponse(response) {
+                // JWTトークンからユーザー情報を取得
+                const credential = this.parseJwt(response.credential);
+                
+                this.setState({
+                    userInfo: {
+                        name: credential.name,
+                        email: credential.email,
+                        picture: credential.picture
+                    }
+                });
+                
+                // アクセストークンをリクエスト
+                this.tokenClient.requestAccessToken();
+            }
+            
+            handleTokenResponse(tokenResponse) {
+                if (tokenResponse.access_token) {
+                    this.setState({
+                        isAuthenticated: true,
+                        accessToken: tokenResponse.access_token
+                    });
+                    this.loadPages();
+                }
+            }
+            
+            parseJwt(token) {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
             }
             
             setState(newState) {
@@ -450,7 +578,7 @@
             }
             
             async loadPages() {
-                this.setState({ loading: true });
+                this.setState({ loading: true, statusMessage: 'ページを読み込み中...' });
                 
                 try {
                     let pages;
@@ -463,11 +591,21 @@
                         pages = result.pages || [];
                     }
                     
-                    this.setState({ pages, loading: false });
+                    this.setState({ 
+                        pages, 
+                        loading: false,
+                        statusMessage: pages.length > 0 ? `${pages.length}個のページを読み込みました` : 'ページがありません'
+                    });
+                    
+                    // ステータスメッセージを3秒後に消去
+                    setTimeout(() => {
+                        this.setState({ statusMessage: '' });
+                    }, 3000);
+                    
                 } catch (error) {
                     console.error('ページ読み込みエラー:', error);
                     this.setState({ 
-                        statusMessage: 'ページの読み込みに失敗しました',
+                        statusMessage: 'ページの読み込みに失敗しました: ' + error.message,
                         loading: false 
                     });
                 }
@@ -494,11 +632,16 @@
                             isEditing: false,
                             loading: false
                         });
+                    } else {
+                        this.setState({
+                            statusMessage: 'ページが見つかりませんでした',
+                            loading: false
+                        });
                     }
                 } catch (error) {
                     console.error('ページ読み込みエラー:', error);
                     this.setState({ 
-                        statusMessage: 'ページの読み込みに失敗しました',
+                        statusMessage: 'ページの読み込みに失敗しました: ' + error.message,
                         loading: false 
                     });
                 }
@@ -506,7 +649,7 @@
             
             async savePage() {
                 const { title, content, currentPage } = this.state;
-                this.setState({ loading: true });
+                this.setState({ loading: true, statusMessage: '保存中...' });
                 
                 try {
                     const pageData = {
@@ -556,14 +699,10 @@
                     
                     await this.loadPages();
                     
-                    setTimeout(() => {
-                        this.setState({ statusMessage: '' });
-                    }, 2000);
-                    
                 } catch (error) {
                     console.error('保存エラー:', error);
                     this.setState({ 
-                        statusMessage: '保存に失敗しました',
+                        statusMessage: '保存に失敗しました: ' + error.message,
                         loading: false 
                     });
                 }
@@ -587,20 +726,17 @@
                     throw new Error('デモモードではAPIコールは利用できません');
                 }
                 
-                const { authInstance } = this.state;
-                if (!authInstance || !authInstance.isSignedIn.get()) {
-                    throw new Error('ログインが必要です');
+                if (!this.state.accessToken) {
+                    throw new Error('アクセストークンがありません。再ログインしてください。');
                 }
 
-                const token = authInstance.currentUser.get().getAuthResponse().access_token;
-                
                 const url = new URL(CONFIG.APPS_SCRIPT_URL);
                 url.searchParams.set('action', endpoint);
                 
                 const options = {
                     method,
                     headers: {
-                        'Authorization': `Bearer ${token}`,
+                        'Authorization': `Bearer ${this.state.accessToken}`,
                         'Content-Type': 'application/json'
                     }
                 };
@@ -614,21 +750,37 @@
                 }
 
                 const response = await fetch(url.toString(), options);
+                
                 if (!response.ok) {
-                    throw new Error(`API エラー: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`API エラー (${response.status}): ${errorText}`);
                 }
+                
                 return response.json();
             }
             
             signIn() {
-                if (this.state.authInstance) {
-                    this.state.authInstance.signIn();
+                if (!CONFIG.DEMO_MODE) {
+                    window.google.accounts.id.prompt();
                 }
             }
             
             signOut() {
-                if (this.state.authInstance) {
-                    this.state.authInstance.signOut();
+                if (!CONFIG.DEMO_MODE && this.state.accessToken) {
+                    window.google.accounts.id.disableAutoSelect();
+                    
+                    // アクセストークンを取り消し
+                    window.google.accounts.oauth2.revoke(this.state.accessToken, () => {
+                        this.setState({
+                            isAuthenticated: false,
+                            accessToken: null,
+                            userInfo: null,
+                            pages: [],
+                            currentPage: null,
+                            title: '',
+                            content: ''
+                        });
+                    });
                 }
             }
             
@@ -663,15 +815,23 @@
                         <div class="login-container">
                             ${configIssue ? `
                                 <div class="config-notice">
-                                    <strong>設定が必要です</strong>
-                                    CONFIG.APPS_SCRIPT_URLとCONFIG.CLIENT_IDを正しい値に更新してください。
-                                    デモモードで試す場合は、CONFIG.DEMO_MODEをtrueに設定してください。
+                                    <strong>🔧 設定が必要です</strong>
+                                    <p>本番モードで使用するには、以下の設定を更新してください：</p>
+                                    <ul style="text-align: left; margin-top: 10px;">
+                                        <li><code>CONFIG.APPS_SCRIPT_URL</code> - Apps ScriptのデプロイURL</li>
+                                        <li><code>CONFIG.CLIENT_ID</code> - Google OAuth2.0クライアントID</li>
+                                        <li><code>CONFIG.DEMO_MODE</code> - falseに変更</li>
+                                    </ul>
+                                    <p style="margin-top: 10px;">
+                                        <strong>デモを試したい場合：</strong><br>
+                                        <code>CONFIG.DEMO_MODE = true</code> に設定してページを再読み込みしてください。
+                                    </p>
                                 </div>
                             ` : ''}
-                            <h1>Notion風Wiki</h1>
-                            <p>このWikiを編集するにはGoogleアカウントでログインしてください。</p>
+                            <h1>🚀 Notion風Wiki</h1>
+                            <p>Google Apps Scriptと統合されたWikiアプリケーションです。<br>編集にはGoogleアカウントでのログインが必要です。</p>
                             <button class="btn btn-primary" id="sign-in-btn" ${configIssue ? 'disabled' : ''}>
-                                Googleでログイン
+                                📝 Googleでログイン
                             </button>
                         </div>
                     </div>
@@ -684,8 +844,8 @@
                 return `
                     <div class="sidebar">
                         <div class="sidebar-header">
-                            <div class="sidebar-title">ページ一覧</div>
-                            ${CONFIG.DEMO_MODE ? '<small style="color: #9b9a97;">(デモモード)</small>' : ''}
+                            <div class="sidebar-title">📚 ページ一覧</div>
+                            ${CONFIG.DEMO_MODE ? '<small style="color: #9b9a97;">🧪 デモモード</small>' : '<small style="color: #9b9a97;">🔗 Apps Script連携</small>'}
                         </div>
                         
                         <ul class="page-list">
@@ -724,11 +884,11 @@
             }
             
             renderHeader() {
-                const { currentPage, isEditing, loading } = this.state;
+                const { currentPage, isEditing, loading, userInfo } = this.state;
                 
-                let headerTitle = '新規ページ';
+                let headerTitle = '📄 新規ページ';
                 if (currentPage) {
-                    headerTitle = isEditing ? '編集中' : (currentPage.title || '無題');
+                    headerTitle = isEditing ? '✏️ 編集中' : `📄 ${currentPage.title || '無題'}`;
                 }
                 
                 return `
@@ -738,18 +898,24 @@
                             ${this.escapeHtml(headerTitle)}
                         </div>
                         <div class="header-actions">
+                            ${!CONFIG.DEMO_MODE && userInfo ? `
+                                <div class="user-info">
+                                    <img src="${userInfo.picture}" alt="${userInfo.name}">
+                                    <span>${userInfo.name}</span>
+                                </div>
+                            ` : ''}
                             ${currentPage && !isEditing ? `
-                                <button class="btn" id="edit-btn" ${loading ? 'disabled' : ''}>編集</button>
+                                <button class="btn" id="edit-btn" ${loading ? 'disabled' : ''}>✏️ 編集</button>
                             ` : ''}
                             ${isEditing ? `
-                                <button class="btn" id="cancel-btn" ${loading ? 'disabled' : ''}>キャンセル</button>
+                                <button class="btn" id="cancel-btn" ${loading ? 'disabled' : ''}>❌ キャンセル</button>
                                 <button class="btn btn-primary" id="save-btn" ${loading ? 'disabled' : ''}>
-                                    ${loading ? '<span class="loading-spinner" style="margin-right: 5px;"></span>' : ''}
+                                    ${loading ? '<span class="loading-spinner" style="margin-right: 5px;"></span>' : '💾'}
                                     保存
                                 </button>
                             ` : ''}
                             ${!CONFIG.DEMO_MODE ? `
-                                <button class="btn" id="sign-out-btn">ログアウト</button>
+                                <button class="btn" id="sign-out-btn">🚪 ログアウト</button>
                             ` : ''}
                         </div>
                     </div>
@@ -762,12 +928,13 @@
                 
                 if (statusMessage.includes('失敗') || statusMessage.includes('エラー')) {
                     className = 'status-error';
-                } else if (loading) {
+                } else if (loading || statusMessage.includes('中...')) {
                     className = 'status-loading';
                 }
                 
                 return `
                     <div class="status-message ${className}">
+                        ${loading ? '<span class="loading-spinner" style="margin-right: 8px;"></span>' : ''}
                         ${this.escapeHtml(statusMessage)}
                     </div>
                 `;
@@ -789,30 +956,82 @@
                                 />
                                 <textarea
                                     class="editor-content"
-                                    placeholder="何か書いてみましょう..."
+                                    placeholder="何か書いてみましょう...
+
+💡 Tips:
+- Ctrl/Cmd + S で保存
+- 改行でパラグラフ分け
+- シンプルなテキスト形式をサポート"
                                     id="content-input"
                                 >${this.escapeHtml(content)}</textarea>
                             </div>
                         </div>
                     `;
                 } else if (currentPage) {
+                    const formattedContent = this.formatContent(currentPage.content || 'コンテンツがありません');
                     return `
                         <div class="editor-container">
                             <div class="editor">
                                 <h1 class="page-title">${this.escapeHtml(currentPage.title || '無題')}</h1>
-                                <div class="viewer-content">${this.escapeHtml(currentPage.content || 'コンテンツがありません')}</div>
+                                <div class="viewer-content">${formattedContent}</div>
+                                <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e9e9e7; font-size: 12px; color: #9b9a97;">
+                                    📅 最終更新: ${new Date(currentPage.updatedAt).toLocaleString('ja-JP')}
+                                </div>
                             </div>
                         </div>
                     `;
                 } else {
                     return `
                         <div class="welcome-screen">
-                            <h2>Notion風Wikiへようこそ</h2>
+                            <h2>🎉 Notion風Wikiへようこそ</h2>
                             <p>左のサイドバーからページを選択するか、新しいページを作成してください。</p>
-                            ${CONFIG.DEMO_MODE ? '<p><em>現在デモモードで動作しています。</em></p>' : ''}
+                            ${CONFIG.DEMO_MODE ? `
+                                <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; border: 1px solid #bae6fd; max-width: 500px;">
+                                    <h3 style="color: #0284c7; margin-bottom: 10px;">🧪 デモモード</h3>
+                                    <p style="color: #0369a1; margin: 0;">
+                                        現在ローカルストレージで動作しています。<br>
+                                        Google Apps Scriptとの統合方法は「はじめに」ページをご確認ください。
+                                    </p>
+                                </div>
+                            ` : `
+                                <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; border: 1px solid #bbf7d0; max-width: 500px;">
+                                    <h3 style="color: #059669; margin-bottom: 10px;">🔗 Apps Script連携モード</h3>
+                                    <p style="color: #047857; margin: 0;">
+                                        Google Sheetsと連携してデータを永続化しています。<br>
+                                        複数デバイスからの編集が可能です。
+                                    </p>
+                                </div>
+                            `}
                         </div>
                     `;
                 }
+            }
+            
+            // コンテンツの簡単なフォーマット（将来のMarkdown対応への準備）
+            formatContent(content) {
+                return content
+                    .split('\n')
+                    .map(line => {
+                        // 見出し
+                        if (line.startsWith('# ')) {
+                            return `<h1 style="font-size: 32px; font-weight: 700; margin: 24px 0 16px; color: #37352f;">${this.escapeHtml(line.substring(2))}</h1>`;
+                        }
+                        if (line.startsWith('## ')) {
+                            return `<h2 style="font-size: 24px; font-weight: 600; margin: 20px 0 12px; color: #37352f;">${this.escapeHtml(line.substring(3))}</h2>`;
+                        }
+                        if (line.startsWith('### ')) {
+                            return `<h3 style="font-size: 18px; font-weight: 600; margin: 16px 0 8px; color: #37352f;">${this.escapeHtml(line.substring(4))}</h3>`;
+                        }
+                        
+                        // 空行
+                        if (line.trim() === '') {
+                            return '<br>';
+                        }
+                        
+                        // 通常のテキスト
+                        return `<p style="margin: 8px 0; line-height: 1.6;">${this.escapeHtml(line)}</p>`;
+                    })
+                    .join('');
             }
             
             attachLoginListeners() {
@@ -827,7 +1046,9 @@
                 document.querySelectorAll('.page-item').forEach(item => {
                     item.addEventListener('click', () => {
                         const pageId = item.dataset.pageId;
-                        this.loadPage(pageId);
+                        if (!this.state.loading) {
+                            this.loadPage(pageId);
+                        }
                     });
                 });
                 
@@ -872,6 +1093,12 @@
                 if (contentInput) {
                     contentInput.addEventListener('input', (e) => {
                         this.setState({ content: e.target.value });
+                    });
+                    
+                    // テキストエリアの自動リサイズ
+                    contentInput.addEventListener('input', function() {
+                        this.style.height = 'auto';
+                        this.style.height = Math.max(400, this.scrollHeight) + 'px';
                     });
                 }
                 
@@ -926,6 +1153,14 @@
                         }
                     }
                 });
+                
+                // 未保存の変更がある場合の警告
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.state.isEditing && (this.state.title !== (this.state.currentPage?.title || '') || this.state.content !== (this.state.currentPage?.content || ''))) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    }
+                });
             }
             
             escapeHtml(text) {
@@ -936,8 +1171,13 @@
             }
         }
 
-        // アプリの初期化
-        new WikiApp();
+        // Google Identity Services が読み込まれた後にアプリを初期化
+        window.addEventListener('load', () => {
+            // 少し遅延を設けてGoogle APIの初期化を待つ
+            setTimeout(() => {
+                new WikiApp();
+            }, 100);
+        });
     </script>
 </body>
 </html>
