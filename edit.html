@@ -294,6 +294,33 @@
             }
         };
 
+        const API_URL = CONFIG.APPS_SCRIPT_URL;
+
+        const apiCall = async (endpoint, method = 'GET', data = null) => {
+            console.log('API Call:', endpoint, method, data);
+        
+            if (method === 'GET') {
+                // GETの場合はURLにactionパラメータを付与
+                const url = `${API_URL}?action=${encodeURIComponent(endpoint)}${data ? '&' + new URLSearchParams(data) : ''}`;
+                const res = await fetch(url);
+                return await res.json();
+            } else if (method === 'POST') {
+                // POSTの場合はJSON bodyにactionを含める
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: endpoint, // ←必須
+                        ...data
+                    })
+                });
+                return await res.json();
+            } else {
+                throw new Error('Invalid method');
+            }
+        };
+
+
         // メインアプリコンポーネント
         function WikiApp() {
             const [isAuthenticated, setIsAuthenticated] = useState(false);
