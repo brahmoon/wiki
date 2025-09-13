@@ -253,38 +253,167 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // 設定 - 実際の使用時は環境変数などで管理
+        // 設定
         const CONFIG = {
-            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxv6dS58SNyn2a7ZD6FMNRHHVyfNHKBtYVxwWnf_Lnha1v5QLbko4gWrFJ88yWzyRFBWg/exec',
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com'
         };
-        
-        const API_URL = CONFIG.APPS_SCRIPT_URL;
 
-        const apiCall = async (endpoint, method = 'GET', data = null) => {
-            console.log('API Call:', endpoint, method, data);
-        
-            if (method === 'GET') {
-                // GETの場合はURLにactionパラメータを付与
-                const url = `${API_URL}?action=${encodeURIComponent(endpoint)}${data ? '&' + new URLSearchParams(data) : ''}`;
-                const res = await fetch(url);
-                return await res.json();
-            } else if (method === 'POST') {
-                // POSTの場合はJSON bodyにactionを含める
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: endpoint, // ←必須
-                        ...data
-                    })
-                });
-                return await res.json();
-            } else {
-                throw new Error('Invalid method');
-            }
+        // JSONP API呼び出し関数
+        const apiCallJSONP = (action, data = {}) => {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                // タイムアウト設定
+                const timeout = setTimeout(() => {
+                    delete window[callbackName];
+                    const script = document.getElementById(callbackName);
+                    if (script) script.parentNode.removeChild(script);
+                    reject(new Error('JSONP request timeout'));
+                }, 30000);
+
+                // コールバック関数を設定
+                window[callbackName] = function(response) {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    const script = document.getElementById(callbackName);
+                    if (script) script.parentNode.removeChild(script);
+                    
+                    if (response.success) {
+                        resolve(response);
+                    } else {
+                        reject(new Error(response.message || 'API call failed'));
+                    }
+                };
+
+                // パラメータを準備
+                const params = new URLSearchParams();
+                params.append('callback', callbackName);
+                params.append('action', action);
+                for (const [key, value] of Object.entries(data)) {
+                    params.append(key, value);
+                }
+
+                // スクリプトタグを作成してリクエスト送信
+                const script = document.createElement('script');
+                script.id = callbackName;
+                script.src = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+                script.onerror = function() {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    script.parentNode.removeChild(script);
+                    reject(new Error('JSONP script load error'));
+                };
+                
+                document.head.appendChild(script);
+            });
         };
 
+        // フォール バック用のフォーム送信API呼び出し
+        const apiCallForm = (action, data = {}) => {
+            return new Promise((resolve, reject) => {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = CONFIG.APPS_SCRIPT_URL;
+                form.target = 'response_iframe';
+                form.style.display = 'none';
+
+                // アクションを含むデータを準備
+                const formData = { action, ...data };
+                
+                for (const [key, value] of Object.entries(formData)) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                }
+
+                const iframe = document.createElement('iframe');
+                iframe.name = 'response_iframe';
+                iframe.style.display = 'none';
+                
+                let responseReceived = false;
+
+                // メッセージリスナー
+                function handleMessage(event) {
+                    if (event.data && event.data.type === 'FORM_RESPONSE') {
+                        responseReceived = true;
+                        cleanup();
+                        if (event.data.data.success) {
+                            resolve(event.data.data);
+                        } else {
+                            reject(new Error(event.data.data.message || 'API call failed'));
+                        }
+                    }
+                }
+
+                iframe.onload = function() {
+                    setTimeout(() => {
+                        if (!responseReceived) {
+                            try {
+                                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                const responseElement = iframeDoc.getElementById('response');
+                                if (responseElement) {
+                                    const responseText = responseElement.textContent || responseElement.innerText;
+                                    const response = JSON.parse(responseText);
+                                    cleanup();
+                                    if (response.success) {
+                                        resolve(response);
+                                    } else {
+                                        reject(new Error(response.message || 'API call failed'));
+                                    }
+                                } else {
+                                    cleanup();
+                                    resolve({ success: true });
+                                }
+                            } catch (error) {
+                                cleanup();
+                                reject(error);
+                            }
+                        }
+                    }, 2000);
+                };
+
+                iframe.onerror = function() {
+                    cleanup();
+                    reject(new Error('Failed to load response iframe'));
+                };
+
+                function cleanup() {
+                    window.removeEventListener('message', handleMessage);
+                    if (form.parentNode) form.parentNode.removeChild(form);
+                    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                }
+
+                window.addEventListener('message', handleMessage);
+                document.body.appendChild(form);
+                document.body.appendChild(iframe);
+                form.submit();
+
+                // タイムアウト
+                setTimeout(() => {
+                    if (!responseReceived) {
+                        cleanup();
+                        resolve({ success: true });
+                    }
+                }, 15000);
+            });
+        };
+
+        // メインAPI呼び出し関数（JSONP -> フォームのフォールバック）
+        const apiCall = async (action, data = {}) => {
+            console.log('API Call:', action, data);
+            
+            try {
+                // まずJSONPを試行
+                return await apiCallJSONP(action, data);
+            } catch (jsonpError) {
+                console.warn('JSONP failed, trying form submission:', jsonpError);
+                // フォーム送信でフォールバック
+                return await apiCallForm(action, data);
+            }
+        };
 
         // メインアプリコンポーネント
         function WikiApp() {
@@ -388,7 +517,7 @@
             // ページ読み込み
             const loadPage = async (pageId) => {
                 try {
-                    const result = await apiCall('getPage', 'GET', { id: pageId });
+                    const result = await apiCall('getPage', { id: pageId });
                     setCurrentPage(result.page);
                     setTitle(result.page.title || '');
                     setContent(result.page.content || '');
@@ -408,7 +537,7 @@
                         content: content
                     };
 
-                    const result = await apiCall('savePage', 'POST', pageData);
+                    const result = await apiCall('savePage', pageData);
                     
                     if (result.success) {
                         setStatusMessage('保存しました');
@@ -583,14 +712,6 @@
                                             placeholder="無題"
                                             value={title}
                                             onChange={(e) => setTitle(e.target.value)}
-                                            onBlur={() => {
-                                                // フォーカスを維持するための処理
-                                                setTimeout(() => {
-                                                    if (document.activeElement !== contentInputRef.current) {
-                                                        // 他の入力フィールドにフォーカスが移っていない場合のみ
-                                                    }
-                                                }, 10);
-                                            }}
                                         />
                                         <textarea
                                             ref={contentInputRef}
@@ -598,14 +719,6 @@
                                             placeholder="何か書いてみましょう..."
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
-                                            onBlur={() => {
-                                                // フォーカスを維持するための処理
-                                                setTimeout(() => {
-                                                    if (document.activeElement !== titleInputRef.current) {
-                                                        // 他の入力フィールドにフォーカスが移っていない場合のみ
-                                                    }
-                                                }, 10);
-                                            }}
                                         />
                                     </>
                                 ) : currentPage ? (
