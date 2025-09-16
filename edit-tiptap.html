@@ -734,6 +734,81 @@
             );
         }
 
+                // リッチテキストビューアーコンポーネント
+        function RichTextViewer({ content }) {
+            const viewerRef = useRef(null);
+            const [useTiptap, setUseTiptap] = useState(false);
+
+            useEffect(() => {
+                if (window.TiptapCore && window.TiptapReact && window.TiptapStarterKit) {
+                    setUseTiptap(true);
+                } else {
+                    console.warn('Tiptap not available, using fallback viewer');
+                }
+            }, []);
+
+            // HTMLかテキストかを判定
+            const isHtmlContent = content && (content.includes('<') || content.includes('>'));
+
+            // Tiptapビューアー（リッチテキスト表示）
+            if (useTiptap && isHtmlContent) {
+                return <TiptapViewer content={content} />;
+            }
+
+            // フォールバックビューアー（プレーンテキスト）
+            if (isHtmlContent) {
+                // HTMLの場合はそのまま表示
+                return <div className="viewer-content" dangerouslySetInnerHTML={{__html: content}} />;
+            } else {
+                // プレーンテキストの場合は改行を保持
+                return (
+                    <div className="viewer-content" style={{whiteSpace: 'pre-wrap'}}>
+                        {content}
+                    </div>
+                );
+            }
+        }
+
+        // Tiptapビューアー（読み取り専用エディター）
+        function TiptapViewer({ content }) {
+            const viewerRef = useRef(null);
+            const [editor, setEditor] = useState(null);
+
+            useEffect(() => {
+                if (!window.TiptapCore || !window.TiptapStarterKit) {
+                    return;
+                }
+
+                const editorInstance = new window.TiptapCore.Editor({
+                    element: viewerRef.current,
+                    extensions: [window.TiptapStarterKit],
+                    content: content,
+                    editable: false,
+                    editorProps: {
+                        attributes: {
+                            class: 'viewer-content'
+                        }
+                    }
+                });
+
+                setEditor(editorInstance);
+
+                return () => {
+                    if (editorInstance) {
+                        editorInstance.destroy();
+                    }
+                };
+            }, []);
+
+            useEffect(() => {
+                if (editor && content !== editor.getHTML()) {
+                    editor.commands.setContent(content, false);
+                }
+            }, [content, editor]);
+
+            return <div ref={viewerRef} />;
+        });
+
         // JSONP API呼び出し関数
         const apiCallJSONP = (action, data = {}) => {
             return new Promise((resolve, reject) => {
@@ -918,6 +993,9 @@
                     const data = await response.json();
                     setUserInfo(data);
                     setIsAuthenticated(true);
+                    
+                    // ログイン情報を保存
+                    localStorage.setItem('wiki_user_info', JSON.stringify(data));
                 } catch (error) {
                     console.error('ユーザー情報取得エラー:', error);
                     setStatusMessage('ユーザー情報の取得に失敗しました');
@@ -1017,6 +1095,11 @@
                         console.log('Token revoked');
                     });
                 }
+                
+                // ローカルストレージからログイン情報を削除
+                localStorage.removeItem('wiki_user_info');
+                localStorage.removeItem('wiki_access_token');
+                
                 setIsAuthenticated(false);
                 setUserInfo(null);
                 setAccessToken(null);
@@ -1148,7 +1231,7 @@
                                 ) : currentPage ? (
                                     <>
                                         <h1 className="page-title">{currentPage.title || '無題'}</h1>
-                                        <div className="viewer-content" dangerouslySetInnerHTML={{__html: currentPage.content || 'コンテンツがありません'}} />
+                                        <RichTextViewer content={currentPage.content || 'コンテンツがありません'} />
                                     </>
                                 ) : (
                                     <div className="viewer-content">ページを選択するか、新しいページを作成してください。</div>
