@@ -933,6 +933,7 @@
             const [pages, setPages] = useState([]);
             const [currentPage, setCurrentPage] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
+            const [editorMode, setEditorMode] = useState('wysiwyg'); // 'wysiwyg' | 'markdown'
             const [title, setTitle] = useState('');
             const [content, setContent] = useState('');
             const [statusMessage, setStatusMessage] = useState('');
@@ -1182,6 +1183,9 @@
                                 )}
                                 {isEditing && (
                                     <>
+                                        <button className="btn" onClick={() => setEditorMode(editorMode === 'wysiwyg' ? 'markdown' : 'wysiwyg')}>
+                                            {editorMode === 'wysiwyg' ? '記述モードへ' : 'WYSIWYGモードへ'}
+                                        </button>
                                         <button className="btn" onClick={() => setIsEditing(false)}>
                                             キャンセル
                                         </button>
@@ -1223,10 +1227,18 @@
                                             value={title}
                                             onChange={(e) => setTitle(e.target.value)}
                                         />
-                                        <RichTextEditor 
-                                            content={content}
-                                            onChange={setContent}
-                                        />
+                                        {editorMode === 'wysiwyg' ? (
+                                          <RichTextEditor content={content} onChange={setContent} />
+                                        ) : (
+                                          <div>
+                                            <SimpleToolbar content={content} onChange={setContent} />
+                                            <textarea
+                                              className="simple-editor"
+                                              value={content}
+                                              onChange={(e) => setContent(e.target.value)}
+                                            />
+                                          </div>
+                                        )}
                                     </>
                                 ) : currentPage ? (
                                     <>
