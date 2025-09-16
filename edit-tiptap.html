@@ -808,7 +808,9 @@
 
             return <div ref={viewerRef} />;
         });
-
+                }
+            }, []);
+        
         // JSONP API呼び出し関数
         const apiCallJSONP = (action, data = {}) => {
             return new Promise((resolve, reject) => {
