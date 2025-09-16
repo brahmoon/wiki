@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion風Wiki with Tiptap</title>
+    <!-- React -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <!-- Tiptap CDN (using unpkg as fallback) -->
+    <script src="https://unpkg.com/@tiptap/core@2.1.13/dist/index.umd.js"></script>
+    <script src="https://unpkg.com/@tiptap/react@2.1.13/dist/index.umd.js"></script>
+    <script src="https://unpkg.com/@tiptap/starter-kit@2.1.13/dist/index.umd.js"></script>
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #fff;
+            color: #37352f;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            width: 240px;
+            background: #f7f6f3;
+            border-right: 1px solid #e9e9e7;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #e9e9e7;
+            margin-bottom: 20px;
+        }
+        
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #37352f;
+        }
+        
+        .page-list {
+            list-style: none;
+        }
+        
+        .page-item {
+            padding: 4px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #37352f;
+            transition: background 0.1s;
+        }
+        
+        .page-item:hover {
+            background: #e9e9e7;
+        }
+        
+        .page-item.active {
+            background: #2383e2;
+            color: white;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            height: 60px;
+            border-bottom: 1px solid #e9e9e7;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+        
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: 1px solid #d3d2ce;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.1s;
+        }
+        
+        .btn:hover {
+            background: #f7f6f3;
+        }
+        
+        .btn-primary {
+            background: #2383e2;
+            color: white;
+            border-color: #2383e2;
+        }
+        
+        .btn-primary:hover {
+            background: #1a6bc2;
+        }
+        
+        .editor-container {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+        
+        .editor {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        
+        .page-title {
+            font-size: 40px;
+            font-weight: 700;
+            border: none;
+            outline: none;
+            width: 100%;
+            margin-bottom: 20px;
+            color: #37352f;
+            background: transparent;
+        }
+        
+        .page-title::placeholder {
+            color: #9b9a97;
+        }
+        
+        /* Simple editor fallback styles */
+        .simple-editor {
+            border: none;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.5;
+            min-height: 400px;
+            width: 100%;
+            resize: vertical;
+            font-family: inherit;
+            background: transparent;
+        }
+        
+        .simple-editor::placeholder {
+            color: #9b9a97;
+        }
+        
+        /* Editor Toolbar */
+        .editor-toolbar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            padding: 8px;
+            border: 1px solid #e9e9e7;
+            border-radius: 6px;
+            background: #fafafa;
+            flex-wrap: wrap;
+        }
+        
+        .toolbar-btn {
+            padding: 6px 8px;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.1s;
+            min-width: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .toolbar-btn:hover {
+            background: #e9e9e7;
+        }
+        
+        .toolbar-btn.is-active {
+            background: #2383e2;
+            color: white;
+        }
+        
+        .toolbar-separator {
+            width: 1px;
+            background: #e9e9e7;
+            margin: 4px 4px;
+        }
+        
+        /* Rich text editor styles */
+        .ProseMirror {
+            outline: none;
+            min-height: 400px;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #37352f;
+        }
+        
+        .ProseMirror h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 24px 0 16px;
+            color: #37352f;
+        }
+        
+        .ProseMirror h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 20px 0 12px;
+            color: #37352f;
+        }
+        
+        .ProseMirror h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 16px 0 8px;
+            color: #37352f;
+        }
+        
+        .ProseMirror p {
+            margin: 8px 0;
+        }
+        
+        .ProseMirror ul, .ProseMirror ol {
+            padding-left: 24px;
+            margin: 8px 0;
+        }
+        
+        .ProseMirror li {
+            margin: 4px 0;
+        }
+        
+        .ProseMirror blockquote {
+            border-left: 3px solid #e9e9e7;
+            padding-left: 16px;
+            margin: 16px 0;
+            color: #6f6f6f;
+            font-style: italic;
+        }
+        
+        .ProseMirror code {
+            background: #f7f6f3;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 14px;
+        }
+        
+        .ProseMirror pre {
+            background: #f7f6f3;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 16px 0;
+            overflow-x: auto;
+        }
+        
+        .ProseMirror pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .ProseMirror a {
+            color: #2383e2;
+            text-decoration: underline;
+        }
+        
+        .ProseMirror strong {
+            font-weight: 700;
+        }
+        
+        .ProseMirror em {
+            font-style: italic;
+        }
+        
+        .viewer-content {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        
+        .viewer-content h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 24px 0 16px;
+            color: #37352f;
+        }
+        
+        .viewer-content h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 20px 0 12px;
+            color: #37352f;
+        }
+        
+        .viewer-content h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 16px 0 8px;
+            color: #37352f;
+        }
+        
+        .viewer-content p {
+            margin: 8px 0;
+        }
+        
+        .viewer-content ul, .viewer-content ol {
+            padding-left: 24px;
+            margin: 8px 0;
+        }
+        
+        .viewer-content li {
+            margin: 4px 0;
+        }
+        
+        .viewer-content blockquote {
+            border-left: 3px solid #e9e9e7;
+            padding-left: 16px;
+            margin: 16px 0;
+            color: #6f6f6f;
+            font-style: italic;
+        }
+        
+        .viewer-content code {
+            background: #f7f6f3;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 14px;
+        }
+        
+        .viewer-content pre {
+            background: #f7f6f3;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 16px 0;
+            overflow-x: auto;
+        }
+        
+        .viewer-content pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .viewer-content a {
+            color: #2383e2;
+            text-decoration: underline;
+        }
+        
+        .viewer-content strong {
+            font-weight: 700;
+        }
+        
+        .viewer-content em {
+            font-style: italic;
+        }
+        
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 20px;
+        }
+        
+        .status-message {
+            padding: 10px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .new-page-form {
+            display: flex;
+            gap: 10px;
+            padding: 20px;
+            border-top: 1px solid #e9e9e7;
+        }
+        
+        .new-page-input {
+            flex: 1;
+            padding: 6px 12px;
+            border: 1px solid #d3d2ce;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .google-signin-btn {
+            background: white;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #3c4043;
+            transition: background 0.1s, box-shadow 0.1s;
+        }
+        
+        .google-signin-btn:hover {
+            background: #f8f9fa;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+        }
+        
+        .google-icon {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // 設定
+        const CONFIG = {
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzGcnE1B7swbbn9i698dIzAfv52Pk8Df-jsMEn1Y29o3Tn2y4_AJxYQjX1Rv8hSreXsqg/exec',
+            CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com'
+        };
+
+        // Tiptapエディターコンポーネント（シンプルなフォールバック付き）
+        function RichTextEditor({ content, onChange, readOnly = false }) {
+            const editorRef = useRef(null);
+            const [useTiptap, setUseTiptap] = useState(false);
+
+            useEffect(() => {
+                // Tiptapの可用性をチェック
+                if (window.TiptapCore && window.TiptapReact && window.TiptapStarterKit) {
+                    setUseTiptap(true);
+                } else {
+                    console.warn('Tiptap not available, using fallback editor');
+                }
+            }, []);
+
+            // フォールバックエディター（プレーンテキスト）
+            if (!useTiptap) {
+                return (
+                    <div>
+                        {!readOnly && <SimpleToolbar content={content} onChange={onChange} />}
+                        <textarea
+                            className="simple-editor"
+                            placeholder="何か書いてみましょう..."
+                            value={content}
+                            onChange={(e) => onChange && onChange(e.target.value)}
+                            readOnly={readOnly}
+                        />
+                    </div>
+                );
+            }
+
+            // Tiptapエディター
+            return <TiptapEditor content={content} onChange={onChange} readOnly={readOnly} />;
+        }
+
+        // シンプルなツールバー（フォールバック用）
+        function SimpleToolbar({ content, onChange }) {
+            const wrapSelection = (prefix, suffix = '') => {
+                const textarea = document.querySelector('.simple-editor');
+                if (!textarea) return;
+
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const selectedText = content.substring(start, end);
+                
+                if (selectedText) {
+                    const newContent = content.substring(0, start) + prefix + selectedText + suffix + content.substring(end);
+                    onChange(newContent);
+                    
+                    // フォーカスを戻す
+                    setTimeout(() => {
+                        textarea.focus();
+                        textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+                    }, 0);
+                }
+            };
+
+            const insertText = (text) => {
+                const textarea = document.querySelector('.simple-editor');
+                if (!textarea) return;
+
+                const start = textarea.selectionStart;
+                const newContent = content.substring(0, start) + text + content.substring(start);
+                onChange(newContent);
+                
+                setTimeout(() => {
+                    textarea.focus();
+                    textarea.setSelectionRange(start + text.length, start + text.length);
+                }, 0);
+            };
+
+            return (
+                <div className="editor-toolbar">
+                    <button className="toolbar-btn" onClick={() => wrapSelection('**', '**')} title="太字">
+                        <strong>B</strong>
+                    </button>
+                    <button className="toolbar-btn" onClick={() => wrapSelection('*', '*')} title="斜体">
+                        <em>I</em>
+                    </button>
+                    <button className="toolbar-btn" onClick={() => wrapSelection('`', '`')} title="コード">
+                        {'</>'}
+                    </button>
+                    <div className="toolbar-separator"></div>
+                    <button className="toolbar-btn" onClick={() => insertText('# ')} title="見出し1">
+                        H1
+                    </button>
+                    <button className="toolbar-btn" onClick={() => insertText('## ')} title="見出し2">
+                        H2
+                    </button>
+                    <button className="toolbar-btn" onClick={() => insertText('### ')} title="見出し3">
+                        H3
+                    </button>
+                    <div className="toolbar-separator"></div>
+                    <button className="toolbar-btn" onClick={() => insertText('- ')} title="リスト">
+                        •
+                    </button>
+                    <button className="toolbar-btn" onClick={() => insertText('> ')} title="引用">
+                        "
+                    </button>
+                    <button className="toolbar-btn" onClick={() => insertText('\n```\n\n```\n')} title="コードブロック">
+                        {'{}'}
+                    </button>
+                </div>
+            );
+        }
+
+        // Tiptapエディター（実際のリッチテキスト）
+        function TiptapEditor({ content, onChange, readOnly }) {
+            const editorRef = useRef(null);
+            const [editor, setEditor] = useState(null);
+
+            useEffect(() => {
+                if (!window.TiptapCore || !window.TiptapReact || !window.TiptapStarterKit) {
+                    return;
+                }
+
+                const { useEditor } = window.TiptapReact;
+                const { StarterKit } = window.TiptapStarterKit;
+
+                // Note: This is a simplified approach. In a real implementation,
+                // you'd want to use the proper React hooks pattern
+                const editorInstance = new window.TiptapCore.Editor({
+                    element: editorRef.current,
+                    extensions: [StarterKit],
+                    content: content,
+                    editable: !readOnly,
+                    onUpdate: ({ editor }) => {
+                        if (onChange) {
+                            onChange(editor.getHTML());
+                        }
+                    },
+                });
+
+                setEditor(editorInstance);
+
+                return () => {
+                    if (editorInstance) {
+                        editorInstance.destroy();
+                    }
+                };
+            }, [readOnly]);
+
+            useEffect(() => {
+                if (editor && content !== editor.getHTML()) {
+                    editor.commands.setContent(content, false);
+                }
+            }, [content, editor]);
+
+            return (
+                <div>
+                    {!readOnly && editor && <TiptapToolbar editor={editor} />}
+                    <div ref={editorRef} />
+                </div>
+            );
+        }
+
+        // Tiptapツールバー
+        function TiptapToolbar({ editor }) {
+            if (!editor) return null;
+
+            const addLink = () => {
+                const url = window.prompt('URLを入力してください');
+                if (url) {
+                    editor.chain().focus().setLink({ href: url }).run();
+                }
+            };
+
+            const removeLink = () => {
+                editor.chain().focus().unsetLink().run();
+            };
+
+            return (
+                <div className="editor-toolbar">
+                    <button
+                        className={`toolbar-btn ${editor.isActive('bold') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleBold().run()}
+                        title="太字"
+                    >
+                        <strong>B</strong>
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('italic') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleItalic().run()}
+                        title="斜体"
+                    >
+                        <em>I</em>
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('strike') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleStrike().run()}
+                        title="取り消し線"
+                    >
+                        <s>S</s>
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('code') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleCode().run()}
+                        title="コード"
+                    >
+                        {'</>'}
+                    </button>
+                    
+                    <div className="toolbar-separator"></div>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                        title="見出し1"
+                    >
+                        H1
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                        title="見出し2"
+                    >
+                        H2
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('heading', { level: 3 }) ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                        title="見出し3"
+                    >
+                        H3
+                    </button>
+                    
+                    <div className="toolbar-separator"></div>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('bulletList') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleBulletList().run()}
+                        title="箇条書きリスト"
+                    >
+                        •
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('orderedList') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                        title="番号付きリスト"
+                    >
+                        1.
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('blockquote') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                        title="引用"
+                    >
+                        "
+                    </button>
+                    
+                    <button
+                        className={`toolbar-btn ${editor.isActive('codeBlock') ? 'is-active' : ''}`}
+                        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+                        title="コードブロック"
+                    >
+                        {'{}'}
+                    </button>
+                </div>
+            );
+        }
+
+        // JSONP API呼び出し関数
+        const apiCallJSONP = (action, data = {}) => {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                const timeout = setTimeout(() => {
+                    delete window[callbackName];
+                    const script = document.getElementById(callbackName);
+                    if (script) script.parentNode.removeChild(script);
+                    reject(new Error('JSONP request timeout'));
+                }, 30000);
+
+                window[callbackName] = function(response) {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    const script = document.getElementById(callbackName);
+                    if (script) script.parentNode.removeChild(script);
+                    
+                    if (response.success) {
+                        resolve(response);
+                    } else {
+                        reject(new Error(response.message || 'API call failed'));
+                    }
+                };
+
+                const params = new URLSearchParams();
+                params.append('callback', callbackName);
+                params.append('action', action);
+                for (const [key, value] of Object.entries(data)) {
+                    params.append(key, value);
+                }
+
+                const script = document.createElement('script');
+                script.id = callbackName;
+                script.src = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+                script.onerror = function() {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    script.parentNode.removeChild(script);
+                    reject(new Error('JSONP script load error'));
+                };
+                
+                document.head.appendChild(script);
+            });
+        };
+
+        // フォールバック用のフォーム送信API呼び出し
+        const apiCallForm = (action, data = {}) => {
+            return new Promise((resolve, reject) => {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = CONFIG.APPS_SCRIPT_URL;
+                form.target = 'response_iframe';
+                form.style.display = 'none';
+        
+                const formData = { action, ...data };
+                
+                for (const [key, value] of Object.entries(formData)) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                }
+        
+                const iframe = document.createElement('iframe');
+                iframe.name = 'response_iframe';
+                iframe.style.display = 'none';
+                
+                let responseReceived = false;
+
+                iframe.onload = function() {
+                    setTimeout(() => {
+                        if (!responseReceived) {
+                            responseReceived = true;
+                            cleanup();
+                            resolve({ success: true, message: 'Request submitted' });
+                        }
+                    }, 10000);
+                };
+        
+                iframe.onerror = function() {
+                    cleanup();
+                    reject(new Error('Failed to load response iframe'));
+                };
+        
+                function cleanup() {
+                    if (form.parentNode) form.parentNode.removeChild(form);
+                    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                }
+        
+                document.body.appendChild(form);
+                document.body.appendChild(iframe);
+                form.submit();
+        
+                setTimeout(() => {
+                    if (!responseReceived) {
+                        responseReceived = true;
+                        cleanup();
+                        resolve({ success: true, message: 'Request submitted (timeout)' });
+                    }
+                }, 15000);
+            });
+        };
+
+        // メインAPI呼び出し関数
+        const apiCall = async (action, data = {}) => {
+            console.log('API Call:', action, data);
+            
+            try {
+                return await apiCallJSONP(action, data);
+            } catch (jsonpError) {
+                console.warn('JSONP failed, trying form submission:', jsonpError);
+                return await apiCallForm(action, data);
+            }
+        };
+
+        // メインアプリコンポーネント
+        function WikiApp() {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [userInfo, setUserInfo] = useState(null);
+            const [pages, setPages] = useState([]);
+            const [currentPage, setCurrentPage] = useState(null);
+            const [isEditing, setIsEditing] = useState(false);
+            const [title, setTitle] = useState('');
+            const [content, setContent] = useState('');
+            const [statusMessage, setStatusMessage] = useState('');
+            const [newPageTitle, setNewPageTitle] = useState('');
+            const [googleClient, setGoogleClient] = useState(null);
+            const [accessToken, setAccessToken] = useState(null);
+
+            // Google Identity Services初期化
+            useEffect(() => {
+                if (!window.google || !window.google.accounts) {
+                    console.log('開発モード: Google Identity Servicesが利用できません');
+                    setIsAuthenticated(true);
+                    setUserInfo({
+                        name: '開発ユーザー',
+                        email: 'dev@example.com',
+                        picture: null
+                    });
+                    return;
+                }
+
+                try {
+                    const client = window.google.accounts.oauth2.initTokenClient({
+                        client_id: CONFIG.CLIENT_ID,
+                        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                        callback: (response) => {
+                            console.log('Token response:', response);
+                            if (response.access_token) {
+                                setAccessToken(response.access_token);
+                                fetchUserInfo(response.access_token);
+                            }
+                        },
+                        error_callback: (error) => {
+                            console.error('OAuth error:', error);
+                            setStatusMessage('ログインに失敗しました');
+                        }
+                    });
+                    
+                    setGoogleClient(client);
+                } catch (error) {
+                    console.error('GIS初期化エラー:', error);
+                    setIsAuthenticated(true);
+                    setUserInfo({
+                        name: '開発ユーザー',
+                        email: 'dev@example.com,
+                    	picture: null
+                    });
+                }
+            }, []);
+
+            // ユーザー情報取得
+            const fetchUserInfo = async (token) => {
+                try {
+                    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    const data = await response.json();
+                    setUserInfo(data);
+                    setIsAuthenticated(true);
+                } catch (error) {
+                    console.error('ユーザー情報取得エラー:', error);
+                    setStatusMessage('ユーザー情報の取得に失敗しました');
+                }
+            };
+
+            // ページリスト読み込み
+            const loadPages = async () => {
+                try {
+                    const result = await apiCall('getPages');
+                    setPages(result.pages || []);
+                } catch (error) {
+                    console.error('ページ読み込みエラー:', error);
+                    setStatusMessage('ページの読み込みに失敗しました');
+                }
+            };
+
+            // 認証後にページ読み込み
+            useEffect(() => {
+                if (isAuthenticated) {
+                    loadPages();
+                }
+            }, [isAuthenticated]);
+
+            // ページ読み込み
+            const loadPage = async (pageId) => {
+                try {
+                    const result = await apiCall('getPage', { id: pageId });
+                    setCurrentPage(result.page);
+                    setTitle(result.page.title || '');
+                    setContent(result.page.content || '');
+                    setIsEditing(false);
+                } catch (error) {
+                    console.error('ページ読み込みエラー:', error);
+                    setStatusMessage('ページの読み込みに失敗しました');
+                }
+            };
+
+            // ページ保存
+            const savePage = async () => {
+                try {
+                    const pageData = {
+                        id: currentPage?.id || Date.now().toString(),
+                        title: title,
+                        content: content
+                    };
+
+                    const result = await apiCall('savePage', pageData);
+                    
+                    if (result.success) {
+                        setStatusMessage('保存しました');
+                        setTimeout(() => setStatusMessage(''), 3000);
+                        
+                        // ページリストを更新
+                        await loadPages();
+                        
+                        // 新規ページの場合は現在のページを更新
+                        if (!currentPage) {
+                            setCurrentPage(pageData);
+                        }
+                        
+                        setIsEditing(false);
+                    }
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                    setStatusMessage('保存に失敗しました');
+                    setTimeout(() => setStatusMessage(''), 3000);
+                }
+            };
+
+            // 新規ページ作成
+            const createNewPage = () => {
+                if (!newPageTitle.trim()) return;
+                
+                setCurrentPage(null);
+                setTitle(newPageTitle);
+                setContent('');
+                setIsEditing(true);
+                setNewPageTitle('');
+            };
+
+            // ログイン
+            const signIn = () => {
+                if (googleClient) {
+                    console.log('Requesting access token...');
+                    googleClient.requestAccessToken();
+                } else {
+                    console.error('Google client not initialized');
+                    setStatusMessage('ログイン機能が初期化されていません');
+                }
+            };
+
+            // ログアウト
+            const signOut = () => {
+                if (accessToken && window.google && window.google.accounts) {
+                    window.google.accounts.oauth2.revoke(accessToken, () => {
+                        console.log('Token revoked');
+                    });
+                }
+                setIsAuthenticated(false);
+                setUserInfo(null);
+                setAccessToken(null);
+                setCurrentPage(null);
+                setPages([]);
+            };
+
+            if (!isAuthenticated) {
+                return (
+                    <div className="app-container">
+                        <div className="login-container">
+                            <h1>Notion風Wiki</h1>
+                            <p>編集するにはGoogleアカウントでログインしてください</p>
+                            <button className="google-signin-btn" onClick={signIn}>
+                                <svg className="google-icon" viewBox="0 0 24 24">
+                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                </svg>
+                                Googleでサインイン
+                            </button>
+                            {statusMessage && (
+                                <div className={`status-message ${statusMessage.includes('失敗') ? 'status-error' : 'status-success'}`}>
+                                    {statusMessage}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="app-container">
+                    {/* サイドバー */}
+                    <div className="sidebar">
+                        <div className="sidebar-header">
+                            <div className="sidebar-title">ページ一覧</div>
+                        </div>
+                        
+                        <ul className="page-list">
+                            {pages.map(page => (
+                                <li 
+                                    key={page.id}
+                                    className={`page-item ${currentPage?.id === page.id ? 'active' : ''}`}
+                                    onClick={() => loadPage(page.id)}
+                                >
+                                    {page.title || '無題'}
+                                </li>
+                            ))}
+                        </ul>
+                        
+                        <div className="new-page-form">
+                            <input
+                                type="text"
+                                className="new-page-input"
+                                placeholder="新しいページタイトル"
+                                value={newPageTitle}
+                                onChange={(e) => setNewPageTitle(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && createNewPage()}
+                            />
+                            <button className="btn btn-primary" onClick={createNewPage}>
+                                追加
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* メインコンテンツ */}
+                    <div className="main-content">
+                        {/* ヘッダー */}
+                        <div className="header">
+                            <div className="header-title">
+                                {currentPage ? (isEditing ? '編集中' : currentPage.title || '無題') : '新規ページ'}
+                            </div>
+                            <div className="header-actions">
+                                {currentPage && !isEditing && (
+                                    <button className="btn" onClick={() => setIsEditing(true)}>
+                                        編集
+                                    </button>
+                                )}
+                                {isEditing && (
+                                    <>
+                                        <button className="btn" onClick={() => setIsEditing(false)}>
+                                            キャンセル
+                                        </button>
+                                        <button className="btn btn-primary" onClick={savePage}>
+                                            保存
+                                        </button>
+                                    </>
+                                )}
+                                {userInfo && (
+                                    <div className="user-info">
+                                        {userInfo.picture && (
+                                            <img src={userInfo.picture} alt={userInfo.name} className="user-avatar" />
+                                        )}
+                                        <span>{userInfo.name || userInfo.email}</span>
+                                    </div>
+                                )}
+                                <button className="btn" onClick={signOut}>
+                                    ログアウト
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* ステータスメッセージ */}
+                        {statusMessage && (
+                            <div className={`status-message ${statusMessage.includes('失敗') ? 'status-error' : 'status-success'}`}>
+                                {statusMessage}
+                            </div>
+                        )}
+
+                        {/* エディター/ビューアー */}
+                        <div className="editor-container">
+                            <div className="editor">
+                                {isEditing ? (
+                                    <>
+                                        <input
+                                            type="text"
+                                            className="page-title"
+                                            placeholder="無題"
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                        />
+                                        <RichTextEditor 
+                                            content={content}
+                                            onChange={setContent}
+                                        />
+                                    </>
+                                ) : currentPage ? (
+                                    <>
+                                        <h1 className="page-title">{currentPage.title || '無題'}</h1>
+                                        <div className="viewer-content" dangerouslySetInnerHTML={{__html: currentPage.content || 'コンテンツがありません'}} />
+                                    </>
+                                ) : (
+                                    <div className="viewer-content">ページを選択するか、新しいページを作成してください。</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // アプリをレンダリング
+        ReactDOM.render(<WikiApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
