@@ -736,7 +736,7 @@
             );
         }
 
-                // リッチテキストビューアーコンポーネント
+        // リッチテキストビューアーコンポーネント
         function RichTextViewer({ content }) {
             const viewerRef = useRef(null);
             const [useTiptap, setUseTiptap] = useState(false);
@@ -1212,7 +1212,8 @@
                                             onChange={(e) => setTitle(e.target.value)}
                                         />
                                         {editorMode === 'wysiwyg' ? (
-                                          <RichTextEditor content={content} onChange={setContent} />
+                                            <RichTextViewer content={currentPage.content} />
+                                            //<RichTextEditor content={content} onChange={setContent} />
                                         ) : (
                                           <div>
                                             <SimpleToolbar content={content} onChange={setContent} />
