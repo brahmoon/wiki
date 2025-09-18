@@ -23,19 +23,26 @@
         .editor:focus {
             border-color: #007acc;
         }
+        
+        .ProseMirror {
+            outline: none;
+        }
     </style>
 </head>
 <body>
     <h1>Simple Tiptap Editor</h1>
     <div id="editor" class="editor"></div>
 
-    <script src="https://unpkg.com/@tiptap/core@2.1.13/dist/index.umd.js"></script>
-    <script src="https://unpkg.com/@tiptap/starter-kit@2.1.13/dist/index.umd.js"></script>
+    <script src="https://unpkg.com/@tiptap/core@2.1.13"></script>
+    <script src="https://unpkg.com/@tiptap/starter-kit@2.1.13"></script>
     
     <script>
-        const editor = new tiptap.Editor({
+        const { Editor } = window.Tiptap;
+        const { StarterKit } = window.TiptapStarterKit;
+        
+        const editor = new Editor({
             element: document.getElementById('editor'),
-            extensions: [tiptapStarterKit.StarterKit],
+            extensions: [StarterKit],
             content: '<p>Hello, Tiptap!</p>'
         });
     </script>
