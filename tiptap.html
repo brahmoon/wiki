@@ -8,10 +8,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-    <!-- Tiptap CDN -->
-    <script src="https://unpkg.com/@tiptap/core@2.1.13/dist/index.umd.js"></script>
-    <script src="https://unpkg.com/@tiptap/react@2.1.13/dist/index.umd.js"></script>
-    <script src="https://unpkg.com/@tiptap/starter-kit@2.1.13/dist/index.umd.js"></script>
+    <!-- Tiptap CDN (correct UMD paths) -->
+    <script src="https://unpkg.com/@tiptap/core@2.1.13"></script>
+    <script src="https://unpkg.com/@tiptap/react@2.1.13"></script>
+    <script src="https://unpkg.com/@tiptap/starter-kit@2.1.13"></script>
     <style>
         * {
             margin: 0;
@@ -309,55 +309,75 @@
         // メインのTiptapエディターコンポーネント
         function TiptapEditor() {
             const [editor, setEditor] = useState(null);
+            const [error, setError] = useState(null);
             const editorRef = useRef(null);
 
             useEffect(() => {
-                // Tiptapの可用性をチェック
-                if (!window.TiptapCore || !window.TiptapStarterKit) {
-                    console.error('Tiptap modules not loaded');
+                // モジュールの読み込み確認とデバッグ
+                console.log('Available globals:', {
+                    Tiptap: !!window.Tiptap,
+                    TiptapCore: !!window.TiptapCore,
+                    TiptapReact: !!window.TiptapReact,
+                    TiptapStarterKit: !!window.TiptapStarterKit
+                });
+
+                // 利用可能なTiptapバージョンを探す
+                let Editor, StarterKit;
+                
+                if (window.Tiptap?.Editor && window.TiptapStarterKit?.StarterKit) {
+                    Editor = window.Tiptap.Editor;
+                    StarterKit = window.TiptapStarterKit.StarterKit;
+                } else if (window.TiptapCore?.Editor && window.TiptapStarterKit?.StarterKit) {
+                    Editor = window.TiptapCore.Editor;
+                    StarterKit = window.TiptapStarterKit.StarterKit;
+                } else {
+                    setError('Tiptapモジュールが正しく読み込まれていません');
                     return;
                 }
 
-                const { StarterKit } = window.TiptapStarterKit;
-
-                // エディターインスタンスを作成
-                const editorInstance = new window.TiptapCore.Editor({
-                    element: editorRef.current,
-                    extensions: [StarterKit],
-                    content: `
-                        <h1>Tiptap エディター</h1>
-                        <p>このエディターでは以下のことができます：</p>
-                        <ul>
-                            <li><strong>太字</strong>や<em>斜体</em>、<s>取り消し線</s></li>
-                            <li><code>インラインコード</code></li>
-                            <li>見出し（H1, H2, H3）</li>
-                            <li>箇条書きリスト</li>
-                            <li>番号付きリスト</li>
-                        </ul>
-                        <blockquote>
-                            引用ブロックも使えます
-                        </blockquote>
-                        <pre><code>// コードブロック
+                try {
+                    // エディターインスタンスを作成
+                    const editorInstance = new Editor({
+                        element: editorRef.current,
+                        extensions: [StarterKit],
+                        content: `
+                            <h1>Tiptap エディター</h1>
+                            <p>このエディターでは以下のことができます：</p>
+                            <ul>
+                                <li><strong>太字</strong>や<em>斜体</em>、<s>取り消し線</s></li>
+                                <li><code>インラインコード</code></li>
+                                <li>見出し（H1, H2, H3）</li>
+                                <li>箇条書きリスト</li>
+                                <li>番号付きリスト</li>
+                            </ul>
+                            <blockquote>
+                                引用ブロックも使えます
+                            </blockquote>
+                            <pre><code>// コードブロック
 function hello() {
     console.log('Hello, Tiptap!');
 }</code></pre>
-                        <p>キーボードショートカットも利用できます：</p>
-                        <ul>
-                            <li><strong>Ctrl/Cmd + B</strong>: 太字</li>
-                            <li><strong>Ctrl/Cmd + I</strong>: 斜体</li>
-                            <li><strong>Ctrl/Cmd + Shift + X</strong>: 取り消し線</li>
-                            <li><strong>Ctrl/Cmd + Z</strong>: 元に戻す</li>
-                            <li><strong>Ctrl/Cmd + Y</strong>: やり直し</li>
-                        </ul>
-                    `,
-                    editorProps: {
-                        attributes: {
-                            class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
+                            <p>キーボードショートカットも利用できます：</p>
+                            <ul>
+                                <li><strong>Ctrl/Cmd + B</strong>: 太字</li>
+                                <li><strong>Ctrl/Cmd + I</strong>: 斜体</li>
+                                <li><strong>Ctrl/Cmd + Shift + X</strong>: 取り消し線</li>
+                                <li><strong>Ctrl/Cmd + Z</strong>: 元に戻す</li>
+                                <li><strong>Ctrl/Cmd + Y</strong>: やり直し</li>
+                            </ul>
+                        `,
+                        editorProps: {
+                            attributes: {
+                                class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
+                            },
                         },
-                    },
-                });
+                    });
 
-                setEditor(editorInstance);
+                    setEditor(editorInstance);
+                } catch (err) {
+                    console.error('Editor initialization error:', err);
+                    setError(`エディターの初期化に失敗しました: ${err.message}`);
+                }
 
                 // クリーンアップ関数
                 return () => {
@@ -366,6 +386,23 @@ function hello() {
                     }
                 };
             }, []);
+
+            if (error) {
+                return (
+                    <div className="editor-container">
+                        <h1 className="editor-title">Simple Tiptap Editor</h1>
+                        <div style={{ 
+                            padding: '20px', 
+                            background: '#f8d7da', 
+                            color: '#721c24', 
+                            border: '1px solid #f5c6cb',
+                            borderRadius: '6px'
+                        }}>
+                            エラー: {error}
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="editor-container">
