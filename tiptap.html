@@ -46,8 +46,9 @@
             const { Editor } = window.TiptapCore.Editor;
             const { useEditor } = window.TiptapReact;
             const { StarterKit } = window.TiptapStarterKit;
+            const { EditorContent } = window.EditorContent;
             
-            const editor = new useEditor({
+            const editor = new Editor({
                 element: document.getElementById('editor'),
                 extensions: [StarterKit],
                 content: '<p>Hello, Tiptap!</p>'
