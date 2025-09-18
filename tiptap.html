@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simple Tiptap Editor</title>
+    <!-- React -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <!-- Tiptap CDN -->
+    <script src="https://unpkg.com/@tiptap/core@2.1.13/dist/index.umd.js"></script>
+    <script scr="https://unpkg.com/@tiptap/react@2.1.13/dist/index.umd.js"></script>
+    <script src="https://unpkg.com/@tiptap/starter-kit@2.1.13/dist/index.umd.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -32,16 +40,25 @@
 <body>
     <h1>Simple Tiptap Editor</h1>
     <div id="editor" class="editor"></div>
-
-    <script src="https://unpkg.com/@tiptap/core@2.1.13/dist/index.umd.js"></script>
-    <script src="https://unpkg.com/@tiptap/starter-kit@2.1.13/dist/index.umd.js"></script>
     
-    <script>
-        const editor = new TiptapCore.Editor({
-            element: document.getElementById('editor'),
-            extensions: [TiptapStarterKit.StarterKit],
-            content: '<p>Hello, Tiptap!</p>'
-        });
+    <script type="text/babel">
+        const Editor_SK = () => {
+            const { Editor } = window.TiptapCore.Editor;
+            const { useEditor } = window.TiptapReact;
+            const { StarterKit } = window.TiptapStarterKit;
+            
+            const editor = new useEditor({
+                element: document.getElementById('editor'),
+                extensions: [StarterKit],
+                content: '<p>Hello, Tiptap!</p>'
+            });
+
+            return (
+                <div>
+                    <EditorContent editor={editor} />
+                </div>
+            );
+        };
     </script>
 </body>
 </html>
