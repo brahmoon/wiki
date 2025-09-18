@@ -11,6 +11,16 @@
     <script src="https://unpkg.com/prosemirror-transform@1.7.0/dist/index.umd.js"></script>
     <script src="https://unpkg.com/prosemirror-commands@1.5.0/dist/index.umd.js"></script>
     <script src="https://unpkg.com/prosemirror-history@1.3.0/dist/index.umd.js"></script>
+    <script>
+      // Tiptap が期待する名前にマッピング
+      window.state = window['prosemirror-state'];
+      window.view = window['prosemirror-view'];
+      window.keymap = window['prosemirror-keymap'];
+      window.model = window['prosemirror-model'];
+      window.transform = window['prosemirror-transform'];
+      window.commands$1 = window['prosemirror-commands'];
+      window.schemaList = window['prosemirror-schema-list'];
+    </script>
     <!-- React -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
