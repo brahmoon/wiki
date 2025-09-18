@@ -313,15 +313,15 @@
 
             useEffect(() => {
                 // Tiptapの可用性をチェック
-                if (!window.TiptapCore || !window.StarterKit) {
+                if (!window['@tiptap/core'] || !window['@tiptap/starter-kit']) {
                     console.error('Tiptap modules not loaded');
                     return;
                 }
 
-                const { StarterKit } = window.StarterKit;
+                const { StarterKit } = window['@tiptap/starter-kit'];
 
                 // エディターインスタンスを作成
-                const editorInstance = new window.TiptapCore.Editor({
+                const editorInstance = new window['@tiptap/core'].Editor({
                     element: editorRef.current,
                     extensions: [StarterKit],
                     content: `
