@@ -9,9 +9,11 @@
   </head>
   <body>
     <div class="element"></div>
-    <script type="text/babel">
+    <script type="module">
       import { Editor } from 'https://esm.sh/@tiptap/core'
       import StarterKit from 'https://esm.sh/@tiptap/starter-kit'
+    </script>
+    <script type="text/babel">
       const editor = new Editor({
         element: document.querySelector('.element'),
         extensions: [StarterKit],
