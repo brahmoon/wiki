@@ -1,24 +1,388 @@
 <!doctype html>
 <html>
-  <head>
+<head>
     <meta charset="utf-8" />
     <!-- React -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-  </head>
-  <body>
-    <div class="element"></div>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .editor-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .toolbar-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 8px;
+            border: 1px solid #dee2e6;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .toolbar-button:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        .toolbar-button.active {
+            background: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        
+        .toolbar-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .toolbar-separator {
+            width: 1px;
+            height: 24px;
+            background: #dee2e6;
+            margin: 0 4px;
+        }
+        
+        .editor-content {
+            padding: 20px;
+            min-height: 400px;
+            line-height: 1.6;
+        }
+        
+        .ProseMirror {
+            outline: none;
+        }
+        
+        .ProseMirror h1 {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 16px 0 12px 0;
+            color: #212529;
+        }
+        
+        .ProseMirror h2 {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 14px 0 10px 0;
+            color: #212529;
+        }
+        
+        .ProseMirror h3 {
+            font-size: 1.25em;
+            font-weight: bold;
+            margin: 12px 0 8px 0;
+            color: #212529;
+        }
+        
+        .ProseMirror blockquote {
+            margin: 16px 0;
+            padding-left: 16px;
+            border-left: 4px solid #007bff;
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .ProseMirror ul, .ProseMirror ol {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+        
+        .ProseMirror li {
+            margin: 4px 0;
+        }
+        
+        .ProseMirror table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+        }
+        
+        .ProseMirror th, .ProseMirror td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        .ProseMirror th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        
+        .ProseMirror .selectedCell {
+            background-color: #e3f2fd !important;
+        }
+        
+        .ProseMirror p.is-editor-empty:first-child::before {
+            content: attr(data-placeholder);
+            float: left;
+            color: #adb5bd;
+            pointer-events: none;
+            height: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor-root"></div>
+    
     <script type="module">
-      import { Editor } from 'https://esm.sh/@tiptap/core'
-      import StarterKit from 'https://esm.sh/@tiptap/starter-kit'
+        import { Editor } from 'https://esm.sh/@tiptap/core'
+        import StarterKit from 'https://esm.sh/@tiptap/starter-kit'
+        import Table from 'https://esm.sh/@tiptap/extension-table'
+        import TableRow from 'https://esm.sh/@tiptap/extension-table-row'
+        import TableHeader from 'https://esm.sh/@tiptap/extension-table-header'
+        import TableCell from 'https://esm.sh/@tiptap/extension-table-cell'
+        import Placeholder from 'https://esm.sh/@tiptap/extension-placeholder'
+        
+        const { useState, useEffect, useCallback } = React;
+        
+        function TipTapEditor() {
+            const [editor, setEditor] = useState(null);
+            
+            useEffect(() => {
+                const editorInstance = new Editor({
+                    element: document.querySelector('.editor-content'),
+                    extensions: [
+                        StarterKit,
+                        Table.configure({
+                            resizable: true,
+                        }),
+                        TableRow,
+                        TableHeader,
+                        TableCell,
+                        Placeholder.configure({
+                            placeholder: 'ここに文章を入力してください...',
+                        }),
+                    ],
+                    content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
+                    onUpdate: ({ editor }) => {
+                        // エディターの更新時の処理をここに追加できます
+                    },
+                });
+                
+                setEditor(editorInstance);
+                
+                return () => {
+                    editorInstance.destroy();
+                };
+            }, []);
+            
+            const ToolbarButton = ({ onClick, isActive, disabled, children, title }) => (
+                <button
+                    className={`toolbar-button ${isActive ? 'active' : ''}`}
+                    onClick={onClick}
+                    disabled={disabled}
+                    title={title}
+                >
+                    {children}
+                </button>
+            );
+            
+            const Separator = () => <div className="toolbar-separator" />;
+            
+            if (!editor) {
+                return <div>Loading...</div>;
+            }
+            
+            return (
+                <div className="editor-container">
+                    <div className="toolbar">
+                        {/* 太字 */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleBold().run()}
+                            isActive={editor.isActive('bold')}
+                            title="太字"
+                        >
+                            <strong>B</strong>
+                        </ToolbarButton>
+                        
+                        {/* イタリック */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleItalic().run()}
+                            isActive={editor.isActive('italic')}
+                            title="イタリック"
+                        >
+                            <em>I</em>
+                        </ToolbarButton>
+                        
+                        <Separator />
+                        
+                        {/* 見出し1 */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                            isActive={editor.isActive('heading', { level: 1 })}
+                            title="見出し1"
+                        >
+                            H1
+                        </ToolbarButton>
+                        
+                        {/* 見出し2 */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                            isActive={editor.isActive('heading', { level: 2 })}
+                            title="見出し2"
+                        >
+                            H2
+                        </ToolbarButton>
+                        
+                        {/* 見出し3 */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                            isActive={editor.isActive('heading', { level: 3 })}
+                            title="見出し3"
+                        >
+                            H3
+                        </ToolbarButton>
+                        
+                        <Separator />
+                        
+                        {/* 引用 */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+                            isActive={editor.isActive('blockquote')}
+                            title="引用"
+                        >
+                            "
+                        </ToolbarButton>
+                        
+                        <Separator />
+                        
+                        {/* 箇条書きリスト */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleBulletList().run()}
+                            isActive={editor.isActive('bulletList')}
+                            title="箇条書きリスト"
+                        >
+                            •
+                        </ToolbarButton>
+                        
+                        {/* 番号付きリスト */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                            isActive={editor.isActive('orderedList')}
+                            title="番号付きリスト"
+                        >
+                            1.
+                        </ToolbarButton>
+                        
+                        <Separator />
+                        
+                        {/* テーブル挿入 */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+                            disabled={editor.isActive('table')}
+                            title="テーブル挿入"
+                        >
+                            ⊞
+                        </ToolbarButton>
+                        
+                        {/* テーブル関連ボタン（テーブル内でのみ表示） */}
+                        {editor.isActive('table') && (
+                            <>
+                                <ToolbarButton
+                                    onClick={() => editor.chain().focus().addRowBefore().run()}
+                                    title="行を上に追加"
+                                >
+                                    ↑+
+                                </ToolbarButton>
+                                
+                                <ToolbarButton
+                                    onClick={() => editor.chain().focus().addRowAfter().run()}
+                                    title="行を下に追加"
+                                >
+                                    ↓+
+                                </ToolbarButton>
+                                
+                                <ToolbarButton
+                                    onClick={() => editor.chain().focus().addColumnBefore().run()}
+                                    title="列を左に追加"
+                                >
+                                    ←+
+                                </ToolbarButton>
+                                
+                                <ToolbarButton
+                                    onClick={() => editor.chain().focus().addColumnAfter().run()}
+                                    title="列を右に追加"
+                                >
+                                    →+
+                                </ToolbarButton>
+                                
+                                <ToolbarButton
+                                    onClick={() => editor.chain().focus().deleteRow().run()}
+                                    title="行を削除"
+                                >
+                                    ↕✕
+                                </ToolbarButton>
+                                
+                                <ToolbarButton
+                                    onClick={() => editor.chain().focus().deleteColumn().run()}
+                                    title="列を削除"
+                                >
+                                    ↔✕
+                                </ToolbarButton>
+                                
+                                <ToolbarButton
+                                    onClick={() => editor.chain().focus().deleteTable().run()}
+                                    title="テーブルを削除"
+                                >
+                                    ⊞✕
+                                </ToolbarButton>
+                            </>
+                        )}
+                        
+                        <Separator />
+                        
+                        {/* 元に戻す/やり直し */}
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().undo().run()}
+                            disabled={!editor.can().undo()}
+                            title="元に戻す"
+                        >
+                            ↶
+                        </ToolbarButton>
+                        
+                        <ToolbarButton
+                            onClick={() => editor.chain().focus().redo().run()}
+                            disabled={!editor.can().redo()}
+                            title="やり直し"
+                        >
+                            ↷
+                        </ToolbarButton>
+                    </div>
+                    
+                    <div className="editor-content"></div>
+                </div>
+            );
+        }
+        
+        ReactDOM.render(<TipTapEditor />, document.getElementById('editor-root'));
     </script>
-    <script type="text/babel">
-      const editor = new Editor({
-        element: document.querySelector('.element'),
-        extensions: [StarterKit],
-        content: '<p>Hello World!</p>',
-      })
-    </script>
-  </body>
+</body>
 </html>
