@@ -161,43 +161,66 @@
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell'
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder'
         
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
         
         function TipTapEditor() {
             const [editor, setEditor] = useState(null);
-            const editorRef = React.useRef(null);
+            const [isLoading, setIsLoading] = useState(true);
+            const editorRef = useRef(null);
             
             useEffect(() => {
-                if (!editorRef.current) return;
-                
-                const editorInstance = new Editor({
-                    element: editorRef.current,
-                    extensions: [
-                        StarterKit,
-                        Table.configure({
-                            resizable: true,
-                        }),
-                        TableRow,
-                        TableHeader,
-                        TableCell,
-                        Placeholder.configure({
-                            placeholder: 'ここに文章を入力してください...',
-                        }),
-                    ],
-                    content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
-                    onUpdate: ({ editor }) => {
-                        // エディターの更新時の処理をここに追加できます
-                    },
-                });
-                
-                setEditor(editorInstance);
-                
-                return () => {
-                    if (editorInstance) {
-                        editorInstance.destroy();
+                // 5秒後にタイムアウトとしてローディングを解除
+                const timeout = setTimeout(() => {
+                    if (isLoading) {
+                        console.warn('Editor initialization timed out');
+                        setIsLoading(false);
                     }
-                };
-            }, []);
+                }, 5000);
+                
+                if (!editorRef.current) {
+                    clearTimeout(timeout);
+                    return;
+                }
+                
+                try {
+                    const editorInstance = new Editor({
+                        element: editorRef.current,
+                        extensions: [
+                            StarterKit,
+                            Table.configure({
+                                resizable: true,
+                            }),
+                            TableRow,
+                            TableHeader,
+                            TableCell,
+                            Placeholder.configure({
+                                placeholder: 'ここに文章を入力してください...',
+                            }),
+                        ],
+                        content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
+                        onCreate: () => {
+                            console.log('Editor created successfully');
+                            setIsLoading(false);
+                        },
+                        onUpdate: ({ editor }) => {
+                            // エディターの更新時の処理をここに追加できます
+                        },
+                    });
+                    
+                    setEditor(editorInstance);
+                    
+                    return () => {
+                        clearTimeout(timeout);
+                        if (editorInstance) {
+                            editorInstance.destroy();
+                        }
+                    };
+                } catch (error) {
+                    console.error('Editor initialization failed:', error);
+                    setIsLoading(false);
+                    clearTimeout(timeout);
+                }
+            }, [isLoading]);
             
             const ToolbarButton = ({ onClick, isActive, disabled, children, title }) => 
                 React.createElement('button', {
@@ -209,8 +232,15 @@
             
             const Separator = () => React.createElement('div', { className: 'toolbar-separator' });
             
-            if (!editor) {
-                return React.createElement('div', null, 'Loading...');
+            if (isLoading) {
+                return React.createElement('div', { 
+                    style: { 
+                        padding: '40px', 
+                        textAlign: 'center',
+                        fontSize: '18px',
+                        color: '#666'
+                    } 
+                }, 'エディターを読み込み中...');
             }
             
             return React.createElement('div', { className: 'editor-container' }, [
