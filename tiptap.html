@@ -262,6 +262,24 @@
         function createToolbar() {
             const toolbar = document.createElement('div');
             toolbar.className = 'toolbar';
+
+            // 元に戻す
+            const undoBtn = createToolbarButton({
+                content: '↶',
+                title: '元に戻す',
+                onClick: () => editor?.chain().focus().undo().run()
+            });
+            undoBtn.setAttribute('data-command', 'undo');
+            toolbar.appendChild(undoBtn);
+            
+            // やり直し
+            const redoBtn = createToolbarButton({
+                content: '↷',
+                title: 'やり直し',
+                onClick: () => editor?.chain().focus().redo().run()
+            });
+            redoBtn.setAttribute('data-command', 'redo');
+            toolbar.appendChild(redoBtn);
             
             // 太字ボタン
             const boldBtn = createToolbarButton({
@@ -408,24 +426,6 @@
             
             toolbar.appendChild(tableButtons);
             toolbar.appendChild(createSeparator());
-            
-            // 元に戻す
-            const undoBtn = createToolbarButton({
-                content: '↶',
-                title: '元に戻す',
-                onClick: () => editor?.chain().focus().undo().run()
-            });
-            undoBtn.setAttribute('data-command', 'undo');
-            toolbar.appendChild(undoBtn);
-            
-            // やり直し
-            const redoBtn = createToolbarButton({
-                content: '↷',
-                title: 'やり直し',
-                onClick: () => editor?.chain().focus().redo().run()
-            });
-            redoBtn.setAttribute('data-command', 'redo');
-            toolbar.appendChild(redoBtn);
             
             return toolbar;
         }
