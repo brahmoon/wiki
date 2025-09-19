@@ -2,10 +2,6 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <!-- React -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -147,10 +143,19 @@
             pointer-events: none;
             height: 0;
         }
+        
+        .loading {
+            padding: 40px;
+            text-align: center;
+            font-size: 18px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <div id="editor-root"></div>
+    <div id="editor-root">
+        <div class="loading">エディターを読み込み中...</div>
+    </div>
     
     <script type="module">
         import { Editor } from 'https://esm.sh/@tiptap/core'
@@ -161,252 +166,348 @@
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell'
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder'
         
-        const { useState, useEffect, useRef } = React;
+        let editor = null;
         
-        function TipTapEditor() {
-            const [editor, setEditor] = useState(null);
-            const [isLoading, setIsLoading] = useState(true);
-            const editorRef = useRef(null);
+        function createToolbarButton(config) {
+            const button = document.createElement('button');
+            button.className = 'toolbar-button';
+            button.innerHTML = config.content;
+            button.title = config.title;
             
-            useEffect(() => {
-                // 5秒後にタイムアウトとしてローディングを解除
-                const timeout = setTimeout(() => {
-                    if (isLoading) {
-                        console.warn('Editor initialization timed out');
-                        setIsLoading(false);
-                    }
-                }, 5000);
-                
-                if (!editorRef.current) {
-                    clearTimeout(timeout);
-                    return;
-                }
-                
-                try {
-                    const editorInstance = new Editor({
-                        element: editorRef.current,
-                        extensions: [
-                            StarterKit,
-                            Table.configure({
-                                resizable: true,
-                            }),
-                            TableRow,
-                            TableHeader,
-                            TableCell,
-                            Placeholder.configure({
-                                placeholder: 'ここに文章を入力してください...',
-                            }),
-                        ],
-                        content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
-                        onCreate: () => {
-                            console.log('Editor created successfully');
-                            setIsLoading(false);
-                        },
-                        onUpdate: ({ editor }) => {
-                            // エディターの更新時の処理をここに追加できます
-                        },
-                    });
-                    
-                    setEditor(editorInstance);
-                    
-                    return () => {
-                        clearTimeout(timeout);
-                        if (editorInstance) {
-                            editorInstance.destroy();
-                        }
-                    };
-                } catch (error) {
-                    console.error('Editor initialization failed:', error);
-                    setIsLoading(false);
-                    clearTimeout(timeout);
-                }
-            }, [isLoading]);
-            
-            const ToolbarButton = ({ onClick, isActive, disabled, children, title }) => 
-                React.createElement('button', {
-                    className: `toolbar-button ${isActive ? 'active' : ''}`,
-                    onClick: onClick,
-                    disabled: disabled,
-                    title: title
-                }, children);
-            
-            const Separator = () => React.createElement('div', { className: 'toolbar-separator' });
-            
-            if (isLoading) {
-                return React.createElement('div', { 
-                    style: { 
-                        padding: '40px', 
-                        textAlign: 'center',
-                        fontSize: '18px',
-                        color: '#666'
-                    } 
-                }, 'エディターを読み込み中...');
+            if (config.onClick) {
+                button.addEventListener('click', config.onClick);
             }
             
-            return React.createElement('div', { className: 'editor-container' }, [
-                React.createElement('div', { className: 'toolbar', key: 'toolbar' }, [
-                    // 太字
-                    React.createElement(ToolbarButton, {
-                        key: 'bold',
-                        onClick: () => editor?.chain().focus().toggleBold().run(),
-                        isActive: editor?.isActive('bold') || false,
-                        title: '太字',
-                        disabled: !editor
-                    }, React.createElement('strong', null, 'B')),
-                    
-                    // イタリック
-                    React.createElement(ToolbarButton, {
-                        key: 'italic',
-                        onClick: () => editor?.chain().focus().toggleItalic().run(),
-                        isActive: editor?.isActive('italic') || false,
-                        title: 'イタリック',
-                        disabled: !editor
-                    }, React.createElement('em', null, 'I')),
-                    
-                    React.createElement(Separator, { key: 'sep1' }),
-                    
-                    // 見出し1
-                    React.createElement(ToolbarButton, {
-                        key: 'h1',
-                        onClick: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
-                        isActive: editor?.isActive('heading', { level: 1 }) || false,
-                        title: '見出し1',
-                        disabled: !editor
-                    }, 'H1'),
-                    
-                    // 見出し2
-                    React.createElement(ToolbarButton, {
-                        key: 'h2',
-                        onClick: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
-                        isActive: editor?.isActive('heading', { level: 2 }) || false,
-                        title: '見出し2',
-                        disabled: !editor
-                    }, 'H2'),
-                    
-                    // 見出し3
-                    React.createElement(ToolbarButton, {
-                        key: 'h3',
-                        onClick: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
-                        isActive: editor?.isActive('heading', { level: 3 }) || false,
-                        title: '見出し3',
-                        disabled: !editor
-                    }, 'H3'),
-                    
-                    React.createElement(Separator, { key: 'sep2' }),
-                    
-                    // 引用
-                    React.createElement(ToolbarButton, {
-                        key: 'quote',
-                        onClick: () => editor?.chain().focus().toggleBlockquote().run(),
-                        isActive: editor?.isActive('blockquote') || false,
-                        title: '引用',
-                        disabled: !editor
-                    }, '"'),
-                    
-                    React.createElement(Separator, { key: 'sep3' }),
-                    
-                    // 箇条書きリスト
-                    React.createElement(ToolbarButton, {
-                        key: 'bullet',
-                        onClick: () => editor?.chain().focus().toggleBulletList().run(),
-                        isActive: editor?.isActive('bulletList') || false,
-                        title: '箇条書きリスト',
-                        disabled: !editor
-                    }, '•'),
-                    
-                    // 番号付きリスト
-                    React.createElement(ToolbarButton, {
-                        key: 'ordered',
-                        onClick: () => editor?.chain().focus().toggleOrderedList().run(),
-                        isActive: editor?.isActive('orderedList') || false,
-                        title: '番号付きリスト',
-                        disabled: !editor
-                    }, '1.'),
-                    
-                    React.createElement(Separator, { key: 'sep4' }),
-                    
-                    // テーブル挿入
-                    React.createElement(ToolbarButton, {
-                        key: 'table',
-                        onClick: () => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-                        disabled: !editor || editor?.isActive('table'),
-                        title: 'テーブル挿入'
-                    }, '⊞'),
-                    
-                    // テーブル関連ボタン（テーブル内でのみ表示）
-                    ...(editor?.isActive('table') ? [
-                        React.createElement(ToolbarButton, {
-                            key: 'addRowBefore',
-                            onClick: () => editor?.chain().focus().addRowBefore().run(),
-                            title: '行を上に追加'
-                        }, '↑+'),
-                        
-                        React.createElement(ToolbarButton, {
-                            key: 'addRowAfter',
-                            onClick: () => editor?.chain().focus().addRowAfter().run(),
-                            title: '行を下に追加'
-                        }, '↓+'),
-                        
-                        React.createElement(ToolbarButton, {
-                            key: 'addColumnBefore',
-                            onClick: () => editor?.chain().focus().addColumnBefore().run(),
-                            title: '列を左に追加'
-                        }, '←+'),
-                        
-                        React.createElement(ToolbarButton, {
-                            key: 'addColumnAfter',
-                            onClick: () => editor?.chain().focus().addColumnAfter().run(),
-                            title: '列を右に追加'
-                        }, '→+'),
-                        
-                        React.createElement(ToolbarButton, {
-                            key: 'deleteRow',
-                            onClick: () => editor?.chain().focus().deleteRow().run(),
-                            title: '行を削除'
-                        }, '↕✕'),
-                        
-                        React.createElement(ToolbarButton, {
-                            key: 'deleteColumn',
-                            onClick: () => editor?.chain().focus().deleteColumn().run(),
-                            title: '列を削除'
-                        }, '↔✕'),
-                        
-                        React.createElement(ToolbarButton, {
-                            key: 'deleteTable',
-                            onClick: () => editor?.chain().focus().deleteTable().run(),
-                            title: 'テーブルを削除'
-                        }, '⊞✕')
-                    ] : []),
-                    
-                    React.createElement(Separator, { key: 'sep5' }),
-                    
-                    // 元に戻す/やり直し
-                    React.createElement(ToolbarButton, {
-                        key: 'undo',
-                        onClick: () => editor?.chain().focus().undo().run(),
-                        disabled: !editor || !editor?.can().undo(),
-                        title: '元に戻す'
-                    }, '↶'),
-                    
-                    React.createElement(ToolbarButton, {
-                        key: 'redo',
-                        onClick: () => editor?.chain().focus().redo().run(),
-                        disabled: !editor || !editor?.can().redo(),
-                        title: 'やり直し'
-                    }, '↷')
-                ]),
-                
-                React.createElement('div', { 
-                    className: 'editor-content', 
-                    key: 'editor',
-                    ref: editorRef
-                })
-            ]);
+            return button;
         }
         
-        const ReactDOM = window.ReactDOM;
+        function createSeparator() {
+            const separator = document.createElement('div');
+            separator.className = 'toolbar-separator';
+            return separator;
+        }
         
-        ReactDOM.render(React.createElement(TipTapEditor), document.getElementById('editor-root'));
+        function updateToolbarState() {
+            if (!editor) return;
+            
+            // 太字ボタン
+            const boldBtn = document.querySelector('[data-command="bold"]');
+            if (boldBtn) {
+                boldBtn.classList.toggle('active', editor.isActive('bold'));
+            }
+            
+            // イタリックボタン
+            const italicBtn = document.querySelector('[data-command="italic"]');
+            if (italicBtn) {
+                italicBtn.classList.toggle('active', editor.isActive('italic'));
+            }
+            
+            // 見出しボタン
+            for (let i = 1; i <= 3; i++) {
+                const headingBtn = document.querySelector(`[data-command="heading${i}"]`);
+                if (headingBtn) {
+                    headingBtn.classList.toggle('active', editor.isActive('heading', { level: i }));
+                }
+            }
+            
+            // 引用ボタン
+            const quoteBtn = document.querySelector('[data-command="blockquote"]');
+            if (quoteBtn) {
+                quoteBtn.classList.toggle('active', editor.isActive('blockquote'));
+            }
+            
+            // リストボタン
+            const bulletBtn = document.querySelector('[data-command="bulletList"]');
+            if (bulletBtn) {
+                bulletBtn.classList.toggle('active', editor.isActive('bulletList'));
+            }
+            
+            const orderedBtn = document.querySelector('[data-command="orderedList"]');
+            if (orderedBtn) {
+                orderedBtn.classList.toggle('active', editor.isActive('orderedList'));
+            }
+            
+            // テーブルボタン
+            const tableBtn = document.querySelector('[data-command="insertTable"]');
+            if (tableBtn) {
+                tableBtn.disabled = editor.isActive('table');
+            }
+            
+            // Undo/Redoボタン
+            const undoBtn = document.querySelector('[data-command="undo"]');
+            if (undoBtn) {
+                undoBtn.disabled = !editor.can().undo();
+            }
+            
+            const redoBtn = document.querySelector('[data-command="redo"]');
+            if (redoBtn) {
+                redoBtn.disabled = !editor.can().redo();
+            }
+            
+            // テーブル関連ボタンの表示/非表示
+            updateTableButtons();
+        }
+        
+        function updateTableButtons() {
+            const tableButtons = document.querySelector('.table-buttons');
+            if (!tableButtons) return;
+            
+            if (editor && editor.isActive('table')) {
+                tableButtons.style.display = 'flex';
+            } else {
+                tableButtons.style.display = 'none';
+            }
+        }
+        
+        function createToolbar() {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'toolbar';
+            
+            // 太字ボタン
+            const boldBtn = createToolbarButton({
+                content: '<strong>B</strong>',
+                title: '太字',
+                onClick: () => editor?.chain().focus().toggleBold().run()
+            });
+            boldBtn.setAttribute('data-command', 'bold');
+            toolbar.appendChild(boldBtn);
+            
+            // イタリックボタン
+            const italicBtn = createToolbarButton({
+                content: '<em>I</em>',
+                title: 'イタリック',
+                onClick: () => editor?.chain().focus().toggleItalic().run()
+            });
+            italicBtn.setAttribute('data-command', 'italic');
+            toolbar.appendChild(italicBtn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // 見出し1
+            const h1Btn = createToolbarButton({
+                content: 'H1',
+                title: '見出し1',
+                onClick: () => editor?.chain().focus().toggleHeading({ level: 1 }).run()
+            });
+            h1Btn.setAttribute('data-command', 'heading1');
+            toolbar.appendChild(h1Btn);
+            
+            // 見出し2
+            const h2Btn = createToolbarButton({
+                content: 'H2',
+                title: '見出し2',
+                onClick: () => editor?.chain().focus().toggleHeading({ level: 2 }).run()
+            });
+            h2Btn.setAttribute('data-command', 'heading2');
+            toolbar.appendChild(h2Btn);
+            
+            // 見出し3
+            const h3Btn = createToolbarButton({
+                content: 'H3',
+                title: '見出し3',
+                onClick: () => editor?.chain().focus().toggleHeading({ level: 3 }).run()
+            });
+            h3Btn.setAttribute('data-command', 'heading3');
+            toolbar.appendChild(h3Btn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // 引用
+            const quoteBtn = createToolbarButton({
+                content: '"',
+                title: '引用',
+                onClick: () => editor?.chain().focus().toggleBlockquote().run()
+            });
+            quoteBtn.setAttribute('data-command', 'blockquote');
+            toolbar.appendChild(quoteBtn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // 箇条書きリスト
+            const bulletBtn = createToolbarButton({
+                content: '•',
+                title: '箇条書きリスト',
+                onClick: () => editor?.chain().focus().toggleBulletList().run()
+            });
+            bulletBtn.setAttribute('data-command', 'bulletList');
+            toolbar.appendChild(bulletBtn);
+            
+            // 番号付きリスト
+            const orderedBtn = createToolbarButton({
+                content: '1.',
+                title: '番号付きリスト',
+                onClick: () => editor?.chain().focus().toggleOrderedList().run()
+            });
+            orderedBtn.setAttribute('data-command', 'orderedList');
+            toolbar.appendChild(orderedBtn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // テーブル挿入
+            const tableBtn = createToolbarButton({
+                content: '⊞',
+                title: 'テーブル挿入',
+                onClick: () => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+            });
+            tableBtn.setAttribute('data-command', 'insertTable');
+            toolbar.appendChild(tableBtn);
+            
+            // テーブル関連ボタン（初期は非表示）
+            const tableButtons = document.createElement('div');
+            tableButtons.className = 'table-buttons';
+            tableButtons.style.display = 'none';
+            tableButtons.style.gap = '4px';
+            
+            // 行を上に追加
+            const addRowBeforeBtn = createToolbarButton({
+                content: '↑+',
+                title: '行を上に追加',
+                onClick: () => editor?.chain().focus().addRowBefore().run()
+            });
+            tableButtons.appendChild(addRowBeforeBtn);
+            
+            // 行を下に追加
+            const addRowAfterBtn = createToolbarButton({
+                content: '↓+',
+                title: '行を下に追加',
+                onClick: () => editor?.chain().focus().addRowAfter().run()
+            });
+            tableButtons.appendChild(addRowAfterBtn);
+            
+            // 列を左に追加
+            const addColBeforeBtn = createToolbarButton({
+                content: '←+',
+                title: '列を左に追加',
+                onClick: () => editor?.chain().focus().addColumnBefore().run()
+            });
+            tableButtons.appendChild(addColBeforeBtn);
+            
+            // 列を右に追加
+            const addColAfterBtn = createToolbarButton({
+                content: '→+',
+                title: '列を右に追加',
+                onClick: () => editor?.chain().focus().addColumnAfter().run()
+            });
+            tableButtons.appendChild(addColAfterBtn);
+            
+            // 行を削除
+            const deleteRowBtn = createToolbarButton({
+                content: '↕✕',
+                title: '行を削除',
+                onClick: () => editor?.chain().focus().deleteRow().run()
+            });
+            tableButtons.appendChild(deleteRowBtn);
+            
+            // 列を削除
+            const deleteColBtn = createToolbarButton({
+                content: '↔✕',
+                title: '列を削除',
+                onClick: () => editor?.chain().focus().deleteColumn().run()
+            });
+            tableButtons.appendChild(deleteColBtn);
+            
+            // テーブルを削除
+            const deleteTableBtn = createToolbarButton({
+                content: '⊞✕',
+                title: 'テーブルを削除',
+                onClick: () => editor?.chain().focus().deleteTable().run()
+            });
+            tableButtons.appendChild(deleteTableBtn);
+            
+            toolbar.appendChild(tableButtons);
+            toolbar.appendChild(createSeparator());
+            
+            // 元に戻す
+            const undoBtn = createToolbarButton({
+                content: '↶',
+                title: '元に戻す',
+                onClick: () => editor?.chain().focus().undo().run()
+            });
+            undoBtn.setAttribute('data-command', 'undo');
+            toolbar.appendChild(undoBtn);
+            
+            // やり直し
+            const redoBtn = createToolbarButton({
+                content: '↷',
+                title: 'やり直し',
+                onClick: () => editor?.chain().focus().redo().run()
+            });
+            redoBtn.setAttribute('data-command', 'redo');
+            toolbar.appendChild(redoBtn);
+            
+            return toolbar;
+        }
+        
+        function initializeEditor() {
+            try {
+                // エディターコンテナを作成
+                const container = document.createElement('div');
+                container.className = 'editor-container';
+                
+                // ツールバーを作成
+                const toolbar = createToolbar();
+                container.appendChild(toolbar);
+                
+                // エディターコンテンツ領域を作成
+                const editorContent = document.createElement('div');
+                editorContent.className = 'editor-content';
+                container.appendChild(editorContent);
+                
+                // エディターを初期化
+                editor = new Editor({
+                    element: editorContent,
+                    extensions: [
+                        StarterKit,
+                        Table.configure({
+                            resizable: true,
+                        }),
+                        TableRow,
+                        TableHeader,
+                        TableCell,
+                        Placeholder.configure({
+                            placeholder: 'ここに文章を入力してください...',
+                        }),
+                    ],
+                    content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
+                    onCreate: () => {
+                        console.log('Editor created successfully');
+                        updateToolbarState();
+                    },
+                    onUpdate: () => {
+                        updateToolbarState();
+                    },
+                    onSelectionUpdate: () => {
+                        updateToolbarState();
+                    },
+                });
+                
+                // ローディング画面をエディターに置き換え
+                const root = document.getElementById('editor-root');
+                root.innerHTML = '';
+                root.appendChild(container);
+                
+            } catch (error) {
+                console.error('Editor initialization failed:', error);
+                document.getElementById('editor-root').innerHTML = 
+                    '<div class="loading">エディターの初期化に失敗しました</div>';
+            }
+        }
+        
+        // DOM読み込み完了後にエディターを初期化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeEditor);
+        } else {
+            initializeEditor();
+        }
+        
+        // タイムアウト処理（5秒後に強制初期化）
+        setTimeout(() => {
+            const root = document.getElementById('editor-root');
+            if (root && root.innerHTML.includes('読み込み中')) {
+                console.warn('Editor initialization timed out');
+                initializeEditor();
+            }
+        }, 5000);
     </script>
 </body>
 </html>
