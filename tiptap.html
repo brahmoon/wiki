@@ -189,6 +189,17 @@
         
         function updateToolbarState() {
             if (!editor) return;
+
+            // Undo/Redoボタン
+            const undoBtn = document.querySelector('[data-command="undo"]');
+            if (undoBtn) {
+                undoBtn.disabled = !editor.can().undo();
+            }
+            
+            const redoBtn = document.querySelector('[data-command="redo"]');
+            if (redoBtn) {
+                redoBtn.disabled = !editor.can().redo();
+            }
             
             // 太字ボタン
             const boldBtn = document.querySelector('[data-command="bold"]');
@@ -231,17 +242,6 @@
             const tableBtn = document.querySelector('[data-command="insertTable"]');
             if (tableBtn) {
                 tableBtn.disabled = editor.isActive('table');
-            }
-            
-            // Undo/Redoボタン
-            const undoBtn = document.querySelector('[data-command="undo"]');
-            if (undoBtn) {
-                undoBtn.disabled = !editor.can().undo();
-            }
-            
-            const redoBtn = document.querySelector('[data-command="redo"]');
-            if (redoBtn) {
-                redoBtn.disabled = !editor.can().redo();
             }
             
             // テーブル関連ボタンの表示/非表示
@@ -358,14 +358,6 @@
             tableButtons.style.display = 'none';
             tableButtons.style.gap = '4px';
             
-            // 行を上に追加
-            const addRowBeforeBtn = createToolbarButton({
-                content: '↑+',
-                title: '行を上に追加',
-                onClick: () => editor?.chain().focus().addRowBefore().run()
-            });
-            tableButtons.appendChild(addRowBeforeBtn);
-            
             // 行を下に追加
             const addRowAfterBtn = createToolbarButton({
                 content: '↓+',
@@ -392,7 +384,7 @@
             
             // 行を削除
             const deleteRowBtn = createToolbarButton({
-                content: '↕✕',
+                content: 'R✕',
                 title: '行を削除',
                 onClick: () => editor?.chain().focus().deleteRow().run()
             });
@@ -400,7 +392,7 @@
             
             // 列を削除
             const deleteColBtn = createToolbarButton({
-                content: '↔✕',
+                content: 'C✕',
                 title: '列を削除',
                 onClick: () => editor?.chain().focus().deleteColumn().run()
             });
