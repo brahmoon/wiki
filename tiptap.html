@@ -165,10 +165,13 @@
         
         function TipTapEditor() {
             const [editor, setEditor] = useState(null);
+            const editorRef = React.useRef(null);
             
             useEffect(() => {
+                if (!editorRef.current) return;
+                
                 const editorInstance = new Editor({
-                    element: document.querySelector('.editor-content'),
+                    element: editorRef.current,
                     extensions: [
                         StarterKit,
                         Table.configure({
@@ -190,7 +193,9 @@
                 setEditor(editorInstance);
                 
                 return () => {
-                    editorInstance.destroy();
+                    if (editorInstance) {
+                        editorInstance.destroy();
+                    }
                 };
             }, []);
             
@@ -213,17 +218,19 @@
                     // 太字
                     React.createElement(ToolbarButton, {
                         key: 'bold',
-                        onClick: () => editor.chain().focus().toggleBold().run(),
-                        isActive: editor.isActive('bold'),
-                        title: '太字'
+                        onClick: () => editor?.chain().focus().toggleBold().run(),
+                        isActive: editor?.isActive('bold') || false,
+                        title: '太字',
+                        disabled: !editor
                     }, React.createElement('strong', null, 'B')),
                     
                     // イタリック
                     React.createElement(ToolbarButton, {
                         key: 'italic',
-                        onClick: () => editor.chain().focus().toggleItalic().run(),
-                        isActive: editor.isActive('italic'),
-                        title: 'イタリック'
+                        onClick: () => editor?.chain().focus().toggleItalic().run(),
+                        isActive: editor?.isActive('italic') || false,
+                        title: 'イタリック',
+                        disabled: !editor
                     }, React.createElement('em', null, 'I')),
                     
                     React.createElement(Separator, { key: 'sep1' }),
@@ -231,25 +238,28 @@
                     // 見出し1
                     React.createElement(ToolbarButton, {
                         key: 'h1',
-                        onClick: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-                        isActive: editor.isActive('heading', { level: 1 }),
-                        title: '見出し1'
+                        onClick: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
+                        isActive: editor?.isActive('heading', { level: 1 }) || false,
+                        title: '見出し1',
+                        disabled: !editor
                     }, 'H1'),
                     
                     // 見出し2
                     React.createElement(ToolbarButton, {
                         key: 'h2',
-                        onClick: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-                        isActive: editor.isActive('heading', { level: 2 }),
-                        title: '見出し2'
+                        onClick: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
+                        isActive: editor?.isActive('heading', { level: 2 }) || false,
+                        title: '見出し2',
+                        disabled: !editor
                     }, 'H2'),
                     
                     // 見出し3
                     React.createElement(ToolbarButton, {
                         key: 'h3',
-                        onClick: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-                        isActive: editor.isActive('heading', { level: 3 }),
-                        title: '見出し3'
+                        onClick: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(),
+                        isActive: editor?.isActive('heading', { level: 3 }) || false,
+                        title: '見出し3',
+                        disabled: !editor
                     }, 'H3'),
                     
                     React.createElement(Separator, { key: 'sep2' }),
@@ -257,9 +267,10 @@
                     // 引用
                     React.createElement(ToolbarButton, {
                         key: 'quote',
-                        onClick: () => editor.chain().focus().toggleBlockquote().run(),
-                        isActive: editor.isActive('blockquote'),
-                        title: '引用'
+                        onClick: () => editor?.chain().focus().toggleBlockquote().run(),
+                        isActive: editor?.isActive('blockquote') || false,
+                        title: '引用',
+                        disabled: !editor
                     }, '"'),
                     
                     React.createElement(Separator, { key: 'sep3' }),
@@ -267,17 +278,19 @@
                     // 箇条書きリスト
                     React.createElement(ToolbarButton, {
                         key: 'bullet',
-                        onClick: () => editor.chain().focus().toggleBulletList().run(),
-                        isActive: editor.isActive('bulletList'),
-                        title: '箇条書きリスト'
+                        onClick: () => editor?.chain().focus().toggleBulletList().run(),
+                        isActive: editor?.isActive('bulletList') || false,
+                        title: '箇条書きリスト',
+                        disabled: !editor
                     }, '•'),
                     
                     // 番号付きリスト
                     React.createElement(ToolbarButton, {
                         key: 'ordered',
-                        onClick: () => editor.chain().focus().toggleOrderedList().run(),
-                        isActive: editor.isActive('orderedList'),
-                        title: '番号付きリスト'
+                        onClick: () => editor?.chain().focus().toggleOrderedList().run(),
+                        isActive: editor?.isActive('orderedList') || false,
+                        title: '番号付きリスト',
+                        disabled: !editor
                     }, '1.'),
                     
                     React.createElement(Separator, { key: 'sep4' }),
@@ -285,52 +298,52 @@
                     // テーブル挿入
                     React.createElement(ToolbarButton, {
                         key: 'table',
-                        onClick: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-                        disabled: editor.isActive('table'),
+                        onClick: () => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+                        disabled: !editor || editor?.isActive('table'),
                         title: 'テーブル挿入'
                     }, '⊞'),
                     
                     // テーブル関連ボタン（テーブル内でのみ表示）
-                    ...(editor.isActive('table') ? [
+                    ...(editor?.isActive('table') ? [
                         React.createElement(ToolbarButton, {
                             key: 'addRowBefore',
-                            onClick: () => editor.chain().focus().addRowBefore().run(),
+                            onClick: () => editor?.chain().focus().addRowBefore().run(),
                             title: '行を上に追加'
                         }, '↑+'),
                         
                         React.createElement(ToolbarButton, {
                             key: 'addRowAfter',
-                            onClick: () => editor.chain().focus().addRowAfter().run(),
+                            onClick: () => editor?.chain().focus().addRowAfter().run(),
                             title: '行を下に追加'
                         }, '↓+'),
                         
                         React.createElement(ToolbarButton, {
                             key: 'addColumnBefore',
-                            onClick: () => editor.chain().focus().addColumnBefore().run(),
+                            onClick: () => editor?.chain().focus().addColumnBefore().run(),
                             title: '列を左に追加'
                         }, '←+'),
                         
                         React.createElement(ToolbarButton, {
                             key: 'addColumnAfter',
-                            onClick: () => editor.chain().focus().addColumnAfter().run(),
+                            onClick: () => editor?.chain().focus().addColumnAfter().run(),
                             title: '列を右に追加'
                         }, '→+'),
                         
                         React.createElement(ToolbarButton, {
                             key: 'deleteRow',
-                            onClick: () => editor.chain().focus().deleteRow().run(),
+                            onClick: () => editor?.chain().focus().deleteRow().run(),
                             title: '行を削除'
                         }, '↕✕'),
                         
                         React.createElement(ToolbarButton, {
                             key: 'deleteColumn',
-                            onClick: () => editor.chain().focus().deleteColumn().run(),
+                            onClick: () => editor?.chain().focus().deleteColumn().run(),
                             title: '列を削除'
                         }, '↔✕'),
                         
                         React.createElement(ToolbarButton, {
                             key: 'deleteTable',
-                            onClick: () => editor.chain().focus().deleteTable().run(),
+                            onClick: () => editor?.chain().focus().deleteTable().run(),
                             title: 'テーブルを削除'
                         }, '⊞✕')
                     ] : []),
@@ -340,20 +353,24 @@
                     // 元に戻す/やり直し
                     React.createElement(ToolbarButton, {
                         key: 'undo',
-                        onClick: () => editor.chain().focus().undo().run(),
-                        disabled: !editor.can().undo(),
+                        onClick: () => editor?.chain().focus().undo().run(),
+                        disabled: !editor || !editor?.can().undo(),
                         title: '元に戻す'
                     }, '↶'),
                     
                     React.createElement(ToolbarButton, {
                         key: 'redo',
-                        onClick: () => editor.chain().focus().redo().run(),
-                        disabled: !editor.can().redo(),
+                        onClick: () => editor?.chain().focus().redo().run(),
+                        disabled: !editor || !editor?.can().redo(),
                         title: 'やり直し'
                     }, '↷')
                 ]),
                 
-                React.createElement('div', { className: 'editor-content', key: 'editor' })
+                React.createElement('div', { 
+                    className: 'editor-content', 
+                    key: 'editor',
+                    ref: editorRef
+                })
             ]);
         }
         
