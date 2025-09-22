@@ -1,0 +1,418 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="./styles/editor.css">
+    <!-- link rel="stylesheet" href="./styles/drive-image-modal.css" -->
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor-root">
+        <div class="loading">エディターを読み込み中...</div>
+    </div>
+    
+    <script type="module">
+        import { Editor } from 'https://esm.sh/@tiptap/core'
+        import StarterKit from 'https://esm.sh/@tiptap/starter-kit'
+        import { Table } from 'https://esm.sh/@tiptap/extension-table'
+        import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row'
+        import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header'
+        import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell'
+        import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder'
+        import Image from 'https://esm.sh/@tiptap/extension-image';
+        import { DriveImageExtension } from './extensions/driveImage/DriveImageExtension.js';
+        
+        let editor = null;
+        
+        function createToolbarButton(config) {
+            const button = document.createElement('button');
+            button.className = 'toolbar-button';
+            button.innerHTML = config.content;
+            button.title = config.title;
+            
+            if (config.onClick) {
+                button.addEventListener('click', config.onClick);
+            }
+            
+            return button;
+        }
+        
+        function createSeparator() {
+            const separator = document.createElement('div');
+            separator.className = 'toolbar-separator';
+            return separator;
+        }
+        
+        function updateToolbarState() {
+            if (!editor) return;
+
+            // Undo/Redoボタン
+            const undoBtn = document.querySelector('[data-command="undo"]');
+            if (undoBtn) {
+                undoBtn.disabled = !editor.can().undo();
+            }
+            
+            const redoBtn = document.querySelector('[data-command="redo"]');
+            if (redoBtn) {
+                redoBtn.disabled = !editor.can().redo();
+            }
+            
+            // 太字ボタン
+            const boldBtn = document.querySelector('[data-command="bold"]');
+            if (boldBtn) {
+                boldBtn.classList.toggle('active', editor.isActive('bold'));
+            }
+            
+            // イタリックボタン
+            const italicBtn = document.querySelector('[data-command="italic"]');
+            if (italicBtn) {
+                italicBtn.classList.toggle('active', editor.isActive('italic'));
+            }
+            
+            // 見出しボタン
+            for (let i = 1; i <= 3; i++) {
+                const headingBtn = document.querySelector(`[data-command="heading${i}"]`);
+                if (headingBtn) {
+                    headingBtn.classList.toggle('active', editor.isActive('heading', { level: i }));
+                }
+            }
+            
+            // 引用ボタン
+            const quoteBtn = document.querySelector('[data-command="blockquote"]');
+            if (quoteBtn) {
+                quoteBtn.classList.toggle('active', editor.isActive('blockquote'));
+            }
+            
+            // リストボタン
+            const bulletBtn = document.querySelector('[data-command="bulletList"]');
+            if (bulletBtn) {
+                bulletBtn.classList.toggle('active', editor.isActive('bulletList'));
+            }
+            
+            const orderedBtn = document.querySelector('[data-command="orderedList"]');
+            if (orderedBtn) {
+                orderedBtn.classList.toggle('active', editor.isActive('orderedList'));
+            }
+            
+            // テーブルボタン
+            const tableBtn = document.querySelector('[data-command="insertTable"]');
+            if (tableBtn) {
+                tableBtn.disabled = editor.isActive('table');
+            }
+            
+            // テーブル関連ボタンの表示/非表示
+            updateTableButtons();
+        }
+        
+        function updateTableButtons() {
+            const tableButtons = document.querySelector('.table-buttons');
+            if (!tableButtons) return;
+            
+            if (editor && editor.isActive('table')) {
+                tableButtons.style.display = 'flex';
+            } else {
+                tableButtons.style.display = 'none';
+            }
+        }
+        
+        function createToolbar() {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'toolbar';
+
+            // 元に戻す
+            const undoBtn = createToolbarButton({
+                content: '↶',
+                title: '元に戻す',
+                onClick: () => editor?.chain().focus().undo().run()
+            });
+            undoBtn.setAttribute('data-command', 'undo');
+            toolbar.appendChild(undoBtn);
+            
+            // やり直し
+            const redoBtn = createToolbarButton({
+                content: '↷',
+                title: 'やり直し',
+                onClick: () => editor?.chain().focus().redo().run()
+            });
+            redoBtn.setAttribute('data-command', 'redo');
+            toolbar.appendChild(redoBtn);
+            
+            // 太字ボタン
+            const boldBtn = createToolbarButton({
+                content: '<strong>B</strong>',
+                title: '太字',
+                onClick: () => editor?.chain().focus().toggleBold().run()
+            });
+            boldBtn.setAttribute('data-command', 'bold');
+            toolbar.appendChild(boldBtn);
+            
+            // イタリックボタン
+            const italicBtn = createToolbarButton({
+                content: '<em>I</em>',
+                title: 'イタリック',
+                onClick: () => editor?.chain().focus().toggleItalic().run()
+            });
+            italicBtn.setAttribute('data-command', 'italic');
+            toolbar.appendChild(italicBtn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // 見出し1
+            const h1Btn = createToolbarButton({
+                content: 'H1',
+                title: '見出し1',
+                onClick: () => editor?.chain().focus().toggleHeading({ level: 1 }).run()
+            });
+            h1Btn.setAttribute('data-command', 'heading1');
+            toolbar.appendChild(h1Btn);
+            
+            // 見出し2
+            const h2Btn = createToolbarButton({
+                content: 'H2',
+                title: '見出し2',
+                onClick: () => editor?.chain().focus().toggleHeading({ level: 2 }).run()
+            });
+            h2Btn.setAttribute('data-command', 'heading2');
+            toolbar.appendChild(h2Btn);
+            
+            // 見出し3
+            const h3Btn = createToolbarButton({
+                content: 'H3',
+                title: '見出し3',
+                onClick: () => editor?.chain().focus().toggleHeading({ level: 3 }).run()
+            });
+            h3Btn.setAttribute('data-command', 'heading3');
+            toolbar.appendChild(h3Btn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // 引用
+            const quoteBtn = createToolbarButton({
+                content: '"',
+                title: '引用',
+                onClick: () => editor?.chain().focus().toggleBlockquote().run()
+            });
+            quoteBtn.setAttribute('data-command', 'blockquote');
+            toolbar.appendChild(quoteBtn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // 箇条書きリスト
+            const bulletBtn = createToolbarButton({
+                content: '•',
+                title: '箇条書きリスト',
+                onClick: () => editor?.chain().focus().toggleBulletList().run()
+            });
+            bulletBtn.setAttribute('data-command', 'bulletList');
+            toolbar.appendChild(bulletBtn);
+            
+            // 番号付きリスト
+            const orderedBtn = createToolbarButton({
+                content: '1.',
+                title: '番号付きリスト',
+                onClick: () => editor?.chain().focus().toggleOrderedList().run()
+            });
+            orderedBtn.setAttribute('data-command', 'orderedList');
+            toolbar.appendChild(orderedBtn);
+            
+            toolbar.appendChild(createSeparator());
+            
+            // テーブル挿入
+            const tableBtn = createToolbarButton({
+                content: '⊞',
+                title: 'テーブル挿入',
+                onClick: () => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+            });
+            tableBtn.setAttribute('data-command', 'insertTable');
+            toolbar.appendChild(tableBtn);
+            
+            // テーブル関連ボタン（初期は非表示）
+            const tableButtons = document.createElement('div');
+            tableButtons.className = 'table-buttons';
+            tableButtons.style.display = 'none';
+            tableButtons.style.gap = '4px';
+            
+            // 行を下に追加
+            const addRowAfterBtn = createToolbarButton({
+                content: '↓+',
+                title: '行を下に追加',
+                onClick: () => editor?.chain().focus().addRowAfter().run()
+            });
+            tableButtons.appendChild(addRowAfterBtn);
+            
+            // 列を左に追加
+            const addColBeforeBtn = createToolbarButton({
+                content: '←+',
+                title: '列を左に追加',
+                onClick: () => editor?.chain().focus().addColumnBefore().run()
+            });
+            tableButtons.appendChild(addColBeforeBtn);
+            
+            // 列を右に追加
+            const addColAfterBtn = createToolbarButton({
+                content: '→+',
+                title: '列を右に追加',
+                onClick: () => editor?.chain().focus().addColumnAfter().run()
+            });
+            tableButtons.appendChild(addColAfterBtn);
+            
+            // 行を削除
+            const deleteRowBtn = createToolbarButton({
+                content: 'R✕',
+                title: '行を削除',
+                onClick: () => editor?.chain().focus().deleteRow().run()
+            });
+            tableButtons.appendChild(deleteRowBtn);
+            
+            // 列を削除
+            const deleteColBtn = createToolbarButton({
+                content: 'C✕',
+                title: '列を削除',
+                onClick: () => editor?.chain().focus().deleteColumn().run()
+            });
+            tableButtons.appendChild(deleteColBtn);
+            
+            // テーブルを削除
+            const deleteTableBtn = createToolbarButton({
+                content: '⊞✕',
+                title: 'テーブルを削除',
+                onClick: () => editor?.chain().focus().deleteTable().run()
+            });
+            tableButtons.appendChild(deleteTableBtn);
+            
+            toolbar.appendChild(tableButtons);
+            toolbar.appendChild(createSeparator());
+            
+            return toolbar;
+        }
+        
+        function initializeEditor() {
+            try {
+                // エディターコンテナを作成
+                const container = document.createElement('div');
+                container.className = 'editor-container';
+                
+                // ツールバーを作成
+                const toolbar = createToolbar();
+                container.appendChild(toolbar);
+                
+                // エディターコンテンツ領域を作成
+                const editorContent = document.createElement('div');
+                editorContent.className = 'editor-content';
+                container.appendChild(editorContent);
+                
+                // エディターを初期化
+                editor = new Editor({
+                    element: editorContent,
+                    extensions: [
+                        StarterKit,
+                        Table.configure({
+                            resizable: true,
+                        }),
+                        TableRow,
+                        TableHeader,
+                        TableCell,
+                        Placeholder.configure({
+                            placeholder: 'ここに文章を入力してください...',
+                        }),
+                        Image.configure({
+                            inline: false,
+                            allowBase64: false,
+                            HTMLAttributes: {
+                                class: 'editor-image',
+                                loading: 'lazy',
+                            },
+                        }),
+                        DriveImageExtension.configure({
+                            webAppUrl: 'https://script.google.com/macros/s/AKfycbwm5fbI1eHdZ5EjUBXgaNi4xZgjNZXQ0QdkTfv5K1WSlj25DNBQtrL-q0wRZZJeUQ6TVg/exec',
+
+                            maxFileSize: 10 * 1024 * 1024,
+                            allowedMimeTypes: [
+                                'image/jpeg',
+                                'image/png',
+                                'image/gif',
+                                'image/webp',
+                                'image/svg+xml'
+                            ],
+
+                            uploadTimeout: 45000,
+                            maxConcurrentUploads: 2,
+
+                            gallaryTimeout: 20000,
+                            gallaryCacheTimeout: 600000,
+
+                            enablePasteUpload: true,
+                            enableDropUpload: true,
+
+                            addToToolbar: true,
+                            toolbarButtonHTML: '📁',
+                            toolbarButtonTitle: 'Driveから画像を挿入',
+                            toolbarSelector: '.ProseMirror-menubar',
+                            buttonClass: 'menubar-button',
+
+                            debug: process.env.NODE_ENV === 'development'
+                        }),
+                    ],
+                    content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
+                    onUpdate: ({ editor }) => {
+                        console.log('Content updated:', editor.getHTML());
+                    },
+                    onCreate: () => {
+                        console.log('Editor created successfully');
+                        const driveExt = editor.extensionManager.extensions.find(
+                            ext => ext.name === 'driveImage'
+                        );
+
+                        if (driveExt) {
+                            const health = driveExt.healthCheck();
+                            if (!health.healthy) {
+                                console.log('DriveImage extension issues:', health.issues);
+                            }
+                        }
+                        updateToolbarState();
+                    },
+                    onUpdate: () => {
+                        updateToolbarState();
+                    },
+                    onSelectionUpdate: () => {
+                        updateToolbarState();
+                    },
+                });
+                
+                // ローディング画面をエディターに置き換え
+                const root = document.getElementById('editor-root');
+                root.innerHTML = '';
+                root.appendChild(container);
+                
+            } catch (error) {
+                console.error('Editor initialization failed:', error);
+                document.getElementById('editor-root').innerHTML = 
+                    '<div class="loading">エディターの初期化に失敗しました</div>';
+            }
+        }
+        
+        // DOM読み込み完了後にエディターを初期化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeEditor);
+        } else {
+            initializeEditor();
+        }
+        
+        // タイムアウト処理（5秒後に強制初期化）
+        setTimeout(() => {
+            const root = document.getElementById('editor-root');
+            if (root && root.innerHTML.includes('読み込み中')) {
+                console.warn('Editor initialization timed out');
+                initializeEditor();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
