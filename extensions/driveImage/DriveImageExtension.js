@@ -1,4 +1,4 @@
-import { Extension } from '@tiptap/core';
+import { Extension } from 'https://esm.sh/@tiptap/core';
 import { DriveImageHandler } from './DriveImageHandler.js';
 import { ImageModal } from './ImageModal.js';
 
@@ -665,4 +665,5 @@ export const DriveImageExtension = Extension.create({
       timestamp: new Date().toISOString()
     };
   }
+
 });
