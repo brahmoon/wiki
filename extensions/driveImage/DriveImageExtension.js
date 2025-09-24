@@ -108,7 +108,7 @@ export const DriveImageExtension = Extension.create({
 
     this.instanceId = `drive_ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // ✅ 内部関数としてバリデーション定義
+    // ✅ 内部関数: validateOptions
     const validateOptions = (options) => {
       const errors = [];
       const warnings = [];
@@ -137,16 +137,86 @@ export const DriveImageExtension = Extension.create({
       }
     };
 
-    // ✅ 呼び出し
-    validateOptions(this.options);
+    // ✅ 内部関数: addToolbarButton
+    const addToolbarButton = () => {
+      const toolbar = document.querySelector(this.options.toolbarSelector);
+      if (!toolbar) return;
 
-    if (this.options.addToToolbar) {
-      this.addToolbarButton();
-    }
-    if (this.options.enablePasteUpload || this.options.enableDropUpload) {
-      this.setupEditorEvents();
-    }
-    this.ensureToolbarStyles();
+      const btn = document.createElement('button');
+      btn.className = this.options.buttonClass;
+      btn.innerHTML = this.options.toolbarButtonHTML;
+      btn.title = this.options.toolbarButtonTitle;
+      btn.type = 'button';
+
+      btn.addEventListener('click', () => {
+        this.editor.commands.openImageModal();
+      });
+
+      toolbar.appendChild(btn);
+      this.toolbarButton = btn;
+    };
+
+    // ✅ 内部関数: setupEditorEvents
+    const setupEditorEvents = () => {
+      const editorElement = this.editor.view.dom;
+      if (this.options.enablePasteUpload) {
+        editorElement.addEventListener('paste', (e) => {
+          const items = Array.from(e.clipboardData?.items || []);
+          const imageItems = items.filter((i) => i.type.startsWith('image/'));
+          if (imageItems.length) {
+            e.preventDefault();
+            const files = imageItems.map((i) => i.getAsFile()).filter(Boolean);
+            DriveImageHandler.uploadMultipleImages(files, this.editor, this.options);
+          }
+        });
+      }
+      if (this.options.enableDropUpload) {
+        editorElement.addEventListener('drop', (e) => {
+          const files = Array.from(e.dataTransfer?.files || []);
+          const imageFiles = files.filter((f) => this.options.allowedMimeTypes.includes(f.type));
+          if (imageFiles.length) {
+            e.preventDefault();
+            DriveImageHandler.uploadMultipleImages(imageFiles, this.editor, this.options);
+          }
+        });
+      }
+    };
+
+    // ✅ 内部関数: ensureToolbarStyles
+    const ensureToolbarStyles = () => {
+      const styleId = 'drive-image-toolbar-styles';
+      if (document.getElementById(styleId)) return;
+
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        .toolbar-button {
+          background: none;
+          border: 1px solid transparent;
+          border-radius: 4px;
+          padding: 6px 8px;
+          cursor: pointer;
+          font-size: 16px;
+          color: #495057;
+          transition: all 0.2s;
+        }
+        .toolbar-button:hover {
+          background: #f8f9fa;
+          border-color: #dee2e6;
+        }
+        .toolbar-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      `;
+      document.head.appendChild(style);
+    };
+
+    // ---- 実行部分 ----
+    validateOptions(this.options);
+    if (this.options.addToToolbar) addToolbarButton();
+    if (this.options.enablePasteUpload || this.options.enableDropUpload) setupEditorEvents();
+    ensureToolbarStyles();
   },
 
   onDestroy() {
@@ -161,6 +231,5 @@ export const DriveImageExtension = Extension.create({
       this.toolbarButton.parentNode.removeChild(this.toolbarButton);
       this.toolbarButton = null;
     }
-    this.removeEditorEvents();
   },
 });
