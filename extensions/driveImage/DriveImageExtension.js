@@ -25,6 +25,34 @@ export const DriveImageExtension = Extension.create({
       debug: false
     };
   },
+  
+  validateOptions() {
+    const errors = [];
+    const warnings = [];
+
+    if (!this.options.webAppUrl) {
+      errors.push('webAppUrl is required');
+    }
+    if (this.options.webAppUrl && !/^https?:\/\//.test(this.options.webAppUrl)) {
+      errors.push('webAppUrl must be a valid URL');
+    }
+    if (this.options.maxFileSize <= 0) {
+      errors.push('maxFileSize must be greater than 0');
+    }
+    if (this.options.maxFileSize > 100 * 1024 * 1024) {
+      warnings.push('maxFileSize が大きすぎます');
+    }
+    if (!Array.isArray(this.options.allowedMimeTypes) || this.options.allowedMimeTypes.length === 0) {
+      errors.push('allowedMimeTypes must be a non-empty array');
+    }
+
+    if (errors.length > 0) {
+      console.error('[DriveImageExtension] Invalid options:', errors);
+    }
+    if (warnings.length > 0) {
+      console.warn('[DriveImageExtension] Option warnings:', warnings);
+    }
+  },
 
   addCommands() {
     return {
@@ -132,35 +160,7 @@ export const DriveImageExtension = Extension.create({
       this.toolbarButton = null;
     }
     this.removeEditorEvents();
-  },
-
-  // 🔽 validateOptions を Extension 内に組み込み
-  validateOptions() {
-    const errors = [];
-    const warnings = [];
-
-    if (!this.options.webAppUrl) {
-      errors.push('webAppUrl is required');
-    }
-    if (this.options.webAppUrl && !/^https?:\/\//.test(this.options.webAppUrl)) {
-      errors.push('webAppUrl must be a valid URL');
-    }
-    if (this.options.maxFileSize <= 0) {
-      errors.push('maxFileSize must be greater than 0');
-    }
-    if (this.options.maxFileSize > 100 * 1024 * 1024) {
-      warnings.push('maxFileSize が大きすぎます');
-    }
-    if (!Array.isArray(this.options.allowedMimeTypes) || this.options.allowedMimeTypes.length === 0) {
-      errors.push('allowedMimeTypes must be a non-empty array');
-    }
-
-    if (errors.length > 0) {
-      console.error('[DriveImageExtension] Invalid options:', errors);
-    }
-    if (warnings.length > 0) {
-      console.warn('[DriveImageExtension] Option warnings:', warnings);
-    }
   }
 });
+
 
