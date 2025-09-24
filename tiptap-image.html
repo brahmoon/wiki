@@ -370,12 +370,6 @@
                             ext => ext.name === 'driveImage'
                         );
 
-                        if (driveExt) {
-                            const health = driveExt.healthCheck();
-                            if (!health.healthy) {
-                                console.log('DriveImage extension issues:', health.issues);
-                            }
-                        }
                         updateToolbarState();
                     },
                     onUpdate: () => {
