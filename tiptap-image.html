@@ -3,13 +3,107 @@
 <head>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="./styles/editor.css">
-    <!-- link rel="stylesheet" href="./styles/drive-image-modal.css" -->
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 20px;
             background-color: #f5f5f5;
+        }
+        
+        .editor-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            flex-wrap: wrap;
+        }
+        
+        .toolbar-button {
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 6px 8px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #495057;
+            transition: all 0.2s;
+            min-width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .toolbar-button:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        .toolbar-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .toolbar-button.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .toolbar-separator {
+            width: 1px;
+            height: 20px;
+            background: #dee2e6;
+            margin: 0 4px;
+        }
+        
+        .table-buttons {
+            display: none;
+            gap: 4px;
+        }
+        
+        .editor-content {
+            min-height: 400px;
+        }
+        
+        .ProseMirror {
+            padding: 20px;
+            outline: none;
+            min-height: 360px;
+        }
+        
+        .ProseMirror p.is-editor-empty:first-child::before {
+            content: attr(data-placeholder);
+            float: left;
+            color: #adb5bd;
+            pointer-events: none;
+            height: 0;
+        }
+        
+        .editor-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -143,6 +237,8 @@
             });
             redoBtn.setAttribute('data-command', 'redo');
             toolbar.appendChild(redoBtn);
+            
+            toolbar.appendChild(createSeparator());
             
             // 太字ボタン
             const boldBtn = createToolbarButton({
@@ -288,7 +384,6 @@
             tableButtons.appendChild(deleteTableBtn);
             
             toolbar.appendChild(tableButtons);
-            toolbar.appendChild(createSeparator());
             
             return toolbar;
         }
@@ -302,9 +397,8 @@
                 // ツールバーを作成
                 const toolbar = createToolbar();
                 container.appendChild(toolbar);
-                DriveImageExtension.addToolbarButton?.();
                 
-                // エディターコンテンツ領域を作成
+                // エディターコンテント領域を作成
                 const editorContent = document.createElement('div');
                 editorContent.className = 'editor-content';
                 container.appendChild(editorContent);
@@ -333,7 +427,7 @@
                         }),
                         DriveImageExtension.configure({
                             webAppUrl: 'https://script.google.com/macros/s/AKfycbwm5fbI1eHdZ5EjUBXgaNi4xZgjNZXQ0QdkTfv5K1WSlj25DNBQtrL-q0wRZZJeUQ6TVg/exec',
-
+                            
                             maxFileSize: 10 * 1024 * 1024,
                             allowedMimeTypes: [
                                 'image/jpeg',
@@ -342,38 +436,33 @@
                                 'image/webp',
                                 'image/svg+xml'
                             ],
-
+                            
                             uploadTimeout: 45000,
                             maxConcurrentUploads: 2,
-
-                            gallaryTimeout: 20000,
-                            gallaryCacheTimeout: 600000,
-
+                            
+                            galleryTimeout: 20000,
+                            galleryCacheTimeout: 600000,
+                            
                             enablePasteUpload: true,
                             enableDropUpload: true,
-
+                            
+                            // 修正: 正しいツールバーセレクタを指定
                             addToToolbar: true,
-                            toolbarButtonHTML: '📁',
+                            toolbarButtonHTML: '🖼️',
                             toolbarButtonTitle: 'Driveから画像を挿入',
-                            toolbarSelector: '.ProseMirror-menubar',
-                            buttonClass: 'menubar-button'
-
-                            //debug: process.env.NODE_ENV === 'development'
+                            toolbarSelector: '.toolbar',  // ここを修正
+                            buttonClass: 'toolbar-button',  // ここを修正
+                            
+                            debug: true  // デバッグを有効にして問題を確認
                         }),
                     ],
                     content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
                     onUpdate: ({ editor }) => {
                         console.log('Content updated:', editor.getHTML());
+                        updateToolbarState();
                     },
                     onCreate: () => {
                         console.log('Editor created successfully');
-                        const driveExt = editor.extensionManager.extensions.find(
-                            ext => ext.name === 'driveImage'
-                        );
-
-                        updateToolbarState();
-                    },
-                    onUpdate: () => {
                         updateToolbarState();
                     },
                     onSelectionUpdate: () => {
@@ -385,6 +474,8 @@
                 const root = document.getElementById('editor-root');
                 root.innerHTML = '';
                 root.appendChild(container);
+                
+                console.log('Editor initialization completed');
                 
             } catch (error) {
                 console.error('Editor initialization failed:', error);
@@ -400,14 +491,14 @@
             initializeEditor();
         }
         
-        // タイムアウト処理（5秒後に強制初期化）
+        // タイムアウト処理（10秒後に強制初期化）
         setTimeout(() => {
             const root = document.getElementById('editor-root');
             if (root && root.innerHTML.includes('読み込み中')) {
                 console.warn('Editor initialization timed out');
                 initializeEditor();
             }
-        }, 5000);
+        }, 10000);
     </script>
 </body>
 </html>
