@@ -721,7 +721,7 @@ export class ImageModal {
     item.title = image.name || `無題の画像 ${index + 1}`;
     
     const img = document.createElement('img');
-    const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})("https://drive.google.com/uc?id=1jaM0bQUmwSHrvfJPrRWwDPh5poanFMbi");
+    const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(image.url);
     img.src = image.thumbnail || viewUrl;
     img.alt = image.name || '';
     img.setAttribute('aria-hidden', 'true'); // スクリーンリーダーでは親ボタンの説明のみ読む
@@ -969,4 +969,5 @@ export class ImageModal {
     this.lastFocusableElement = null;
   }
 }
+
 
