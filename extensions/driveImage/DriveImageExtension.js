@@ -22,36 +22,8 @@ export const DriveImageExtension = Extension.create({
       buttonClass: 'toolbar-button',
       enablePasteUpload: true,
       enableDropUpload: true,
-      debug: false
+      debug: false,
     };
-  },
-  
-  validateOptions() {
-    const errors = [];
-    const warnings = [];
-
-    if (!this.options.webAppUrl) {
-      errors.push('webAppUrl is required');
-    }
-    if (this.options.webAppUrl && !/^https?:\/\//.test(this.options.webAppUrl)) {
-      errors.push('webAppUrl must be a valid URL');
-    }
-    if (this.options.maxFileSize <= 0) {
-      errors.push('maxFileSize must be greater than 0');
-    }
-    if (this.options.maxFileSize > 100 * 1024 * 1024) {
-      warnings.push('maxFileSize が大きすぎます');
-    }
-    if (!Array.isArray(this.options.allowedMimeTypes) || this.options.allowedMimeTypes.length === 0) {
-      errors.push('allowedMimeTypes must be a non-empty array');
-    }
-
-    if (errors.length > 0) {
-      console.error('[DriveImageExtension] Invalid options:', errors);
-    }
-    if (warnings.length > 0) {
-      console.warn('[DriveImageExtension] Option warnings:', warnings);
-    }
   },
 
   addCommands() {
@@ -136,7 +108,37 @@ export const DriveImageExtension = Extension.create({
 
     this.instanceId = `drive_ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    this.validateOptions();
+    // ✅ 内部関数としてバリデーション定義
+    const validateOptions = (options) => {
+      const errors = [];
+      const warnings = [];
+
+      if (!options.webAppUrl) {
+        errors.push('webAppUrl is required');
+      }
+      if (options.webAppUrl && !/^https?:\/\//.test(options.webAppUrl)) {
+        errors.push('webAppUrl must be a valid URL');
+      }
+      if (options.maxFileSize <= 0) {
+        errors.push('maxFileSize must be greater than 0');
+      }
+      if (options.maxFileSize > 100 * 1024 * 1024) {
+        warnings.push('maxFileSize が大きすぎます');
+      }
+      if (!Array.isArray(options.allowedMimeTypes) || options.allowedMimeTypes.length === 0) {
+        errors.push('allowedMimeTypes must be a non-empty array');
+      }
+
+      if (errors.length > 0) {
+        console.error('[DriveImageExtension] Invalid options:', errors);
+      }
+      if (warnings.length > 0) {
+        console.warn('[DriveImageExtension] Option warnings:', warnings);
+      }
+    };
+
+    // ✅ 呼び出し
+    validateOptions(this.options);
 
     if (this.options.addToToolbar) {
       this.addToolbarButton();
@@ -151,8 +153,8 @@ export const DriveImageExtension = Extension.create({
     if (this.options.debug) {
       console.log(`DriveImageExtension destroyed (${this.instanceId})`);
     }
-    if (this.modal) {
-      this.modal.cleanup?.();
+    if (this.modal?.destroy) {
+      this.modal.destroy();
       this.modal = null;
     }
     if (this.toolbarButton && this.toolbarButton.parentNode) {
@@ -160,7 +162,5 @@ export const DriveImageExtension = Extension.create({
       this.toolbarButton = null;
     }
     this.removeEditorEvents();
-  }
+  },
 });
-
-
