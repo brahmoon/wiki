@@ -161,5 +161,6 @@ export const DriveImageExtension = Extension.create({
     if (warnings.length > 0) {
       console.warn('[DriveImageExtension] Option warnings:', warnings);
     }
-  },
+  }
 });
+
