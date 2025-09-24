@@ -56,8 +56,10 @@ export class DriveImageHandler {
       
       if (result.success) {
         // Tiptapエディターに画像を挿入
+        const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(result.url);
+        
         editor.chain().focus().setImage({
-          src: result.url,
+          src: viewUrl,
           alt: result.name || file.name,
           'data-drive-id': result.id,
           'data-upload-method': result.method,
@@ -655,3 +657,4 @@ export class DriveImageHandler {
     }, 300);
   }
 }
+
