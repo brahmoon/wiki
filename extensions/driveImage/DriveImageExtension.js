@@ -102,74 +102,41 @@ export const DriveImageExtension = Extension.create({
   },
 
   onCreate() {
-    if (this.options.debug) {
-      console.log('DriveImageExtension created with options:', this.options);
-    }
-
-    this.instanceId = `drive_ext_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // ✅ 内部関数: validateOptions
-    const validateOptions = (options) => {
-      const errors = [];
-      const warnings = [];
-
-      if (!options.webAppUrl) {
-        errors.push('webAppUrl is required');
-      }
-      if (options.webAppUrl && !/^https?:\/\//.test(options.webAppUrl)) {
-        errors.push('webAppUrl must be a valid URL');
-      }
-      if (options.maxFileSize <= 0) {
-        errors.push('maxFileSize must be greater than 0');
-      }
-      if (options.maxFileSize > 100 * 1024 * 1024) {
-        warnings.push('maxFileSize が大きすぎます');
-      }
-      if (!Array.isArray(options.allowedMimeTypes) || options.allowedMimeTypes.length === 0) {
-        errors.push('allowedMimeTypes must be a non-empty array');
-      }
-
-      if (errors.length > 0) {
-        console.error('[DriveImageExtension] Invalid options:', errors);
-      }
-      if (warnings.length > 0) {
-        console.warn('[DriveImageExtension] Option warnings:', warnings);
-      }
-    };
-
-    // ✅ 内部関数: addToolbarButton
     const addToolbarButton = () => {
       const toolbar = document.querySelector(this.options.toolbarSelector);
-      if (!toolbar) return;
-
+      if (!toolbar) {
+        console.warn('[DriveImageExtension] Toolbar element not found:', this.options.toolbarSelector);
+        return;
+      }
       const btn = document.createElement('button');
       btn.className = this.options.buttonClass;
       btn.innerHTML = this.options.toolbarButtonHTML;
       btn.title = this.options.toolbarButtonTitle;
       btn.type = 'button';
-
       btn.addEventListener('click', () => {
         this.editor.commands.openImageModal();
       });
-
       toolbar.appendChild(btn);
       this.toolbarButton = btn;
     };
-
-    // ✅ 内部関数: setupEditorEvents
+  
     const setupEditorEvents = () => {
       const editorElement = this.editor.view.dom;
+  
       if (this.options.enablePasteUpload) {
         editorElement.addEventListener('paste', (e) => {
           const items = Array.from(e.clipboardData?.items || []);
-          const imageItems = items.filter((i) => i.type.startsWith('image/'));
-          if (imageItems.length) {
+          const files = items
+            .filter((i) => i.type.startsWith('image/'))
+            .map((i) => i.getAsFile())
+            .filter(Boolean);
+          if (files.length) {
             e.preventDefault();
-            const files = imageItems.map((i) => i.getAsFile()).filter(Boolean);
             DriveImageHandler.uploadMultipleImages(files, this.editor, this.options);
           }
         });
       }
+  
       if (this.options.enableDropUpload) {
         editorElement.addEventListener('drop', (e) => {
           const files = Array.from(e.dataTransfer?.files || []);
@@ -181,14 +148,11 @@ export const DriveImageExtension = Extension.create({
         });
       }
     };
-
-    // ✅ 内部関数: ensureToolbarStyles
+  
     const ensureToolbarStyles = () => {
-      const styleId = 'drive-image-toolbar-styles';
-      if (document.getElementById(styleId)) return;
-
+      if (document.getElementById('drive-image-toolbar-styles')) return;
       const style = document.createElement('style');
-      style.id = styleId;
+      style.id = 'drive-image-toolbar-styles';
       style.textContent = `
         .toolbar-button {
           background: none;
@@ -204,16 +168,11 @@ export const DriveImageExtension = Extension.create({
           background: #f8f9fa;
           border-color: #dee2e6;
         }
-        .toolbar-button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
       `;
       document.head.appendChild(style);
     };
-
-    // ---- 実行部分 ----
-    validateOptions(this.options);
+  
+    // 実際に実行
     if (this.options.addToToolbar) addToolbarButton();
     if (this.options.enablePasteUpload || this.options.enableDropUpload) setupEditorEvents();
     ensureToolbarStyles();
@@ -233,3 +192,4 @@ export const DriveImageExtension = Extension.create({
     }
   },
 });
+
