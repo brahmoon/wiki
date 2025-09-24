@@ -1,10 +1,11 @@
+// CORS対応版 DriveImageHandler - プリフライトリクエストを回避
 /**
- * Google Drive画像アップロード・ギャラリー取得を行うハンドラークラス
+ * Google Drive画像アップロード・ギャラリー取得を行うハンドラークラス（CORS対応）
  * @class DriveImageHandler
  */
 export class DriveImageHandler {
   /**
-   * 画像ファイルをGoogle Driveにアップロード（バイナリ送信対応）
+   * 画像ファイルをGoogle Driveにアップロード（CORS対応版）
    * @param {File} file - アップロードするファイル
    * @param {Object} editor - Tiptapエディターインスタンス
    * @param {Object} options - 設定オプション
@@ -20,37 +21,28 @@ export class DriveImageHandler {
       
       this.showLoading(`"${file.name}" をアップロード中...`);
       
-      // バイナリ送信を優先、フォールバック時はBase64
-      let formData;
-      let uploadMethod;
+      // Base64に変換（プリフライトリクエストを回避するため）
+      const base64Data = await this.fileToBase64(file);
       
-      try {
-        // 効率的なバイナリ送信を試行
-        formData = new FormData();
-        formData.append('file', file);
-        formData.append('filename', file.name);
-        formData.append('mimetype', file.type);
-        formData.append('size', file.size.toString());
-        formData.append('uploadId', uploadId);
-        uploadMethod = 'binary';
-        
-      } catch (binaryError) {
-        // フォールバック: Base64送信
-        console.warn('Binary upload failed, falling back to Base64:', binaryError);
-        const base64 = await this.fileToBase64(file);
-        formData = new FormData();
-        formData.append('file', base64);
-        formData.append('filename', file.name);
-        formData.append('mimetype', file.type);
-        formData.append('method', 'base64');
-        formData.append('uploadId', uploadId);
-        uploadMethod = 'base64';
-      }
+      // リクエストデータを作成
+      const requestData = {
+        file: base64Data,
+        filename: file.name,
+        mimetype: file.type,
+        size: file.size.toString(),
+        uploadId: uploadId,
+        method: 'base64'
+      };
       
       const startTime = Date.now();
-      const response = await this.fetchWithTimeout(options.webAppUrl, {
+      
+      // Content-Type: text/plain でPOSTリクエストを送信（プリフライト回避）
+      const response = await this.fetchWithoutPreflight(options.webAppUrl, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'text/plain', // 重要: application/jsonではなくtext/plain
+        },
+        body: JSON.stringify(requestData), // JSONを文字列として送信
       }, options.uploadTimeout || 30000);
       
       const uploadTime = Date.now() - startTime;
@@ -68,19 +60,18 @@ export class DriveImageHandler {
           src: result.url,
           alt: result.name || file.name,
           'data-drive-id': result.id,
-          'data-upload-method': uploadMethod,
+          'data-upload-method': result.method,
           'data-upload-time': uploadTime.toString()
         }).run();
         
         this.hideLoading();
         this.showMessage(
-          `"${file.name}" をアップロードしました (${uploadMethod}, ${uploadTime}ms)`, 
+          `"${file.name}" をアップロードしました (${result.method}, ${uploadTime}ms)`, 
           'success'
         );
         
         return {
           ...result,
-          uploadMethod,
           uploadTime,
           fileName: file.name
         };
@@ -108,7 +99,50 @@ export class DriveImageHandler {
   }
   
   /**
-   * タイムアウト付きfetch
+   * プリフライトリクエストを回避するためのfetch実装
+   * @param {string} url - リクエストURL
+   * @param {Object} options - fetchオプション
+   * @param {number} timeout - タイムアウト時間(ms)
+   * @returns {Promise<Response>} レスポンス
+   */
+  static fetchWithoutPreflight(url, options, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`アップロードタイムアウト (${timeout}ms)`));
+      }, timeout);
+      
+      // Content-Type: text/plain を使用してプリフライトリクエストを回避
+      const fetchOptions = {
+        ...options,
+        headers: {
+          'Content-Type': 'text/plain', // 重要: プリフライトリクエストを回避
+          ...options.headers
+        },
+        signal: controller.signal,
+        mode: 'cors', // CORSモードで送信
+        credentials: 'omit' // 認証情報は送信しない
+      };
+      
+      fetch(url, fetchOptions)
+      .then(response => {
+        clearTimeout(timeoutId);
+        resolve(response);
+      })
+      .catch(error => {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          reject(new Error(`アップロードタイムアウト (${timeout}ms)`));
+        } else {
+          reject(error);
+        }
+      });
+    });
+  }
+  
+  /**
+   * タイムアウト付きfetch（GET用）
    * @param {string} url - リクエストURL
    * @param {Object} options - fetchオプション
    * @param {number} timeout - タイムアウト時間(ms)
@@ -119,12 +153,14 @@ export class DriveImageHandler {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-        reject(new Error(`アップロードタイムアウト (${timeout}ms)`));
+        reject(new Error(`リクエストタイムアウト (${timeout}ms)`));
       }, timeout);
       
       fetch(url, {
         ...options,
-        signal: controller.signal
+        signal: controller.signal,
+        mode: 'cors',
+        credentials: 'omit'
       })
       .then(response => {
         clearTimeout(timeoutId);
@@ -133,7 +169,7 @@ export class DriveImageHandler {
       .catch(error => {
         clearTimeout(timeoutId);
         if (error.name === 'AbortError') {
-          reject(new Error(`アップロードタイムアウト (${timeout}ms)`));
+          reject(new Error(`リクエストタイムアウト (${timeout}ms)`));
         } else {
           reject(error);
         }
@@ -162,6 +198,8 @@ export class DriveImageHandler {
       return error.message;
     } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
       return `${baseMessage}: ネットワークエラー。インターネット接続を確認してください`;
+    } else if (error.message.includes('CORS')) {
+      return `${baseMessage}: アクセス制限エラー。しばらく待ってから再試行してください`;
     } else {
       return `${baseMessage}: ${error.message}`;
     }
@@ -179,7 +217,7 @@ export class DriveImageHandler {
     if (!files || files.length === 0) return { success: [], errors: [] };
     
     const results = { success: [], errors: [] };
-    const maxConcurrent = options.maxConcurrentUploads || 3;
+    const maxConcurrent = Math.min(options.maxConcurrentUploads || 2, 2); // CORS回避のため最大2並列
     
     // ファイルをチャンクに分割して並列処理
     for (let i = 0; i < files.length; i += maxConcurrent) {
@@ -218,6 +256,11 @@ export class DriveImageHandler {
       });
       
       await Promise.all(promises);
+      
+      // CORS制限回避のため、チャンク間に短い遅延を追加
+      if (i + maxConcurrent < files.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
     
     // 結果サマリーを表示
@@ -351,7 +394,7 @@ export class DriveImageHandler {
   }
   
   /**
-   * Google Driveから画像ギャラリーを取得（キャッシュ対応）
+   * Google Driveから画像ギャラリーを取得（キャッシュ対応・CORS対応）
    * @param {Object} options - 設定オプション
    * @returns {Promise<Array>} 画像リスト
    */
@@ -369,9 +412,14 @@ export class DriveImageHandler {
     }
     
     try {
+      // GETリクエストはプリフライトリクエストが発生しないため、通常のfetchを使用
       const response = await this.fetchWithTimeout(
         `${options.webAppUrl}?action=gallery&_t=${Date.now()}`,
-        { method: 'GET' },
+        { 
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit'
+        },
         options.galleryTimeout || 15000
       );
       
@@ -425,6 +473,8 @@ export class DriveImageHandler {
       return 'アクセス制限中です。しばらく待ってから再試行してください';
     } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
       return 'ネットワークエラー';
+    } else if (error.message.includes('CORS')) {
+      return 'アクセス制限エラー';
     } else {
       return error.message;
     }
@@ -550,7 +600,7 @@ export class DriveImageHandler {
       box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 400px; word-wrap: break-word;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 14px; line-height: 1.4; opacity: 0; transform: translateX(100%);
-      transition: all 0.3s ease-out;
+      transition: all 0.3s ease-out; pointer-events: auto;
     `;
     
     // 閉じるボタンのイベント
@@ -583,7 +633,6 @@ export class DriveImageHandler {
         position: fixed; top: 20px; right: 20px; z-index: 10001;
         display: flex; flex-direction: column; pointer-events: none;
       `;
-      container.style.pointerEvents = 'none';
       document.body.appendChild(container);
     }
     return container;
