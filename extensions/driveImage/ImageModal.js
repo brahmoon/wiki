@@ -721,8 +721,8 @@ export class ImageModal {
     item.title = image.name || `無題の画像 ${index + 1}`;
     
     const img = document.createElement('img');
-    const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(image.url);
-    img.src = image.thumbnail || viewUrl;
+    //const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(image.url);
+    img.src = image.thumbnail || image.url;
     img.alt = image.name || '';
     img.setAttribute('aria-hidden', 'true'); // スクリーンリーダーでは親ボタンの説明のみ読む
     
@@ -758,9 +758,9 @@ export class ImageModal {
    * @param {Object} image - 画像情報
    */
   insertImage(image) {
-    const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(image.url);
+    //const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(image.url);
     this.editor.chain().focus().setImage({
-      src: viewUrl,
+      src: image.url,
       alt: image.name || '',
       'data-drive-id': image.id
     }).run();
@@ -970,6 +970,7 @@ export class ImageModal {
     this.lastFocusableElement = null;
   }
 }
+
 
 
 
