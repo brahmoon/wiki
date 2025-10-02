@@ -103,7 +103,100 @@
             border-radius: 4px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        
+
+        .resizable-image {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .resizable-image img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .resizable-image.is-selected img {
+            outline: 2px solid rgba(0, 123, 255, 0.45);
+            outline-offset: 2px;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(0, 123, 255, 0.95);
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            touch-action: none;
+            z-index: 5;
+        }
+
+        .resizable-image.is-selected .resize-handle {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .resize-handle-n {
+            top: 0;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: ns-resize;
+        }
+
+        .resize-handle-s {
+            bottom: 0;
+            left: 50%;
+            transform: translate(-50%, 50%);
+            cursor: ns-resize;
+        }
+
+        .resize-handle-e {
+            top: 50%;
+            right: 0;
+            transform: translate(50%, -50%);
+            cursor: ew-resize;
+        }
+
+        .resize-handle-w {
+            top: 50%;
+            left: 0;
+            transform: translate(-50%, -50%);
+            cursor: ew-resize;
+        }
+
+        .resize-handle-ne {
+            top: 0;
+            right: 0;
+            transform: translate(50%, -50%);
+            cursor: nesw-resize;
+        }
+
+        .resize-handle-nw {
+            top: 0;
+            left: 0;
+            transform: translate(-50%, -50%);
+            cursor: nwse-resize;
+        }
+
+        .resize-handle-se {
+            bottom: 0;
+            right: 0;
+            transform: translate(50%, 50%);
+            cursor: nwse-resize;
+        }
+
+        .resize-handle-sw {
+            bottom: 0;
+            left: 0;
+            transform: translate(-50%, 50%);
+            cursor: nesw-resize;
+        }
+
         .loading {
             text-align: center;
             padding: 60px 20px;
@@ -125,11 +218,10 @@
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header'
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell'
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder'
-        import { Image } from 'https://esm.sh/@tiptap/extension-image'
+        import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js'
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js'
-        
+
         let editor = null;
-        
         function createToolbarButton(config) {
             const button = document.createElement('button');
             button.className = 'toolbar-button';
@@ -208,6 +300,7 @@
             
             // テーブル関連ボタンの表示/非表示
             updateTableButtons();
+
         }
         
         function updateTableButtons() {
@@ -389,7 +482,7 @@
             tableButtons.appendChild(deleteTableBtn);
             
             toolbar.appendChild(tableButtons);
-            
+
             return toolbar;
         }
         
@@ -422,12 +515,16 @@
                         Placeholder.configure({
                             placeholder: 'ここに文章を入力してください...',
                         }),
-                        Image.configure({
+                        ResizableImage.configure({
                             inline: false,
                             allowBase64: false,
                             HTMLAttributes: {
                                 class: 'editor-image',
                                 loading: 'lazy',
+                            },
+                            resizeConstraints: {
+                                minShortSide: 200,
+                                maxLongSide: 720,
                             },
                         }),
                         DriveImageExtension.configure({
@@ -475,7 +572,13 @@
                         updateToolbarState();
                     },
                 });
-                
+
+                if (editor) {
+                    editor.on('transaction', () => {
+                        updateToolbarState();
+                    });
+                }
+
                 // ローディング画面をエディターに置き換え
                 const root = document.getElementById('editor-root');
                 root.innerHTML = '';
