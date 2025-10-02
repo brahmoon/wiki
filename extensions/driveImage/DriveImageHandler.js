@@ -54,7 +54,7 @@ export class DriveImageHandler {
       
       const result = await response.json();
       
-      //if (result.success) {
+      if (result.success) {
       //  サムネイルURLでTiptapエディターに画像を挿入
       //  editor.chain().focus().setImage({
       //    src: result.driveUrl, // サムネイルURL
@@ -685,4 +685,5 @@ export class DriveImageHandler {
     }, 300);
   }
 }
+
 
