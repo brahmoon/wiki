@@ -55,13 +55,11 @@ export class DriveImageHandler {
       const result = await response.json();
       
       if (result.success) {
-        // Tiptapエディターに画像を挿入
-        //const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(result.url);
-  
+        // サムネイルURLでTiptapエディターに画像を挿入
         editor.chain().focus().setImage({
-          src: result.url,
-          alt: result.name || file.name,
-          'data-drive-id': result.id,
+          src: result.driveUrl, // サムネイルURL
+          alt: result.fileName || file.name,
+          'data-drive-id': result.driveId,
           'data-upload-method': result.method,
           'data-upload-time': uploadTime.toString()
         }).run();
@@ -97,6 +95,55 @@ export class DriveImageHandler {
       enrichedError.uploadId = uploadId;
       
       throw enrichedError;
+    }
+  }
+  
+  /**
+   * 画像を削除
+   * @param {string} imageId - 削除する画像のDrive ID
+   * @param {Object} options - 設定オプション
+   * @returns {Promise<Object>} 削除結果
+   */
+  static async deleteImage(imageId, options) {
+    try {
+      if (!imageId) {
+        throw new Error('画像IDが指定されていません');
+      }
+      
+      this.showLoading('画像を削除中...');
+      
+      // DELETEリクエストを送信
+      const response = await this.fetchWithTimeout(
+        `${options.webAppUrl}?id=${encodeURIComponent(imageId)}`,
+        {
+          method: 'DELETE',
+          mode: 'cors',
+          credentials: 'omit'
+        },
+        options.uploadTimeout || 15000
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}\n${errorText}`);
+      }
+      
+      const result = await response.json();
+      
+      this.hideLoading();
+      
+      if (result.success) {
+        this.showMessage('画像を削除しました', 'success');
+        return result;
+      } else {
+        throw new Error(result.error || '削除に失敗しました');
+      }
+      
+    } catch (error) {
+      console.error('Delete error:', error);
+      this.hideLoading();
+      this.showMessage(`削除エラー: ${error.message}`, 'error');
+      throw error;
     }
   }
   
@@ -175,7 +222,7 @@ export class DriveImageHandler {
         } else {
           reject(error);
         }
-      });
+        });
     });
   }
   
@@ -396,25 +443,17 @@ export class DriveImageHandler {
   }
   
   /**
-   * Google Driveから画像ギャラリーを取得（キャッシュ対応・CORS対応）
+   * Google Driveから画像ギャラリーを取得（毎回リフレッシュ）
    * @param {Object} options - 設定オプション
    * @returns {Promise<Array>} 画像リスト
    */
   static async loadGallery(options) {
-    const cacheKey = `drive_gallery_${options.webAppUrl}`;
-    const cacheTimeout = options.galleryCacheTimeout || 300000; // 5分
-    
-    // キャッシュチェック
-    const cached = this.getCache(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < cacheTimeout) {
-      if (options.debug) {
-        console.log('Using cached gallery data');
-      }
-      return cached.data;
-    }
-    
     try {
-      // GETリクエストはプリフライトリクエストが発生しないため、通常のfetchを使用
+      if (options.debug) {
+        console.log('Loading gallery from Drive...');
+      }
+      
+      // 毎回新しいデータを取得（キャッシュ回避）
       const response = await this.fetchWithTimeout(
         `${options.webAppUrl}?action=gallery&_t=${Date.now()}`,
         { 
@@ -435,9 +474,6 @@ export class DriveImageHandler {
       if (result.success) {
         const images = result.images || [];
         
-        // キャッシュに保存
-        this.setCache(cacheKey, images);
-        
         if (options.debug) {
           console.log(`Loaded ${images.length} images from gallery`);
         }
@@ -448,14 +484,6 @@ export class DriveImageHandler {
       }
     } catch (error) {
       console.error('Gallery load error:', error);
-      
-      // エラー時はキャッシュを返す（あれば）
-      if (cached) {
-        console.warn('Using stale cached gallery data due to error');
-        this.showMessage('ギャラリー更新に失敗しました（キャッシュデータを表示）', 'warning');
-        return cached.data;
-      }
-      
       this.showMessage(`ギャラリー読み込みエラー: ${this.formatGalleryError(error)}`, 'error');
       return [];
     }
@@ -483,7 +511,7 @@ export class DriveImageHandler {
   }
   
   /**
-   * 簡易キャッシュ管理
+   * 簡易キャッシュ管理（削除機能追加）
    */
   static cache = new Map();
   
@@ -657,5 +685,3 @@ export class DriveImageHandler {
     }, 300);
   }
 }
-
-
