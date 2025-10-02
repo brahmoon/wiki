@@ -54,15 +54,15 @@ export class DriveImageHandler {
       
       const result = await response.json();
       
-      if (result.success) {
-        // サムネイルURLでTiptapエディターに画像を挿入
-        editor.chain().focus().setImage({
-          src: result.driveUrl, // サムネイルURL
-          alt: result.fileName || file.name,
-          'data-drive-id': result.driveId,
-          'data-upload-method': result.method,
-          'data-upload-time': uploadTime.toString()
-        }).run();
+      //if (result.success) {
+      //  サムネイルURLでTiptapエディターに画像を挿入
+      //  editor.chain().focus().setImage({
+      //    src: result.driveUrl, // サムネイルURL
+      //    alt: result.fileName || file.name,
+      //    'data-drive-id': result.driveId,
+      //    'data-upload-method': result.method,
+      //    'data-upload-time': uploadTime.toString()
+      //  }).run();
         
         this.hideLoading();
         this.showMessage(
@@ -685,3 +685,4 @@ export class DriveImageHandler {
     }, 300);
   }
 }
+
