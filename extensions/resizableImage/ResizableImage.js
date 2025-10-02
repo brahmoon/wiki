@@ -537,7 +537,7 @@ export const ResizableImage = Image.extend({
             try {
               event.target.releasePointerCapture(pointerId);
             } catch (error) {
-              // ignore release errors
+              // ignore
             }
           }
 
@@ -554,7 +554,7 @@ export const ResizableImage = Image.extend({
           try {
             event.target.setPointerCapture(pointerId);
           } catch (error) {
-            // ignore capture errors
+            // ignore
           }
         }
 
