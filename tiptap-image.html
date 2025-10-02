@@ -103,7 +103,150 @@
             border-radius: 4px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        
+
+        .toolbar-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            background: rgba(0, 123, 255, 0.08);
+            border: 1px solid rgba(0, 123, 255, 0.18);
+            border-radius: 6px;
+            font-size: 13px;
+            color: #495057;
+        }
+
+        .toolbar-group label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #495057;
+        }
+
+        .toolbar-group .toolbar-group-label {
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .toolbar-group .toolbar-group-separator {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .toolbar-group input[type="number"] {
+            width: 76px;
+            padding: 4px 6px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+        }
+
+        .toolbar-group input[type="number"]:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+        }
+
+        .image-size-group {
+            margin-left: auto;
+            order: 100;
+        }
+
+        .resizable-image {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .resizable-image img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .resizable-image.is-selected img {
+            outline: 2px solid rgba(0, 123, 255, 0.45);
+            outline-offset: 2px;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(0, 123, 255, 0.95);
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            touch-action: none;
+            z-index: 5;
+        }
+
+        .resizable-image.is-selected .resize-handle {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .resize-handle-n {
+            top: 0;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: ns-resize;
+        }
+
+        .resize-handle-s {
+            bottom: 0;
+            left: 50%;
+            transform: translate(-50%, 50%);
+            cursor: ns-resize;
+        }
+
+        .resize-handle-e {
+            top: 50%;
+            right: 0;
+            transform: translate(50%, -50%);
+            cursor: ew-resize;
+        }
+
+        .resize-handle-w {
+            top: 50%;
+            left: 0;
+            transform: translate(-50%, -50%);
+            cursor: ew-resize;
+        }
+
+        .resize-handle-ne {
+            top: 0;
+            right: 0;
+            transform: translate(50%, -50%);
+            cursor: nesw-resize;
+        }
+
+        .resize-handle-nw {
+            top: 0;
+            left: 0;
+            transform: translate(-50%, -50%);
+            cursor: nwse-resize;
+        }
+
+        .resize-handle-se {
+            bottom: 0;
+            right: 0;
+            transform: translate(50%, 50%);
+            cursor: nwse-resize;
+        }
+
+        .resize-handle-sw {
+            bottom: 0;
+            left: 0;
+            transform: translate(-50%, 50%);
+            cursor: nesw-resize;
+        }
+
         .loading {
             text-align: center;
             padding: 60px 20px;
@@ -125,10 +268,12 @@
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header'
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell'
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder'
-        import { Image } from 'https://esm.sh/@tiptap/extension-image'
+        import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js'
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js'
-        
+
         let editor = null;
+        let minWidthInput = null;
+        let maxWidthInput = null;
         
         function createToolbarButton(config) {
             const button = document.createElement('button');
@@ -208,6 +353,18 @@
             
             // テーブル関連ボタンの表示/非表示
             updateTableButtons();
+
+            const constraints = editor.storage?.resizableImage?.constraints || {};
+
+            if (minWidthInput && document.activeElement !== minWidthInput) {
+                const value = constraints.minWidth ?? '';
+                minWidthInput.value = value === '' ? '' : String(value);
+            }
+
+            if (maxWidthInput && document.activeElement !== maxWidthInput) {
+                const value = constraints.maxWidth ?? '';
+                maxWidthInput.value = value === '' ? '' : String(value);
+            }
         }
         
         function updateTableButtons() {
@@ -389,7 +546,70 @@
             tableButtons.appendChild(deleteTableBtn);
             
             toolbar.appendChild(tableButtons);
-            
+
+            const sizeGroup = document.createElement('div');
+            sizeGroup.className = 'toolbar-group image-size-group';
+
+            const sizeLabel = document.createElement('span');
+            sizeLabel.className = 'toolbar-group-label';
+            sizeLabel.textContent = '画像サイズ';
+            sizeGroup.appendChild(sizeLabel);
+
+            const minWrapper = document.createElement('label');
+            minWrapper.style.display = 'inline-flex';
+            minWrapper.style.alignItems = 'center';
+            minWrapper.style.gap = '4px';
+            minWrapper.textContent = '最小';
+
+            minWidthInput = document.createElement('input');
+            minWidthInput.type = 'number';
+            minWidthInput.min = '1';
+            minWidthInput.placeholder = 'px';
+            minWidthInput.setAttribute('aria-label', '画像の最小幅');
+            minWidthInput.addEventListener('change', () => {
+                if (!editor) return;
+                const raw = minWidthInput.value.trim();
+                const parsed = raw === '' ? null : Number(raw);
+                const payload = {
+                    minWidth: Number.isFinite(parsed) ? parsed : null,
+                };
+                editor.chain().focus().setImageResizeConstraints(payload).run();
+                updateToolbarState();
+            });
+            minWrapper.appendChild(minWidthInput);
+            sizeGroup.appendChild(minWrapper);
+
+            const separator = document.createElement('span');
+            separator.className = 'toolbar-group-separator';
+            separator.textContent = '〜';
+            sizeGroup.appendChild(separator);
+
+            const maxWrapper = document.createElement('label');
+            maxWrapper.style.display = 'inline-flex';
+            maxWrapper.style.alignItems = 'center';
+            maxWrapper.style.gap = '4px';
+            maxWrapper.textContent = '最大';
+
+            maxWidthInput = document.createElement('input');
+            maxWidthInput.type = 'number';
+            maxWidthInput.min = '1';
+            maxWidthInput.placeholder = 'px';
+            maxWidthInput.setAttribute('aria-label', '画像の最大幅');
+            maxWidthInput.addEventListener('change', () => {
+                if (!editor) return;
+                const raw = maxWidthInput.value.trim();
+                const parsed = raw === '' ? null : Number(raw);
+                const payload = {
+                    maxWidth: Number.isFinite(parsed) ? parsed : null,
+                };
+                editor.chain().focus().setImageResizeConstraints(payload).run();
+                updateToolbarState();
+            });
+            maxWrapper.appendChild(maxWidthInput);
+            sizeGroup.appendChild(maxWrapper);
+
+            toolbar.appendChild(sizeGroup);
+
             return toolbar;
         }
         
@@ -422,12 +642,18 @@
                         Placeholder.configure({
                             placeholder: 'ここに文章を入力してください...',
                         }),
-                        Image.configure({
+                        ResizableImage.configure({
                             inline: false,
                             allowBase64: false,
                             HTMLAttributes: {
                                 class: 'editor-image',
                                 loading: 'lazy',
+                            },
+                            resizeConstraints: {
+                                minWidth: 160,
+                                maxWidth: 720,
+                                minHeight: 120,
+                                maxHeight: 720,
                             },
                         }),
                         DriveImageExtension.configure({
@@ -475,7 +701,13 @@
                         updateToolbarState();
                     },
                 });
-                
+
+                if (editor) {
+                    editor.on('transaction', () => {
+                        updateToolbarState();
+                    });
+                }
+
                 // ローディング画面をエディターに置き換え
                 const root = document.getElementById('editor-root');
                 root.innerHTML = '';
