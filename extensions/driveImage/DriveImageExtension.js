@@ -11,9 +11,9 @@ export const DriveImageExtension = Extension.create({
       maxFileSize: 5 * 1024 * 1024,
       allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
       uploadTimeout: 30000,
-      maxConcurrentUploads: 3,
+      maxConcurrentUploads: 2, // CORS対応のため2に変更
       galleryTimeout: 15000,
-      galleryCacheTimeout: 300000,
+      galleryCacheTimeout: 0, // キャッシュを無効化（毎回リフレッシュ）
       recaptchaSiteKey: null,
       addToToolbar: true,
       toolbarButtonHTML: '🖼️',
@@ -82,12 +82,35 @@ export const DriveImageExtension = Extension.create({
           return true;
         },
 
+      deleteImage:
+        (imageId) =>
+        () => {
+          if (!imageId) {
+            if (this.options.debug) {
+              console.error('No image ID provided to deleteImage command');
+            }
+            return false;
+          }
+          DriveImageHandler.deleteImage(imageId, this.options);
+          return true;
+        },
+
       clearImageCache:
         () =>
         () => {
           DriveImageHandler.clearCache();
           if (this.options.debug) {
             console.log('Image cache cleared');
+          }
+          return true;
+        },
+
+      refreshGallery:
+        () =>
+        () => {
+          if (this.modal && this.modal.isVisible && this.modal.currentTab === 'gallery') {
+            const content = this.modal.modal.querySelector('.tab-content');
+            this.modal.showGalleryTab(content);
           }
           return true;
         },
@@ -98,6 +121,7 @@ export const DriveImageExtension = Extension.create({
     return {
       'Mod-Shift-i': () => this.editor.commands.openImageModal(),
       'Mod-Alt-i': () => this.editor.commands.insertImageFromGallery(),
+      'Mod-Shift-r': () => this.editor.commands.refreshGallery(),
     };
   },
 
@@ -146,6 +170,11 @@ export const DriveImageExtension = Extension.create({
             DriveImageHandler.uploadMultipleImages(imageFiles, this.editor, this.options);
           }
         });
+        
+        // ドラッグオーバー時のデフォルト動作を防止
+        editorElement.addEventListener('dragover', (e) => {
+          e.preventDefault();
+        });
       }
     };
   
@@ -163,10 +192,23 @@ export const DriveImageExtension = Extension.create({
           font-size: 16px;
           color: #495057;
           transition: all 0.2s;
+          min-width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         .toolbar-button:hover {
           background: #f8f9fa;
           border-color: #dee2e6;
+        }
+        .toolbar-button:focus {
+          outline: 2px solid #007bff;
+          outline-offset: 2px;
+        }
+        .toolbar-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
       `;
       document.head.appendChild(style);
@@ -182,8 +224,8 @@ export const DriveImageExtension = Extension.create({
     if (this.options.debug) {
       console.log(`DriveImageExtension destroyed (${this.instanceId})`);
     }
-    if (this.modal?.destroy) {
-      this.modal.destroy();
+    if (this.modal?.cleanup) {
+      this.modal.cleanup();
       this.modal = null;
     }
     if (this.toolbarButton && this.toolbarButton.parentNode) {
@@ -192,4 +234,3 @@ export const DriveImageExtension = Extension.create({
     }
   },
 });
-
