@@ -56,6 +56,11 @@
             cursor: not-allowed;
         }
         
+        .toolbar-button:focus {
+            outline: 2px solid #007bff;
+            outline-offset: 2px;
+        }
+        
         .toolbar-button.active {
             background: #007bff;
             color: white;
@@ -426,9 +431,10 @@
                             },
                         }),
                         DriveImageExtension.configure({
-                            webAppUrl: 'https://script.google.com/macros/s/AKfycbzgjl4qHGzz2KoCFD6g0IdI9Ikjzt6xRqBSSg1JitWIgA5sMWSMqlzdYMc1kfT_quuq/exec',
+                            // あなたのWebApp URLに変更してください
+                            webAppUrl: 'https://script.google.com/macros/s/AKfycbwJEdB6C4LTA6AAif4iDOOULVkwn1BZw44dGClLLaacF_jxdbA0a_Vq0SDYgd53D9rc/exec',
                             
-                            maxFileSize: 10 * 1024 * 1024,
+                            maxFileSize: 10 * 1024 * 1024, // 10MB
                             allowedMimeTypes: [
                                 'image/jpeg',
                                 'image/png',
@@ -438,22 +444,22 @@
                             ],
                             
                             uploadTimeout: 45000,
-                            maxConcurrentUploads: 2,
+                            maxConcurrentUploads: 2, // CORS対応のため2に変更
                             
                             galleryTimeout: 20000,
-                            galleryCacheTimeout: 600000,
+                            galleryCacheTimeout: 0, // 毎回リフレッシュ
                             
                             enablePasteUpload: true,
-                            enableDropUpload: false,
+                            enableDropUpload: true,
                             
-                            // 修正: 正しいツールバーセレクタを指定
+                            // ツールバー設定
                             addToToolbar: true,
                             toolbarButtonHTML: '🖼️',
                             toolbarButtonTitle: 'Driveから画像を挿入',
-                            toolbarSelector: '.toolbar',  // ここを修正
-                            buttonClass: 'toolbar-button',  // ここを修正
+                            toolbarSelector: '.toolbar',
+                            buttonClass: 'toolbar-button',
                             
-                            debug: true  // デバッグを有効にして問題を確認
+                            debug: true // デバッグを有効にして問題を確認
                         }),
                     ],
                     content: '<p>こんにちは！リッチテキストエディターをお試しください。</p>',
