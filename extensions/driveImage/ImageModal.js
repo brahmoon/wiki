@@ -1,5 +1,5 @@
 /**
- * 画像挿入用モーダルダイアログクラス（アクセシビリティ対応）
+ * 画像挿入用モーダルダイアログクラス（アクセシビリティ対応・削除機能付き）
  * @class ImageModal
  */
 export class ImageModal {
@@ -182,6 +182,42 @@ export class ImageModal {
         background: white;
       }
       
+      /* 削除ボタン */
+      .drive-image-modal .gallery-item .delete-btn {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 24px;
+        height: 24px;
+        background: rgba(220, 53, 69, 0.9);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        line-height: 1;
+        transition: all 0.2s;
+        z-index: 1;
+      }
+      
+      .drive-image-modal .gallery-item:hover .delete-btn,
+      .drive-image-modal .gallery-item:focus-within .delete-btn {
+        display: flex;
+      }
+      
+      .drive-image-modal .gallery-item .delete-btn:hover {
+        background: rgba(220, 53, 69, 1);
+        transform: scale(1.1);
+      }
+      
+      .drive-image-modal .gallery-item .delete-btn:focus {
+        outline: 2px solid #fff;
+        outline-offset: 1px;
+      }
+      
       .drive-image-modal .gallery-loading,
       .drive-image-modal .gallery-empty {
         text-align: center; 
@@ -276,6 +312,112 @@ export class ImageModal {
         margin-bottom: 4px;
       }
       
+      /* 進捗表示 */
+      .drive-image-modal .upload-progress {
+        margin-top: 16px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+      }
+      
+      .drive-image-modal .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      
+      .drive-image-modal .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #007bff, #0056b3);
+        transition: width 0.3s ease;
+        width: 0%;
+      }
+      
+      /* 削除確認ダイアログ */
+      .delete-confirmation-dialog {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10002;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      
+      .delete-confirmation-content {
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      }
+      
+      .delete-confirmation-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        color: #dc3545;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .delete-confirmation-message {
+        font-size: 14px;
+        color: #6c757d;
+        margin-bottom: 20px;
+        line-height: 1.5;
+      }
+      
+      .delete-confirmation-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+      }
+      
+      .delete-confirmation-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+      
+      .delete-confirmation-btn.cancel {
+        background: #f8f9fa;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+      }
+      
+      .delete-confirmation-btn.cancel:hover {
+        background: #e9ecef;
+      }
+      
+      .delete-confirmation-btn.delete {
+        background: #dc3545;
+        color: white;
+      }
+      
+      .delete-confirmation-btn.delete:hover {
+        background: #c82333;
+      }
+      
+      .delete-confirmation-btn:focus {
+        outline: 2px solid #007bff;
+        outline-offset: 2px;
+      }
+      
       /* レスポンシブ対応 */
       @media (max-width: 768px) {
         .drive-image-modal .modal-content {
@@ -300,6 +442,11 @@ export class ImageModal {
           padding: 30px 16px;
           min-height: 100px;
         }
+        
+        .delete-confirmation-content {
+          padding: 20px;
+          margin: 20px;
+        }
       }
       
       /* フォーカストラップ用のスタイル */
@@ -307,29 +454,17 @@ export class ImageModal {
         outline: none;
       }
       
-      /* 進捗表示 */
-      .drive-image-modal .upload-progress {
-        margin-top: 16px;
-        padding: 12px;
-        background: #f8f9fa;
-        border-radius: 6px;
-        border: 1px solid #e9ecef;
-      }
-      
-      .drive-image-modal .progress-bar {
-        width: 100%;
-        height: 8px;
-        background: #e9ecef;
-        border-radius: 4px;
+      /* アクセシビリティ用の非表示クラス */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
         overflow: hidden;
-        margin-top: 8px;
-      }
-      
-      .drive-image-modal .progress-bar-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #007bff, #0056b3);
-        transition: width 0.3s ease;
-        width: 0%;
+        clip: rect(0,0,0,0);
+        white-space: nowrap;
+        border: 0;
       }
     `;
   }
@@ -646,15 +781,15 @@ export class ImageModal {
       this.showUploadTab(content);
     }
   }
-  
-  /**
-   * ギャラリータブを表示
+
+   /**
+   * ギャラリータブを表示（毎回リフレッシュ）
    * @param {HTMLElement} container - コンテナ要素
    */
   async showGalleryTab(container) {
     container.innerHTML = `
       <div class="gallery-loading" role="status" aria-live="polite">
-        <div>🔄 ギャラリーを読み込み中...</div>
+        <div>📄 ギャラリーを読み込み中...</div>
         <div style="font-size: 14px; margin-top: 8px; opacity: 0.7;">しばらくお待ちください</div>
       </div>
     `;
@@ -707,21 +842,32 @@ export class ImageModal {
   }
   
   /**
-   * ギャラリーアイテムを作成（アクセシビリティ対応）
+   * ギャラリーアイテムを作成（アクセシビリティ対応・削除機能付き）
    * @param {Object} image - 画像情報
    * @param {number} index - インデックス
    * @returns {HTMLElement} ギャラリーアイテム要素
    */
   createGalleryItem(image, index) {
-    const item = document.createElement('button');
+    const item = document.createElement('div');
     item.className = 'gallery-item';
-    item.setAttribute('role', 'gridcell');
+    item.setAttribute('role', 'button');
     item.setAttribute('tabindex', '0');
     item.setAttribute('aria-label', `画像: ${image.name || `無題${index + 1}`}を挿入`);
     item.title = image.name || `無題の画像 ${index + 1}`;
     
+    // 削除ボタン
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.setAttribute('aria-label', `画像「${image.name || '無題'}」を削除`);
+    deleteBtn.title = '画像を削除';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showDeleteConfirmation(image);
+    });
+    
+    // 画像要素
     const img = document.createElement('img');
-    //const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(image.url);
     img.src = image.thumbnail || image.url;
     img.alt = image.name || '';
     img.setAttribute('aria-hidden', 'true'); // スクリーンリーダーでは親ボタンの説明のみ読む
@@ -735,10 +881,16 @@ export class ImageModal {
         </div>
       `;
       item.setAttribute('aria-label', `画像読み込みエラー: ${image.name || '無題の画像'}`);
+      // 削除ボタンは残す
+      item.appendChild(deleteBtn);
     };
     
-    item.addEventListener('click', () => {
-      this.insertImage(image);
+    // クリックで挿入
+    item.addEventListener('click', (e) => {
+      // 削除ボタンのクリックでない場合のみ挿入
+      if (!e.target.classList.contains('delete-btn')) {
+        this.insertImage(image);
+      }
     });
     
     // キーボードアクセシビリティ
@@ -746,11 +898,93 @@ export class ImageModal {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         this.insertImage(image);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        this.showDeleteConfirmation(image);
       }
     });
     
     item.appendChild(img);
+    item.appendChild(deleteBtn);
     return item;
+  }
+  
+  /**
+   * 削除確認ダイアログを表示
+   * @param {Object} image - 削除する画像情報
+   */
+  showDeleteConfirmation(image) {
+    const dialog = document.createElement('div');
+    dialog.className = 'delete-confirmation-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-labelledby', 'delete-title');
+    
+    dialog.innerHTML = `
+      <div class="delete-confirmation-content">
+        <div class="delete-confirmation-title" id="delete-title">
+          ⚠️ 画像を削除
+        </div>
+        <div class="delete-confirmation-message">
+          「${image.name || '無題の画像'}」を削除しますか？<br>
+          この操作は取り消せません。
+        </div>
+        <div class="delete-confirmation-buttons">
+          <button class="delete-confirmation-btn cancel">キャンセル</button>
+          <button class="delete-confirmation-btn delete">削除する</button>
+        </div>
+      </div>
+    `;
+    
+    const cancelBtn = dialog.querySelector('.cancel');
+    const deleteBtn = dialog.querySelector('.delete');
+    
+    // イベントリスナー
+    cancelBtn.addEventListener('click', () => {
+      document.body.removeChild(dialog);
+    });
+    
+    deleteBtn.addEventListener('click', async () => {
+      document.body.removeChild(dialog);
+      await this.deleteImage(image);
+    });
+    
+    // ESCキーで閉じる
+    dialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(dialog);
+      }
+    });
+    
+    // 外側クリックで閉じる
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        document.body.removeChild(dialog);
+      }
+    });
+    
+    document.body.appendChild(dialog);
+    
+    // 削除ボタンにフォーカス
+    setTimeout(() => deleteBtn.focus(), 100);
+  }
+  
+  /**
+   * 画像を削除
+   * @param {Object} image - 削除する画像情報
+   */
+  async deleteImage(image) {
+    try {
+      await this.handler.deleteImage(image.id, this.options);
+      
+      // ギャラリーを再読み込み
+      const content = this.modal.querySelector('.tab-content');
+      this.showGalleryTab(content);
+      
+    } catch (error) {
+      console.error('Delete image failed:', error);
+      // エラーメッセージは handler 内で表示済み
+    }
   }
   
   /**
@@ -758,9 +992,9 @@ export class ImageModal {
    * @param {Object} image - 画像情報
    */
   insertImage(image) {
-    //const viewUrl=((u)=>{try{const id=new URL(u).searchParams.get('id');return id?`https://drive.google.com/uc?export=view&id=${id}`:null}catch(_){return null}})(image.url);
+    // サムネイルURLで挿入
     this.editor.chain().focus().setImage({
-      src: image.url,
+      src: image.thumbnail || image.url,
       alt: image.name || '',
       'data-drive-id': image.id
     }).run();
@@ -970,7 +1204,3 @@ export class ImageModal {
     this.lastFocusableElement = null;
   }
 }
-
-
-
-
