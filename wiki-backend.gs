@@ -121,6 +121,12 @@ function routeAction(data) {
         originalId: data.originalId,
         newId: data.newId,
       });
+    case 'reorderPages':
+      return reorderPages({
+        movedId: data.movedId,
+        targetId: data.targetId,
+        position: data.position,
+      });
     default:
       return {
         success: false,
@@ -129,21 +135,59 @@ function routeAction(data) {
   }
 }
 
+function getParentIdFromPageId(id) {
+  if (!id) {
+    return '';
+  }
+  const parts = id.toString().split('/');
+  if (parts.length <= 1) {
+    return '';
+  }
+  parts.pop();
+  return parts.join('/');
+}
+
+function parseOrderValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function ensureSheetStructure(sheet) {
+  const headers = ['ID', 'Title', 'Content', 'UpdatedAt', 'Order'];
+  const current = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+  let needsUpdate = false;
+  for (let i = 0; i < headers.length; i++) {
+    if (current[i] !== headers[i]) {
+      needsUpdate = true;
+      break;
+    }
+  }
+  if (needsUpdate) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  if (sheet.getFrozenRows() < 1) {
+    sheet.setFrozenRows(1);
+  }
+}
+
 function getPages() {
   try {
     const sheet = getOrCreateSheet();
+    ensureSheetStructure(sheet);
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
       return { success: true, pages: [] };
     }
 
-    const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    const width = Math.max(sheet.getLastColumn(), 5);
+    const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const pages = data
       .filter(row => row[0])
       .map(row => ({
         id: row[0],
         title: row[1] || '無題',
-        updatedAt: row[3] || ''
+        updatedAt: row[3] || '',
+        order: parseOrderValue(row[4])
       }));
 
     return { success: true, pages };
@@ -159,12 +203,14 @@ function getPage(id) {
     }
 
     const sheet = getOrCreateSheet();
+    ensureSheetStructure(sheet);
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
       return { success: false, message: 'No pages found' };
     }
 
-    const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    const width = Math.max(sheet.getLastColumn(), 5);
+    const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const row = data.find(r => r[0] && r[0].toString() === id.toString());
     if (!row) {
       return { success: false, message: 'Page not found' };
@@ -176,7 +222,8 @@ function getPage(id) {
         id: row[0],
         title: row[1] || '無題',
         content: row[2] || '',
-        updatedAt: row[3] || ''
+        updatedAt: row[3] || '',
+        order: parseOrderValue(row[4])
       }
     };
   } catch (error) {
@@ -191,27 +238,63 @@ function savePage(page) {
     }
 
     const sheet = getOrCreateSheet();
+    ensureSheetStructure(sheet);
     const lastRow = sheet.getLastRow();
     const updatedAt = new Date().toISOString();
 
+    const width = Math.max(sheet.getLastColumn(), 5);
+    const data = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, width).getValues() : [];
+
     let targetRow = -1;
-    if (lastRow >= 2) {
-      const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
-      targetRow = ids.findIndex(value => value && value.toString() === page.id.toString());
+    let existingOrder = null;
+    if (data.length) {
+      targetRow = data.findIndex(row => row[0] && row[0].toString() === page.id.toString());
       if (targetRow >= 0) {
+        existingOrder = parseOrderValue(data[targetRow][4]);
         targetRow += 2;
       }
     }
+
+    let orderValue = parseOrderValue(page.order);
+    if (targetRow > 0 && orderValue === null) {
+      orderValue = existingOrder;
+    }
+
+    if (orderValue === null) {
+      const parentId = getParentIdFromPageId(page.id);
+      let maxOrder = 0;
+      data.forEach(row => {
+        const rowId = row[0];
+        if (!rowId) {
+          return;
+        }
+        const rowParent = getParentIdFromPageId(rowId.toString());
+        if (rowParent === parentId) {
+          const parsed = parseOrderValue(row[4]);
+          if (parsed !== null && parsed > maxOrder) {
+            maxOrder = parsed;
+          }
+        }
+      });
+      orderValue = maxOrder + 1;
+    }
+
+    if (!Number.isFinite(orderValue)) {
+      orderValue = data.length + 1;
+    }
+
+    orderValue = Math.max(1, Math.round(orderValue));
 
     const rowData = [
       page.id,
       page.title || '無題',
       page.content || '',
-      updatedAt
+      updatedAt,
+      orderValue
     ];
 
     if (targetRow > 0) {
-      sheet.getRange(targetRow, 1, 1, 4).setValues([rowData]);
+      sheet.getRange(targetRow, 1, 1, 5).setValues([rowData]);
       return { success: true, message: 'Page updated', updatedAt };
     }
 
@@ -236,12 +319,14 @@ function renamePageTree(params) {
     }
 
     const sheet = getOrCreateSheet();
+    ensureSheetStructure(sheet);
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
       return { success: false, message: 'Page not found' };
     }
 
-    const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    const width = Math.max(sheet.getLastColumn(), 5);
+    const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const updates = [];
     const prefix = originalId + '/';
 
@@ -300,13 +385,122 @@ function renamePageTree(params) {
   }
 }
 
+function reorderPages(params) {
+  try {
+    const movedId = params && params.movedId ? params.movedId.toString() : '';
+    const rawPosition = params && params.position ? params.position.toString() : 'end';
+    const position = rawPosition ? rawPosition.toLowerCase() : 'end';
+    const targetId = params && params.targetId ? params.targetId.toString() : '';
+
+    if (!movedId) {
+      return { success: false, message: 'movedId is required' };
+    }
+
+    const sheet = getOrCreateSheet();
+    ensureSheetStructure(sheet);
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, message: 'No pages found' };
+    }
+
+    const width = Math.max(sheet.getLastColumn(), 5);
+    const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+
+    const entries = data.map((row, index) => {
+      const id = row[0] ? row[0].toString() : '';
+      return {
+        id,
+        parent: getParentIdFromPageId(id),
+        order: parseOrderValue(row[4]),
+        index,
+      };
+    });
+
+    const movedEntry = entries.find(entry => entry.id === movedId);
+    if (!movedEntry) {
+      return { success: false, message: 'Moved page not found' };
+    }
+
+    let targetEntry = null;
+    if (position === 'before' || position === 'after') {
+      if (!targetId) {
+        return { success: false, message: 'targetId is required for before/after positions' };
+      }
+      targetEntry = entries.find(entry => entry.id === targetId);
+      if (!targetEntry) {
+        return { success: false, message: 'Target page not found' };
+      }
+      if (targetEntry.parent !== movedEntry.parent) {
+        return { success: false, message: 'Target and moved page must share the same parent' };
+      }
+    }
+
+    const parentKey = position === 'end' ? movedEntry.parent : (targetEntry ? targetEntry.parent : movedEntry.parent);
+    const siblings = entries
+      .filter(entry => entry.parent === parentKey && entry.id)
+      .sort((a, b) => {
+        const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+        const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        return a.index - b.index;
+      });
+
+    const remaining = siblings.filter(entry => entry.id !== movedEntry.id);
+    let reordered;
+    if (position === 'before') {
+      const targetIndex = remaining.findIndex(entry => entry.id === targetEntry.id);
+      if (targetIndex < 0) {
+        return { success: false, message: 'Target sibling not found' };
+      }
+      reordered = [
+        ...remaining.slice(0, targetIndex),
+        movedEntry,
+        ...remaining.slice(targetIndex),
+      ];
+    } else if (position === 'after') {
+      const targetIndex = remaining.findIndex(entry => entry.id === targetEntry.id);
+      if (targetIndex < 0) {
+        return { success: false, message: 'Target sibling not found' };
+      }
+      reordered = [
+        ...remaining.slice(0, targetIndex + 1),
+        movedEntry,
+        ...remaining.slice(targetIndex + 1),
+      ];
+    } else {
+      reordered = [...remaining, movedEntry];
+    }
+
+    const updates = [];
+    reordered.forEach((entry, index) => {
+      const desiredOrder = index + 1;
+      if (!Number.isFinite(entry.order) || entry.order !== desiredOrder) {
+        updates.push({ rowIndex: entry.index + 2, order: desiredOrder });
+      }
+    });
+
+    if (!updates.length) {
+      return { success: true, message: 'No changes required' };
+    }
+
+    updates.forEach(update => {
+      sheet.getRange(update.rowIndex, 5).setValue(update.order);
+    });
+
+    return { success: true, message: 'Order updated' };
+  } catch (error) {
+    return { success: false, message: 'Failed to reorder pages: ' + error };
+  }
+}
+
 function getOrCreateSheet() {
   const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   let sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(CONFIG.SHEET_NAME);
-    sheet.getRange(1, 1, 1, 4).setValues([['ID', 'Title', 'Content', 'UpdatedAt']]);
-    sheet.setFrozenRows(1);
   }
+  ensureSheetStructure(sheet);
   return sheet;
 }

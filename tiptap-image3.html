@@ -78,6 +78,7 @@
             align-items: center;
             gap: 6px;
             color: #37352f;
+            position: relative;
         }
 
         .tree-item:hover {
@@ -96,6 +97,19 @@
         .tree-item.drop-target,
         .tree-list.drop-target,
         .tree-children.drop-target {
+            outline: 2px dashed #2383e2;
+            outline-offset: 2px;
+        }
+
+        .tree-item.drop-before {
+            box-shadow: inset 0 3px 0 #2383e2;
+        }
+
+        .tree-item.drop-after {
+            box-shadow: inset 0 -3px 0 #2383e2;
+        }
+
+        .tree-item.drop-inside {
             outline: 2px dashed #2383e2;
             outline-offset: 2px;
         }
@@ -201,6 +215,8 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            position: relative;
+            --toolbar-height: 0px;
         }
 
         .loading-overlay {
@@ -315,6 +331,9 @@
             padding: 16px;
             border-bottom: 1px solid #edeceb;
             background: #fafafa;
+            position: sticky;
+            top: 0;
+            z-index: 20;
         }
 
         .toolbar button {
@@ -346,10 +365,18 @@
             background: #fff;
             align-items: center;
             flex-wrap: wrap;
+            position: sticky;
+            top: var(--toolbar-height, 0px);
+            z-index: 19;
         }
 
         .link-editor-bar.visible {
             display: flex;
+        }
+
+        .editor-container.is-scrolled .toolbar,
+        .editor-container.is-scrolled .link-editor-bar.visible {
+            box-shadow: 0 6px 12px rgba(15, 23, 42, 0.12);
         }
 
         .link-editor-input {
@@ -530,6 +557,7 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
+        import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
@@ -577,6 +605,8 @@
             createRootPage: document.getElementById('create-root-page'),
             reloadPages: document.getElementById('reload-pages'),
             toolbar: document.getElementById('toolbar'),
+            editorWrapper: document.querySelector('.editor-wrapper'),
+            editorContainer: document.querySelector('.editor-container'),
             editor: document.getElementById('editor'),
             statusMessage: document.getElementById('status-message'),
             updatedAt: document.getElementById('updated-at'),
@@ -597,7 +627,9 @@
         };
 
         const dragState = {
-            sourceId: null
+            sourceId: null,
+            dropTargetId: null,
+            dropPosition: null
         };
 
         function beginLoading(message) {
@@ -613,6 +645,27 @@
             if (loadingState.count === 0) {
                 elements.loadingOverlay.classList.remove('visible');
             }
+        }
+
+        function updateToolbarMetrics() {
+            if (!elements.editorContainer || !elements.toolbar) {
+                return;
+            }
+            const height = elements.toolbar.offsetHeight || 0;
+            elements.editorContainer.style.setProperty('--toolbar-height', `${height}px`);
+        }
+
+        function updateToolbarShadow() {
+            if (!elements.editorWrapper || !elements.editorContainer) {
+                return;
+            }
+            const scrolled = elements.editorWrapper.scrollTop > 4;
+            elements.editorContainer.classList.toggle('is-scrolled', scrolled);
+        }
+
+        function refreshToolbarAffordances() {
+            updateToolbarMetrics();
+            updateToolbarShadow();
         }
 
         function normalizeSlug(value) {
@@ -731,6 +784,32 @@
             });
         }
 
+        function isImageNodeSelection(editor) {
+            if (!editor) {
+                return false;
+            }
+            const selection = editor.state?.selection;
+            return selection instanceof NodeSelection && selection.node?.type?.name === 'image';
+        }
+
+        function getSelectedImageAttributes(editor) {
+            if (!isImageNodeSelection(editor)) {
+                return null;
+            }
+            return editor.state.selection.node?.attrs || null;
+        }
+
+        function isLinkActive(editor) {
+            if (!editor) {
+                return false;
+            }
+            if (editor.isActive('link')) {
+                return true;
+            }
+            const imageAttrs = getSelectedImageAttributes(editor);
+            return !!imageAttrs?.href;
+        }
+
         function createToolbarButton(label, command, isActive, tooltip) {
             const button = document.createElement('button');
             button.type = 'button';
@@ -753,7 +832,7 @@
             const buttons = [
                 createToolbarButton('B', () => editor.chain().focus().toggleBold().run(), () => editor.isActive('bold'), '太字'),
                 createToolbarButton('I', () => editor.chain().focus().toggleItalic().run(), () => editor.isActive('italic'), '斜体'),
-                createToolbarButton('🔗', handleLinkButtonClick, () => editor.isActive('link'), 'リンクを挿入/編集'),
+                createToolbarButton('🔗', handleLinkButtonClick, () => isLinkActive(editor), 'リンクを挿入/編集'),
                 createToolbarButton('H1', () => editor.chain().focus().toggleHeading({ level: 1 }).run(), () => editor.isActive('heading', { level: 1 }), '見出し 1'),
                 createToolbarButton('H2', () => editor.chain().focus().toggleHeading({ level: 2 }).run(), () => editor.isActive('heading', { level: 2 }), '見出し 2'),
                 createToolbarButton('H3', () => editor.chain().focus().toggleHeading({ level: 3 }).run(), () => editor.isActive('heading', { level: 3 }), '見出し 3'),
@@ -772,6 +851,8 @@
             if (state.linkEditor.visible) {
                 syncLinkEditorFromSelection();
             }
+
+            requestAnimationFrame(refreshToolbarAffordances);
         }
 
         function updateLinkTargetToggle() {
@@ -786,6 +867,7 @@
             state.linkEditor.visible = true;
             elements.linkEditorBar.classList.add('visible');
             updateLinkTargetToggle();
+            requestAnimationFrame(refreshToolbarAffordances);
         }
 
         function hideLinkEditor() {
@@ -794,11 +876,20 @@
             elements.linkInput.value = '';
             state.linkEditor.openInNewTab = false;
             updateLinkTargetToggle();
+            requestAnimationFrame(refreshToolbarAffordances);
         }
 
         function handleLinkButtonClick() {
             const editor = state.editor;
             if (!editor) return;
+            if (isImageNodeSelection(editor)) {
+                const attrs = getSelectedImageAttributes(editor) || {};
+                elements.linkInput.value = attrs.href || '';
+                state.linkEditor.openInNewTab = attrs.target === '_blank';
+                showLinkEditor();
+                requestAnimationFrame(() => elements.linkInput.focus());
+                return;
+            }
             const attrs = editor.getAttributes('link') || {};
             elements.linkInput.value = attrs.href || '';
             state.linkEditor.openInNewTab = attrs.target === '_blank';
@@ -810,6 +901,25 @@
             const editor = state.editor;
             if (!editor) return;
             const href = (elements.linkInput.value || '').trim();
+            if (isImageNodeSelection(editor)) {
+                if (!href) {
+                    editor.chain().focus().updateAttributes('image', {
+                        href: null,
+                        target: null,
+                        rel: null
+                    }).run();
+                    hideLinkEditor();
+                    return;
+                }
+                const attributes = {
+                    href,
+                    target: state.linkEditor.openInNewTab ? '_blank' : null,
+                    rel: state.linkEditor.openInNewTab ? 'noopener noreferrer' : null
+                };
+                editor.chain().focus().updateAttributes('image', attributes).run();
+                hideLinkEditor();
+                return;
+            }
             const chain = editor.chain().focus();
             if (!href) {
                 chain.extendMarkRange('link').unsetLink().run();
@@ -831,6 +941,15 @@
         function removeLinkFromSelection() {
             const editor = state.editor;
             if (!editor) return;
+            if (isImageNodeSelection(editor)) {
+                editor.chain().focus().updateAttributes('image', {
+                    href: null,
+                    target: null,
+                    rel: null
+                }).run();
+                hideLinkEditor();
+                return;
+            }
             editor.chain().focus().extendMarkRange('link').unsetLink().run();
             hideLinkEditor();
         }
@@ -843,6 +962,13 @@
             if (!editor) {
                 return;
             }
+            if (isImageNodeSelection(editor)) {
+                const attrs = getSelectedImageAttributes(editor) || {};
+                elements.linkInput.value = attrs.href || '';
+                state.linkEditor.openInNewTab = attrs.target === '_blank';
+                updateLinkTargetToggle();
+                return;
+            }
             const attrs = editor.getAttributes('link') || {};
             if (attrs.href) {
                 elements.linkInput.value = attrs.href;
@@ -852,59 +978,120 @@
         }
 
         function buildPageTree(pages) {
-            const map = new Map();
-            pages.forEach(page => {
-                const node = {
+            const nodes = [];
+            pages.forEach((page, index) => {
+                if (!page.id) {
+                    return;
+                }
+                const parentId = getParentId(page.id);
+                const parsedOrder = Number(page.order);
+                nodes.push({
                     id: page.id,
                     title: page.title || '無題',
                     updatedAt: page.updatedAt || '',
-                    parentId: getParentId(page.id),
+                    parentId,
                     slug: getSlug(page.id),
+                    order: Number.isFinite(parsedOrder) ? parsedOrder : index + 1,
                     children: []
-                };
-                map.set(node.id, node);
+                });
             });
 
-            const roots = [];
-            map.forEach(node => {
-                if (node.parentId && map.has(node.parentId)) {
-                    map.get(node.parentId).children.push(node);
-                } else {
-                    roots.push(node);
+            const map = new Map();
+            nodes.forEach(node => map.set(node.id, node));
+
+            const buckets = new Map();
+            nodes.forEach(node => {
+                const parentExists = node.parentId && map.has(node.parentId);
+                const key = parentExists ? node.parentId : null;
+                if (!parentExists) {
+                    node.parentId = null;
                 }
+                if (!buckets.has(key)) {
+                    buckets.set(key, []);
+                }
+                buckets.get(key).push(node);
             });
 
-            const sortNodes = nodes => {
-                nodes.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-                nodes.forEach(child => sortNodes(child.children));
+            const sortNodes = list => {
+                list.sort((a, b) => {
+                    const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+                    const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+                    if (orderA !== orderB) {
+                        return orderA - orderB;
+                    }
+                    return (a.title || '').localeCompare(b.title || '', 'ja');
+                });
             };
 
-            sortNodes(roots);
+            const roots = [];
+            const buildChildren = parentId => {
+                const key = parentId || null;
+                const list = buckets.get(key) || [];
+                sortNodes(list);
+                list.forEach(child => {
+                    if (parentId) {
+                        const parentNode = map.get(parentId);
+                        if (parentNode) {
+                            parentNode.children.push(child);
+                        }
+                    } else {
+                        roots.push(child);
+                    }
+                    buildChildren(child.id);
+                });
+            };
+
+            buildChildren(null);
 
             state.pageMap = map;
             state.pageTree = roots;
         }
 
-        function insertNode(node) {
-            state.pageMap.set(node.id, node);
-            if (node.parentId && state.pageMap.has(node.parentId)) {
-                const parent = state.pageMap.get(node.parentId);
-                parent.children.push(node);
-                parent.children.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-            } else {
-                state.pageTree.push(node);
-                state.pageTree.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+        function getSiblingList(parentId) {
+            if (parentId && state.pageMap.has(parentId)) {
+                return state.pageMap.get(parentId).children;
             }
+            return state.pageTree;
+        }
+
+        function sortSiblings(siblings) {
+            siblings.sort((a, b) => {
+                const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+                const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                return (a.title || '').localeCompare(b.title || '', 'ja');
+            });
+        }
+
+        function insertNode(node) {
+            const parentId = node.parentId || null;
+            const siblings = getSiblingList(parentId);
+            if (!Number.isFinite(Number(node.order))) {
+                const maxOrder = siblings.reduce((max, child) => {
+                    if (Number.isFinite(child.order) && child.order > max) {
+                        return child.order;
+                    }
+                    return max;
+                }, 0);
+                node.order = maxOrder + 1;
+            }
+            siblings.push(node);
+            sortSiblings(siblings);
+            state.pageMap.set(node.id, node);
         }
 
         function removeNode(id) {
             const node = state.pageMap.get(id);
-            if (!node) return;
-            if (node.parentId && state.pageMap.has(node.parentId)) {
-                const parent = state.pageMap.get(node.parentId);
-                parent.children = parent.children.filter(child => child.id !== id);
-            } else {
-                state.pageTree = state.pageTree.filter(root => root.id !== id);
+            if (!node) {
+                return;
+            }
+            const parentId = node.parentId || null;
+            const siblings = getSiblingList(parentId);
+            const index = siblings.findIndex(child => child.id === id);
+            if (index >= 0) {
+                siblings.splice(index, 1);
             }
             state.pageMap.delete(id);
         }
@@ -930,6 +1117,8 @@
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
             event.currentTarget.classList.add('drop-target');
+            dragState.dropTargetId = null;
+            dragState.dropPosition = null;
         }
 
         function handleListDragLeave(event) {
@@ -948,6 +1137,8 @@
                 setStatus('子ページの下へは移動できません。', 'error');
                 return;
             }
+            dragState.dropTargetId = null;
+            dragState.dropPosition = null;
             movePage(dragState.sourceId, parentId ? parentId : null);
         }
 
@@ -965,7 +1156,27 @@
         function handleDragEnd(event) {
             event.currentTarget.classList.remove('dragging');
             dragState.sourceId = null;
+            dragState.dropTargetId = null;
+            dragState.dropPosition = null;
             clearDropIndicators();
+        }
+
+        function setItemDropIndicator(element, position) {
+            if (!element) {
+                return;
+            }
+            element.classList.remove('drop-target', 'drop-before', 'drop-after', 'drop-inside');
+            if (!position) {
+                return;
+            }
+            if (position === 'inside') {
+                element.classList.add('drop-target');
+                element.classList.add('drop-inside');
+            } else if (position === 'before') {
+                element.classList.add('drop-before');
+            } else if (position === 'after') {
+                element.classList.add('drop-after');
+            }
         }
 
         function handleItemDragEnter(event) {
@@ -976,11 +1187,15 @@
             if (!targetId || targetId === dragState.sourceId || isDescendantId(targetId, dragState.sourceId)) {
                 return;
             }
-            event.currentTarget.classList.add('drop-target');
+            dragState.dropTargetId = targetId;
         }
 
         function handleItemDragLeave(event) {
-            event.currentTarget.classList.remove('drop-target');
+            setItemDropIndicator(event.currentTarget, null);
+            if (event.currentTarget.dataset.id === dragState.dropTargetId) {
+                dragState.dropTargetId = null;
+                dragState.dropPosition = null;
+            }
         }
 
         function handleItemDragOver(event) {
@@ -993,6 +1208,20 @@
             }
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
+            const rect = event.currentTarget.getBoundingClientRect();
+            const offsetY = event.clientY - rect.top;
+            const threshold = rect.height * 0.25;
+            let position = 'inside';
+            if (rect.height > 0) {
+                if (offsetY < threshold) {
+                    position = 'before';
+                } else if (offsetY > rect.height - threshold) {
+                    position = 'after';
+                }
+            }
+            dragState.dropTargetId = targetId;
+            dragState.dropPosition = position;
+            setItemDropIndicator(event.currentTarget, position);
         }
 
         function handleItemDrop(event) {
@@ -1002,15 +1231,27 @@
             event.preventDefault();
             event.stopPropagation();
             const targetId = event.currentTarget.dataset.id;
-            event.currentTarget.classList.remove('drop-target');
+            const dropPosition = dragState.dropPosition || 'inside';
+            setItemDropIndicator(event.currentTarget, null);
             if (!targetId || targetId === dragState.sourceId || isDescendantId(targetId, dragState.sourceId)) {
+                dragState.dropTargetId = null;
+                dragState.dropPosition = null;
                 return;
             }
-            movePage(dragState.sourceId, targetId);
+            if (dropPosition === 'before' || dropPosition === 'after') {
+                movePageRelative(dragState.sourceId, targetId, dropPosition);
+            } else {
+                movePage(dragState.sourceId, targetId);
+            }
+            dragState.dropTargetId = null;
+            dragState.dropPosition = null;
         }
 
         function clearDropIndicators() {
-            document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+            document.querySelectorAll('.drop-target, .drop-before, .drop-after, .drop-inside')
+                .forEach(el => el.classList.remove('drop-target', 'drop-before', 'drop-after', 'drop-inside'));
+            dragState.dropTargetId = null;
+            dragState.dropPosition = null;
         }
 
         function renderTree() {
@@ -1075,22 +1316,90 @@
             const baseSlug = node.slug || getSlug(pageId);
             const uniqueSlug = generateUniqueSlug(parentId, baseSlug, pageId);
             const newId = parentId ? `${parentId}/${uniqueSlug}` : uniqueSlug;
+            const requiresRename = newId !== pageId;
+            let workingId = pageId;
+            let nextSelection = null;
+            try {
+                clearDropIndicators();
+                setStatus('ページを移動しています...');
+                beginLoading('ページを移動しています...');
+                if (requiresRename) {
+                    await dataService.renamePageTree({ originalId: pageId, newId });
+                    workingId = newId;
+                    if (state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
+                        const suffix = state.currentPageId.substring(pageId.length);
+                        nextSelection = newId + suffix;
+                    }
+                } else if (state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
+                    nextSelection = state.currentPageId;
+                }
 
-            if (newId === pageId) {
+                await dataService.reorderPages({ movedId: workingId, targetId: null, position: 'end' });
+
+                const selectionTarget = nextSelection || state.currentPageId || workingId;
+                await loadPages(selectionTarget || undefined);
+                setStatus('ページを移動しました', 'success');
+            } catch (error) {
+                console.error('ページ移動エラー', error);
+                setStatus('ページの移動に失敗しました: ' + error.message, 'error');
+            } finally {
+                endLoading();
+            }
+        }
+
+        async function movePageRelative(pageId, referenceId, position) {
+            if (!pageId || !referenceId || !position) {
                 return;
             }
+            const node = state.pageMap.get(pageId);
+            const targetNode = state.pageMap.get(referenceId);
+            if (!node || !targetNode) {
+                return;
+            }
+            if (state.isNewPage && state.currentPageId === pageId) {
+                alert('新規ページは保存後に移動してください。');
+                return;
+            }
+            if (state.isDirty && state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
+                alert('未保存の変更があります。保存してから移動してください。');
+                return;
+            }
+
+            const desiredParentId = targetNode.parentId || null;
+            const currentParentId = node.parentId || null;
+            const baseSlug = node.slug || getSlug(pageId);
+            let workingId = pageId;
+            let nextSelection = null;
 
             try {
                 clearDropIndicators();
                 setStatus('ページを移動しています...');
                 beginLoading('ページを移動しています...');
-                await dataService.renamePageTree({ originalId: pageId, newId });
-                let nextSelection = null;
-                if (state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
-                    const suffix = state.currentPageId.substring(pageId.length);
-                    nextSelection = newId + suffix;
+
+                if (desiredParentId !== currentParentId) {
+                    const uniqueSlug = generateUniqueSlug(desiredParentId, baseSlug, pageId);
+                    const newId = desiredParentId ? `${desiredParentId}/${uniqueSlug}` : uniqueSlug;
+                    if (newId !== pageId) {
+                        await dataService.renamePageTree({ originalId: pageId, newId });
+                        workingId = newId;
+                        if (state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
+                            const suffix = state.currentPageId.substring(pageId.length);
+                            nextSelection = newId + suffix;
+                        }
+                    } else {
+                        workingId = newId;
+                    }
                 }
-                await loadPages(nextSelection || undefined);
+
+                await dataService.reorderPages({ movedId: workingId, targetId: referenceId, position });
+
+                if (!nextSelection && state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
+                    const suffix = state.currentPageId.substring(pageId.length);
+                    nextSelection = workingId + suffix;
+                }
+
+                const selectionTarget = nextSelection || state.currentPageId || workingId;
+                await loadPages(selectionTarget || undefined);
                 setStatus('ページを移動しました', 'success');
             } catch (error) {
                 console.error('ページ移動エラー', error);
@@ -1215,6 +1524,9 @@
                 return;
             }
 
+            const previousId = state.currentPageId;
+            const existingNode = previousId ? state.pageMap.get(previousId) : null;
+
             const payload = {
                 id,
                 title: titleInput || slugInput,
@@ -1224,12 +1536,23 @@
             try {
                 setStatus('保存中です...');
                 beginLoading('保存しています...');
-                if (!state.isNewPage && state.currentPageId && id !== state.currentPageId) {
+                if (!state.isNewPage && previousId && id !== previousId) {
                     elements.loadingMessage.textContent = 'ページIDを更新しています...';
-                    await dataService.renamePageTree({ originalId: state.currentPageId, newId: id });
+                    await dataService.renamePageTree({ originalId: previousId, newId: id });
+                    if (existingNode) {
+                        state.pageMap.delete(previousId);
+                        existingNode.id = id;
+                        existingNode.parentId = parentId || null;
+                        existingNode.slug = slugInput;
+                        state.pageMap.set(id, existingNode);
+                    }
                     state.currentPageId = id;
                     state.currentParentId = parentId || null;
                     elements.loadingMessage.textContent = '保存しています...';
+                }
+                const orderNode = state.pageMap.get(id);
+                if (orderNode && Number.isFinite(orderNode.order)) {
+                    payload.order = orderNode.order;
                 }
                 const response = await dataService.savePage(payload);
                 if (response.updatedAt) {
@@ -1371,6 +1694,10 @@
                     state.editor?.commands.focus();
                 }
             });
+            elements.editorWrapper?.addEventListener('scroll', updateToolbarShadow);
+            window.addEventListener('resize', () => {
+                requestAnimationFrame(updateToolbarMetrics);
+            });
             window.addEventListener('beforeunload', event => {
                 if (state.isDirty) {
                     event.preventDefault();
@@ -1437,6 +1764,7 @@
             });
             renderToolbar();
             prepareToolbarUpdates();
+            refreshToolbarAffordances();
         }
 
         function initialize() {
