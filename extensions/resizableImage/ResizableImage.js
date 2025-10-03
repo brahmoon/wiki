@@ -1,3 +1,4 @@
+import { mergeAttributes } from 'https://esm.sh/@tiptap/core';
 import { Image } from 'https://esm.sh/@tiptap/extension-image';
 
 const DIRECTIONS = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
@@ -153,7 +154,43 @@ export const ResizableImage = Image.extend({
           return ratio ? { 'data-aspect-ratio': String(ratio) } : {};
         },
       },
+      href: {
+        default: null,
+        parseHTML: element => {
+          const anchor = element.closest('a[href]');
+          return anchor ? anchor.getAttribute('href') : null;
+        },
+        renderHTML: attrs => (attrs.href ? { href: attrs.href } : {}),
+      },
+      target: {
+        default: null,
+        parseHTML: element => {
+          const anchor = element.closest('a[href]');
+          return anchor ? anchor.getAttribute('target') : null;
+        },
+        renderHTML: attrs => (attrs.target ? { target: attrs.target } : {}),
+      },
+      rel: {
+        default: null,
+        parseHTML: element => {
+          const anchor = element.closest('a[href]');
+          return anchor ? anchor.getAttribute('rel') : null;
+        },
+        renderHTML: attrs => (attrs.rel ? { rel: attrs.rel } : {}),
+      },
     };
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const { href, target, rel, ...rest } = HTMLAttributes;
+    const image = ['img', mergeAttributes(this.options.HTMLAttributes, rest)];
+    if (href) {
+      const anchorAttrs = { href };
+      if (target) anchorAttrs.target = target;
+      if (rel) anchorAttrs.rel = rel;
+      return ['a', anchorAttrs, image];
+    }
+    return image;
   },
 
   addCommands() {
@@ -224,6 +261,12 @@ export const ResizableImage = Image.extend({
       container.style.position = 'relative';
       container.style.display = 'inline-block';
 
+      const linkWrapper = document.createElement('a');
+      linkWrapper.classList.add('resizable-image-link');
+      linkWrapper.style.display = 'inline-block';
+      linkWrapper.style.lineHeight = '0';
+      linkWrapper.setAttribute('draggable', 'false');
+
       const imageEl = document.createElement('img');
       imageEl.draggable = false;
       let loadListener = null;
@@ -239,7 +282,8 @@ export const ResizableImage = Image.extend({
         });
       };
       applyOptionAttributes();
-      container.appendChild(imageEl);
+      linkWrapper.appendChild(imageEl);
+      container.appendChild(linkWrapper);
 
       const getConstraints = () => this.storage.constraints || {};
 
@@ -273,7 +317,26 @@ export const ResizableImage = Image.extend({
           imageEl.removeAttribute('height');
         }
 
-        const ignored = new Set(['src', 'alt', 'title', 'width', 'height', 'aspectRatio']);
+        const updateLinkAttributes = attrs => {
+          const hrefValue = attrs.href ?? null;
+          if (hrefValue) {
+            linkWrapper.setAttribute('href', String(hrefValue));
+            linkWrapper.classList.add('has-link');
+          } else {
+            linkWrapper.removeAttribute('href');
+            linkWrapper.classList.remove('has-link');
+          }
+
+          if (attrs.target) linkWrapper.setAttribute('target', String(attrs.target));
+          else linkWrapper.removeAttribute('target');
+
+          if (attrs.rel) linkWrapper.setAttribute('rel', String(attrs.rel));
+          else linkWrapper.removeAttribute('rel');
+        };
+
+        updateLinkAttributes(attrs);
+
+        const ignored = new Set(['src', 'alt', 'title', 'width', 'height', 'aspectRatio', 'href', 'target', 'rel']);
         Object.entries(attrs).forEach(([k, v]) => {
           if (ignored.has(k)) return;
           if (v === null || v === undefined || v === false) imageEl.removeAttribute(k);
@@ -432,7 +495,7 @@ export const ResizableImage = Image.extend({
           validateAndCommitDimensions();
           return true;
         },
-        ignoreMutation: m => m.type === 'attributes' && m.target === imageEl,
+        ignoreMutation: m => m.type === 'attributes' && (m.target === imageEl || m.target === linkWrapper),
         destroy: () => {
           if (loadListener) imageEl.removeEventListener('load', loadListener);
         },

@@ -77,6 +77,20 @@ export class WikiDataService {
     return this.#apiCall('renamePageTree', { originalId, newId });
   }
 
+  async reorderPages({ movedId, targetId = null, position = 'end' } = {}) {
+    if (!movedId) {
+      throw new Error('movedId is required');
+    }
+    const payload = {
+      movedId,
+      position,
+    };
+    if (targetId) {
+      payload.targetId = targetId;
+    }
+    return this.#apiCall('reorderPages', payload);
+  }
+
   async #apiCall(action, data = {}) {
     const payload = {
       action,
