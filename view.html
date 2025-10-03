@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wikiページ表示</title>
-  <link rel="stylesheet" href="../styles/editor.css">
+  <link rel="stylesheet" href="./styles/editor.css">
   <style>
     body {
       margin: 0;
@@ -160,7 +160,7 @@
   <script type="module">
     // Append a cache-busting query parameter so GitHub Pages deployments
     // fetch the latest WikiDataService implementation (text/plain POST).
-    import { WikiDataService } from '../scripts/wikiDataService.js?v=20240220';
+    import { WikiDataService } from './scripts/wikiDataService.js?v=20240220';
 
     const WIKI_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzg5z7gt9ILWlVLFAt5vANfdAgi7kFbLa_K5w03Qt14IKfAJU3soOtf5dfIf6AVKjTIYg/exec';
     const dataService = new WikiDataService({ endpoint: WIKI_APPS_SCRIPT_ENDPOINT });
