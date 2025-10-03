@@ -360,7 +360,7 @@
                 <div class="breadcrumb" id="breadcrumb"></div>
                 <div class="page-header-row">
                     <div class="input-group">
-                        <label class="input-label" for="page-name">ページ名（内部）</label>
+                        <label class="input-label" for="page-name">Page ID</label>
                         <input id="page-name" class="text-input" placeholder="sample-page" />
                     </div>
                     <div class="input-group" style="flex:1; min-width: 260px;">
@@ -368,8 +368,9 @@
                         <input id="page-title" class="text-input" placeholder="ページタイトル" />
                     </div>
                     <div class="header-actions">
-                        <button id="add-child-page" class="btn">子ページを追加</button>
-                        <button id="save-page" class="btn btn-primary">保存</button>
+                        <button id="add-child-page" class="btn" type="button">子ページを追加</button>
+                        <button id="save-page" class="btn btn-primary" type="button">保存</button>
+                        <button id="view-page" class="btn" type="button">ページを表示</button>
                     </div>
                 </div>
             </div>
@@ -435,6 +436,7 @@
             pageTitle: document.getElementById('page-title'),
             addChildPage: document.getElementById('add-child-page'),
             savePage: document.getElementById('save-page'),
+            viewPage: document.getElementById('view-page'),
             createRootPage: document.getElementById('create-root-page'),
             reloadPages: document.getElementById('reload-pages'),
             toolbar: document.getElementById('toolbar'),
@@ -445,6 +447,19 @@
 
         function normalizeSlug(value) {
             return value.trim().replace(/\s+/g, '-');
+        }
+
+        function getPageIdFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            const value = (params.get('page') || '').trim();
+            return value || null;
+        }
+
+        function updateHistory(pageId) {
+            const url = pageId
+                ? `${window.location.pathname}?page=${encodeURIComponent(pageId)}`
+                : window.location.pathname;
+            history.replaceState({ pageId }, '', url);
         }
 
         function getParentId(id) {
@@ -647,7 +662,7 @@
             }
         }
 
-        async function navigateToPage(id) {
+        async function navigateToPage(id, { updateHistory: shouldUpdateHistory = true } = {}) {
             if (!id) return;
             if (state.isNewPage && state.currentPageId === id) {
                 renderTree();
@@ -679,6 +694,9 @@
                 setStatus('ページを読み込みました', 'success');
                 updateBreadcrumb(page.id);
                 renderTree();
+                if (shouldUpdateHistory) {
+                    updateHistory(page.id);
+                }
             } catch (error) {
                 console.error('ページ読み込みエラー', error);
                 setStatus('ページの読み込みに失敗しました: ' + error.message, 'error');
@@ -785,6 +803,7 @@
             setUpdatedAt('');
             setStatus('新しいページを作成しました。保存して反映してください。');
             renderTree();
+            updateHistory(id);
         }
 
         function attachEventListeners() {
@@ -815,6 +834,24 @@
                         : state.currentPageId;
                     updateBreadcrumb(prospectiveId);
                 }
+            });
+            elements.viewPage.addEventListener('click', () => {
+                let targetId = state.currentPageId;
+                if (state.isNewPage) {
+                    const slug = normalizeSlug(elements.pageName.value || '');
+                    if (!slug) {
+                        alert('ページ名を入力してください。');
+                        elements.pageName.focus();
+                        return;
+                    }
+                    targetId = state.currentParentId ? `${state.currentParentId}/${slug}` : slug;
+                }
+                if (!targetId) {
+                    alert('ページを選択してください。');
+                    return;
+                }
+                const viewUrl = `./view.html?page=${encodeURIComponent(targetId)}`;
+                window.open(viewUrl, '_blank', 'noopener,noreferrer');
             });
             window.addEventListener('beforeunload', event => {
                 if (state.isDirty) {
@@ -882,7 +919,11 @@
         function initialize() {
             initEditor();
             attachEventListeners();
-            loadPages();
+            const initialPageId = getPageIdFromQuery();
+            if (initialPageId) {
+                updateHistory(initialPageId);
+            }
+            loadPages(initialPageId || undefined);
         }
 
         initialize();
