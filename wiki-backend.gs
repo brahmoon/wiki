@@ -13,23 +13,24 @@ const CONFIG = {
 };
 
 function doGet(e) {
+  const origin = getRequestOrigin(e);
   const data = parseRequestData(e);
   if (!data.action) {
     return createJsonOutput({
       success: true,
       message: 'Wiki backend is running',
       timestamp: new Date().toISOString(),
-    });
+    }, origin);
   }
 
   try {
     const result = routeAction(data);
-    return createJsonOutput(result);
+    return createJsonOutput(result, origin);
   } catch (error) {
     return createJsonOutput({
       success: false,
       message: 'Internal server error: ' + error,
-    });
+    }, origin);
   }
 }
 
@@ -37,19 +38,44 @@ function doPost(e) {
   try {
     const data = parseRequestData(e);
     const result = routeAction(data);
-    return createJsonOutput(result);
+    return createJsonOutput(result, getRequestOrigin(e));
   } catch (error) {
     return createJsonOutput({
       success: false,
       message: 'Internal server error: ' + error
-    });
+    }, getRequestOrigin(e));
   }
 }
 
-function createJsonOutput(data) {
-  return ContentService
+function createJsonOutput(data, requestOrigin) {
+  const output = ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+
+  const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || []).map(function(origin) {
+    return (origin || '').trim();
+  }).filter(function(origin) {
+    return origin;
+  });
+
+  if (allowedOrigins.length) {
+    if (allowedOrigins.indexOf('*') !== -1) {
+      output.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
+      output
+        .setHeader('Access-Control-Allow-Origin', requestOrigin)
+        .setHeader('Vary', 'Origin');
+    }
+  }
+
+  return output;
+}
+
+function getRequestOrigin(e) {
+  if (!e || !e.headers) {
+    return '';
+  }
+  return e.headers.origin || e.headers.Origin || '';
 }
 
 function parseRequestData(e) {
