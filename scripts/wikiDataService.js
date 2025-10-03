@@ -67,8 +67,22 @@ export class WikiDataService {
     return this.#apiCall('savePage', page);
   }
 
+  async renamePageTree({ originalId, newId }) {
+    if (!originalId || !newId) {
+      throw new Error('Both originalId and newId are required');
+    }
+    if (originalId === newId) {
+      return { success: true, message: 'No changes required' };
+    }
+    return this.#apiCall('renamePageTree', { originalId, newId });
+  }
+
   async #apiCall(action, data = {}) {
-    const payload = { action, ...data };
+    const payload = {
+      action,
+      origin: typeof window !== 'undefined' && window.location ? window.location.origin : '',
+      ...data,
+    };
 
     let response;
     try {
