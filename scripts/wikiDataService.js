@@ -85,22 +85,9 @@ export class WikiDataService {
     };
 
     let response;
-    let requestUrl = this.endpoint;
-    if (typeof window !== 'undefined' && window.location) {
-      try {
-        const url = new URL(this.endpoint);
-        if (!url.searchParams.has('origin')) {
-          url.searchParams.set('origin', window.location.origin);
-        }
-        requestUrl = url.toString();
-      } catch (error) {
-        console.warn('[WikiDataService] Failed to append origin to endpoint URL:', error);
-      }
-    }
-
     try {
       response = await fetchWithoutPreflight(
-        requestUrl,
+        this.endpoint,
         {
           method: 'POST',
           body: JSON.stringify(payload),
