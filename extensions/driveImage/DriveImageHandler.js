@@ -112,13 +112,16 @@ export class DriveImageHandler {
       
       this.showLoading('画像を削除中...');
       
-      // DELETEリクエストを送信
-      const response = await this.fetchWithTimeout(
-        `${options.webAppUrl}?id=${encodeURIComponent(imageId)}`,
+      // プリフライトを発生させない text/plain POST を使用して削除リクエストを送信
+      const response = await this.fetchWithoutPreflight(
+        options.webAppUrl,
         {
-          method: 'DELETE',
-          mode: 'cors',
-          credentials: 'omit'
+          method: 'POST',
+          body: JSON.stringify({
+            method: 'delete',
+            id: imageId,
+            imageId
+          })
         },
         options.uploadTimeout || 15000
       );
