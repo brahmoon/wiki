@@ -192,6 +192,59 @@
             flex-direction: column;
         }
 
+        .editor-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        }
+
+        .resizable-image {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .resizable-image img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .resizable-image.is-selected img {
+            outline: 2px solid rgba(35, 131, 226, 0.5);
+            outline-offset: 2px;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #2383e2;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            touch-action: none;
+            z-index: 5;
+        }
+
+        .resizable-image.is-selected .resize-handle {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .resize-handle-n { top: 0; left: 50%; transform: translate(-50%, -50%); cursor: ns-resize; }
+        .resize-handle-s { bottom: 0; left: 50%; transform: translate(-50%, 50%); cursor: ns-resize; }
+        .resize-handle-e { top: 50%; right: 0; transform: translate(50%, -50%); cursor: ew-resize; }
+        .resize-handle-w { top: 50%; left: 0; transform: translate(-50%, -50%); cursor: ew-resize; }
+        .resize-handle-ne { top: 0; right: 0; transform: translate(50%, -50%); cursor: nesw-resize; }
+        .resize-handle-nw { top: 0; left: 0; transform: translate(-50%, -50%); cursor: nwse-resize; }
+        .resize-handle-se { bottom: 0; right: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
+        .resize-handle-sw { bottom: 0; left: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
+
         .toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -343,6 +396,8 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
+        import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
+        import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
         /**
@@ -350,7 +405,7 @@
          * - wiki-backend.gs (spreadsheet storage)
          * - extensions/driveImage/DriveImageAppsScript.gs (Drive image management)
          */
-        const WIKI_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzg5z7gt9ILWlVLFAt5vANfdAgi7kFbLa_K5w03Qt14IKfAJU3soOtf5dfIf6AVKjTIYg/exec';
+        const WIKI_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxkzVroCbSCqvxaVyPjk-QZy6CMlvzXPnOHTWLH3HKUaRqnSQRhKjl_mahsXf52qD2XZQ/exec';
         const DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbytAAym-sjES9hdBK_0LES7nQ6H4mwxCgADk7u9xY--YRIWlkEJrvK2FMHmJG74zQ7E/exec';
 
         const APPS_SCRIPT_ENDPOINT = WIKI_APPS_SCRIPT_ENDPOINT;
@@ -455,6 +510,10 @@
                 createToolbarButton('コード', () => editor.chain().focus().toggleCodeBlock().run(), () => editor.isActive('codeBlock')),
                 createToolbarButton('表', () => editor.chain().focus().insertTable({ rows: 3, cols: 3 }).run(), () => false)
             ];
+
+            const driveImageButton = createToolbarButton('🖼️', () => editor.commands.openImageModal(), () => false);
+            driveImageButton.title = 'Drive画像を挿入';
+            buttons.push(driveImageButton);
 
             buttons.forEach(button => elements.toolbar.appendChild(button));
         }
@@ -780,7 +839,34 @@
                     Table.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
-                    TableCell
+                    TableCell,
+                    ResizableImage.configure({
+                        inline: false,
+                        allowBase64: false,
+                        HTMLAttributes: {
+                            class: 'editor-image',
+                            loading: 'lazy'
+                        },
+                        resizeConstraints: {
+                            minShortSide: 200,
+                            maxLongSide: 860
+                        }
+                    }),
+                    DriveImageExtension.configure({
+                        webAppUrl: DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT,
+                        maxFileSize: 10 * 1024 * 1024,
+                        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
+                        uploadTimeout: 45000,
+                        maxConcurrentUploads: 2,
+                        galleryTimeout: 20000,
+                        galleryCacheTimeout: 0,
+                        enablePasteUpload: true,
+                        enableDropUpload: true,
+                        addToToolbar: false,
+                        toolbarSelector: '.toolbar',
+                        buttonClass: 'btn',
+                        debug: false
+                    })
                 ],
                 content: '',
                 onUpdate() {

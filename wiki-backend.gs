@@ -1,6 +1,10 @@
 /**
  * Notion風Wikiバックエンド
- * JSONP / フォームPOST両対応
+ * text/plain POST（プリフライト回避）でのアクセスに対応
+ *
+ * このスクリプトは DriveImage 用 Apps Script とは別に独立した Web アプリとして
+ * デプロイし、フロントエンド（tiptap-image2.html 等）から Web App URL を指定して
+ * 呼び出してください。GitHub 上で直接実行することはありません。
  */
 const CONFIG = {
   SHEET_ID: '1ZN1LQdk2TDNmtMOdx6mXBNe3jQjFfM6CXWYc2Z4vXDk',
@@ -9,119 +13,89 @@ const CONFIG = {
 };
 
 function doGet(e) {
+  const data = parseRequestData(e);
+  if (!data.action) {
+    return createJsonOutput({
+      success: true,
+      message: 'Wiki backend is running',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   try {
-    const params = e?.parameter || {};
-    const callback = params.callback || 'callback';
-    const action = params.action;
-
-    if (!action) {
-      return createJsonpResponse({
-        success: true,
-        message: 'Wiki backend is running',
-        timestamp: new Date().toISOString()
-      }, callback);
-    }
-
-    let result;
-    switch (action) {
-      case 'getPages':
-        result = getPages();
-        break;
-      case 'getPage':
-        result = getPage(params.id);
-        break;
-      case 'savePage':
-        result = savePage({
-          id: params.id,
-          title: params.title,
-          content: params.content
-        });
-        break;
-      default:
-        result = { success: false, message: 'Unknown action: ' + action };
-        break;
-    }
-
-    return createJsonpResponse(result, callback);
+    const result = routeAction(data);
+    return createJsonOutput(result);
   } catch (error) {
-    const callback = e?.parameter?.callback || 'callback';
-    return createJsonpResponse({
+    return createJsonOutput({
       success: false,
       message: 'Internal server error: ' + error,
-    }, callback);
+    });
   }
 }
 
 function doPost(e) {
   try {
-    const params = e?.parameter || {};
-    const action = params.action;
-
-    let result;
-    switch (action) {
-      case 'savePage':
-        result = savePage({
-          id: params.id,
-          title: params.title,
-          content: params.content
-        });
-        break;
-      case 'getPages':
-        result = getPages();
-        break;
-      case 'getPage':
-        result = getPage(params.id);
-        break;
-      default:
-        result = { success: false, message: 'Unknown action: ' + action };
-        break;
-    }
-
-    return createHtmlResponse(result);
+    const data = parseRequestData(e);
+    const result = routeAction(data);
+    return createJsonOutput(result);
   } catch (error) {
-    return createHtmlResponse({
+    return createJsonOutput({
       success: false,
       message: 'Internal server error: ' + error
     });
   }
 }
 
-function createJsonpResponse(data, callback) {
-  const jsonp = callback + '(' + JSON.stringify(data) + ');';
+function createJsonOutput(data) {
   return ContentService
-    .createTextOutput(jsonp)
-    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
-function createHtmlResponse(data) {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head><meta charset="UTF-8"></head>
-      <body>
-        <div id="response" style="display:none;">${JSON.stringify(data)}</div>
-        <script>
-          try {
-            const responseData = ${JSON.stringify(data)};
-            if (window.parent && window.parent !== window) {
-              window.parent.postMessage({
-                type: 'FORM_RESPONSE',
-                data: responseData
-              }, '*');
-            }
-          } catch (error) {
-            if (window.parent && window.parent !== window) {
-              window.parent.postMessage({
-                type: 'FORM_RESPONSE',
-                data: { success: false, message: 'Response processing failed' }
-              }, '*');
-            }
-          }
-        </script>
-      </body>
-    </html>`;
-  return HtmlService.createHtmlOutput(html)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function parseRequestData(e) {
+  const data = {};
+
+  if (e && e.parameter) {
+    Object.keys(e.parameter).forEach(function(key) {
+      data[key] = e.parameter[key];
+    });
+  }
+
+  if (e && e.postData && e.postData.contents) {
+    try {
+      const parsed = JSON.parse(e.postData.contents);
+      Object.keys(parsed || {}).forEach(function(key) {
+        data[key] = parsed[key];
+      });
+    } catch (error) {
+      Logger.log('[WikiBackend] Failed to parse request body: %s', error);
+      data.rawBody = e.postData.contents;
+    }
+  }
+
+  return data;
+}
+
+function routeAction(data) {
+  const action = (data.action || '').toString();
+
+  switch (action) {
+    case 'savePage':
+      return savePage({
+        id: data.id,
+        title: data.title,
+        content: data.content,
+      });
+    case 'getPages':
+      return getPages();
+    case 'getPage':
+      return getPage(data.id);
+    default:
+      return {
+        success: false,
+        message: 'Unknown action: ' + action,
+      };
+  }
 }
 
 function getPages() {
