@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wikiページ表示</title>
+  <link rel="stylesheet" href="../styles/editor.css">
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #37352f;
+    }
+
+    .view-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    .breadcrumb {
+      font-size: 14px;
+      color: #6b6b67;
+      margin-bottom: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .breadcrumb a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
+    .page-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      padding: 40px;
+    }
+
+    .page-title {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 16px;
+      line-height: 1.3;
+    }
+
+    .page-updated {
+      font-size: 13px;
+      color: #6b6b67;
+      margin-bottom: 24px;
+    }
+
+    .page-content {
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .page-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+    }
+
+    .child-pages {
+      margin-top: 40px;
+      border-top: 1px solid #e9e9e7;
+      padding-top: 28px;
+    }
+
+    .child-pages-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 16px;
+    }
+
+    .child-page-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .child-page-list li a {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #f7f6f3;
+      color: #37352f;
+      text-decoration: none;
+      transition: background 0.2s ease;
+    }
+
+    .child-page-list li a:hover {
+      background: #ebeae7;
+    }
+
+    .status-message {
+      margin-top: 24px;
+      padding: 16px 20px;
+      border-radius: 8px;
+      background: #fff8e6;
+      border: 1px solid #f3d29b;
+      color: #9b6b2f;
+      font-size: 14px;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .status-message.error {
+      background: #ffecec;
+      border-color: #f2a7a7;
+      color: #b14242;
+    }
+
+    .loading-spinner {
+      margin: 120px auto;
+      width: 48px;
+      height: 48px;
+      border: 4px solid #d3d2ce;
+      border-top-color: #2383e2;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="view-container">
+    <nav class="breadcrumb" id="breadcrumb"></nav>
+    <div id="loader" class="loading-spinner"></div>
+    <section class="page-card hidden" id="pageCard">
+      <h1 class="page-title" id="pageTitle"></h1>
+      <div class="page-updated" id="pageUpdated"></div>
+      <article class="page-content" id="pageContent"></article>
+      <section class="child-pages hidden" id="childPagesSection">
+        <h2 class="child-pages-title">子ページ</h2>
+        <ul class="child-page-list" id="childPageList"></ul>
+      </section>
+      <div class="status-message hidden" id="statusMessage"></div>
+    </section>
+  </div>
+
+  <script type="module">
+    // Append a cache-busting query parameter so GitHub Pages deployments
+    // fetch the latest WikiDataService implementation (text/plain POST).
+    import { WikiDataService } from '../scripts/wikiDataService.js?v=20240220';
+
+    const WIKI_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzg5z7gt9ILWlVLFAt5vANfdAgi7kFbLa_K5w03Qt14IKfAJU3soOtf5dfIf6AVKjTIYg/exec';
+    const dataService = new WikiDataService({ endpoint: WIKI_APPS_SCRIPT_ENDPOINT });
+
+    const elements = {
+      loader: document.getElementById('loader'),
+      card: document.getElementById('pageCard'),
+      title: document.getElementById('pageTitle'),
+      updated: document.getElementById('pageUpdated'),
+      content: document.getElementById('pageContent'),
+      breadcrumb: document.getElementById('breadcrumb'),
+      childSection: document.getElementById('childPagesSection'),
+      childList: document.getElementById('childPageList'),
+      status: document.getElementById('statusMessage'),
+    };
+
+    const normalizePageId = (pageId) => {
+      const trimmed = (pageId || '').trim();
+      return trimmed || 'top';
+    };
+
+    function getPageIdFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      return normalizePageId(params.get('page'));
+    }
+
+    function showStatus(message, isError = false) {
+      if (!message) {
+        elements.status.classList.add('hidden');
+        elements.status.textContent = '';
+        elements.status.classList.remove('error');
+        return;
+      }
+      elements.status.textContent = message;
+      elements.status.classList.toggle('error', isError);
+      elements.status.classList.remove('hidden');
+    }
+
+    function renderBreadcrumb(pageId) {
+      const parts = pageId.split('/').filter(Boolean);
+      let pathAccumulator = '';
+      elements.breadcrumb.innerHTML = '';
+
+      if (!parts.length) {
+        const span = document.createElement('span');
+        span.textContent = 'top';
+        elements.breadcrumb.appendChild(span);
+        return;
+      }
+
+      parts.forEach((part, index) => {
+        pathAccumulator = index === 0 ? part : `${pathAccumulator}/${part}`;
+        if (index > 0) {
+          const separator = document.createElement('span');
+          separator.textContent = '›';
+          elements.breadcrumb.appendChild(separator);
+        }
+        const link = document.createElement('a');
+        link.href = `./view.html?page=${encodeURIComponent(pathAccumulator)}`;
+        link.dataset.pageId = pathAccumulator;
+        link.textContent = part;
+        elements.breadcrumb.appendChild(link);
+      });
+    }
+
+    function renderChildPages(pageId, pages) {
+      const children = pages
+        .filter(page => page.id.startsWith(`${pageId}/`))
+        .map(page => ({
+          ...page,
+          remainder: page.id.slice(pageId.length + 1),
+        }))
+        .filter(page => page.remainder && !page.remainder.includes('/'))
+        .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+
+      if (!children.length) {
+        elements.childSection.classList.add('hidden');
+        elements.childList.innerHTML = '';
+        return;
+      }
+
+      elements.childList.innerHTML = '';
+      children.forEach(child => {
+        const li = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = `./view.html?page=${encodeURIComponent(child.id)}`;
+        link.dataset.pageId = child.id;
+        link.textContent = child.title || child.remainder || '無題';
+        li.appendChild(link);
+        elements.childList.appendChild(li);
+      });
+      elements.childSection.classList.remove('hidden');
+    }
+
+    async function displayPage(pageId) {
+      const normalizedId = normalizePageId(pageId);
+      renderBreadcrumb(normalizedId);
+      showStatus('');
+      elements.loader.classList.remove('hidden');
+      elements.card.classList.add('hidden');
+
+      try {
+        const [page, pages] = await Promise.all([
+          dataService.getPage(normalizedId),
+          dataService.getPages(),
+        ]);
+
+        document.title = `${page.title || normalizedId} | Wikiビュー`;
+        elements.title.textContent = page.title || normalizedId;
+        elements.updated.textContent = page.updatedAt
+          ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}`
+          : '';
+        elements.content.innerHTML = page.content || '';
+        renderChildPages(normalizedId, pages);
+        showStatus('');
+      } catch (error) {
+        document.title = 'ページを表示できません';
+        elements.title.textContent = 'ページを表示できません';
+        elements.updated.textContent = '';
+        elements.content.innerHTML = '';
+        elements.childSection.classList.add('hidden');
+        showStatus(error.message || 'ページの取得に失敗しました。', true);
+      } finally {
+        elements.loader.classList.add('hidden');
+        elements.card.classList.remove('hidden');
+      }
+    }
+
+    function navigateTo(pageId, { replace = false } = {}) {
+      const normalizedId = normalizePageId(pageId);
+      const url = `?page=${encodeURIComponent(normalizedId)}`;
+
+      if (replace) {
+        history.replaceState({ pageId: normalizedId }, '', url);
+      } else {
+        history.pushState({ pageId: normalizedId }, '', url);
+      }
+
+      void displayPage(normalizedId);
+    }
+
+    document.addEventListener('click', (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      const anchor = event.target.closest('a[data-page-id]');
+      if (!anchor) {
+        return;
+      }
+
+      event.preventDefault();
+      navigateTo(anchor.dataset.pageId);
+    });
+
+    window.addEventListener('popstate', (event) => {
+      const pageId = normalizePageId(event.state?.pageId || getPageIdFromQuery());
+      void displayPage(pageId);
+    });
+
+    navigateTo(getPageIdFromQuery(), { replace: true });
+  </script>
+</body>
+</html>
