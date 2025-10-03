@@ -1,9 +1,6 @@
 /**
  * Google Apps Script backend for the Drive image integration.
  *
- * Deploy this file as a Web App and provide the deployment URL to the
- * DriveImageExtension front-end. Requests are sent as text/plain to avoid CORS
- * preflight checks, so the body must be parsed manually.
  */
 
 const DRIVE_IMAGE_FOLDER_PROPERTY = 'DRIVE_IMAGE_FOLDER_ID';

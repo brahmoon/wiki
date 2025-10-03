@@ -345,7 +345,21 @@
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
-        const APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzGcnE1B7swbbn9i698dIzAfv52Pk8Df-jsMEn1Y29o3Tn2y4_AJxYQjX1Rv8hSreXsqg/exec';
+        /**
+         * Apps Script endpoints
+         * - wiki-backend.gs (spreadsheet storage)
+         * - extensions/driveImage/DriveImageAppsScript.gs (Drive image management)
+         */
+        const WIKI_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzg5z7gt9ILWlVLFAt5vANfdAgi7kFbLa_K5w03Qt14IKfAJU3soOtf5dfIf6AVKjTIYg/exec';
+        const DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbytAAym-sjES9hdBK_0LES7nQ6H4mwxCgADk7u9xY--YRIWlkEJrvK2FMHmJG74zQ7E/exec';
+
+        const APPS_SCRIPT_ENDPOINT = WIKI_APPS_SCRIPT_ENDPOINT;
+
+        window.APP_ENDPOINTS = {
+          wiki: WIKI_APPS_SCRIPT_ENDPOINT,
+          driveImage: DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT
+        };
+
         const dataService = new WikiDataService({ endpoint: APPS_SCRIPT_ENDPOINT });
 
         const state = {
