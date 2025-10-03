@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion風Wikiエディター（TipTap）</title>
+    <link rel="stylesheet" href="./styles/editor.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #f5f5f5;
+            color: #37352f;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #f7f6f3;
+            border-right: 1px solid #e9e9e7;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px 24px 12px;
+            border-bottom: 1px solid #e9e9e7;
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .sidebar-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 24px;
+            border-bottom: 1px solid #e9e9e7;
+        }
+
+        .sidebar-actions .btn {
+            flex: 1;
+        }
+
+        .page-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 8px 24px 16px;
+        }
+
+        .tree-list,
+        .tree-list ul {
+            list-style: none;
+            margin: 0;
+            padding-left: 16px;
+        }
+
+        .tree-list > li {
+            padding-left: 0;
+        }
+
+        .tree-item {
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #37352f;
+        }
+
+        .tree-item:hover {
+            background: #e9e9e7;
+        }
+
+        .tree-item.active {
+            background: #2383e2;
+            color: #fff;
+        }
+
+        .tree-children {
+            margin-left: 12px;
+            border-left: 1px solid #e0dfdc;
+            padding-left: 12px;
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .page-header {
+            padding: 16px 32px;
+            border-bottom: 1px solid #e9e9e7;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .page-header-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 200px;
+        }
+
+        .input-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b6b67;
+        }
+
+        .text-input {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #d3d2ce;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .text-input:disabled {
+            background: #f1f1ef;
+            color: #9b9a97;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #d3d2ce;
+            background: #fff;
+            color: #37352f;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s, border 0.2s;
+        }
+
+        .btn:hover {
+            background: #f7f6f3;
+        }
+
+        .btn-primary {
+            background: #2383e2;
+            border-color: #2383e2;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #1a6bc2;
+        }
+
+        .editor-wrapper {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+            background: #f8f8f7;
+        }
+
+        .editor-container {
+            max-width: 860px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 16px;
+            border-bottom: 1px solid #edeceb;
+            background: #fafafa;
+        }
+
+        .toolbar button {
+            border: 1px solid transparent;
+            background: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 15px;
+            cursor: pointer;
+            color: #494848;
+        }
+
+        .toolbar button:hover {
+            background: #ececec;
+            border-color: #d0d0ce;
+        }
+
+        .toolbar button.active {
+            background: #2383e2;
+            color: #fff;
+            border-color: #2383e2;
+        }
+
+        .editor-content {
+            padding: 24px 32px 48px;
+        }
+
+        .ProseMirror {
+            min-height: 400px;
+            outline: none;
+        }
+
+        .ProseMirror p.is-editor-empty:first-child::before {
+            content: attr(data-placeholder);
+            float: left;
+            color: #adb5bd;
+            pointer-events: none;
+            height: 0;
+        }
+
+        .status-bar {
+            padding: 10px 24px;
+            font-size: 13px;
+            border-top: 1px solid #e9e9e7;
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-message {
+            color: #6b6b67;
+        }
+
+        .status-message.status-success {
+            color: #2f8f2f;
+        }
+
+        .status-message.status-error {
+            color: #c0352b;
+        }
+
+        .breadcrumb {
+            font-size: 12px;
+            color: #9b9a97;
+        }
+
+        .breadcrumb span + span::before {
+            content: ' / ';
+            color: #c6c5c1;
+        }
+
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: #9b9a97;
+        }
+
+        @media (max-width: 960px) {
+            .app-container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 260px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">ページ一覧</div>
+            </div>
+            <div class="sidebar-actions">
+                <button id="create-root-page" class="btn">新規ページ</button>
+                <button id="reload-pages" class="btn">再読み込み</button>
+            </div>
+            <div id="page-tree" class="page-tree"></div>
+        </aside>
+        <main class="main-area">
+            <div class="page-header">
+                <div class="breadcrumb" id="breadcrumb"></div>
+                <div class="page-header-row">
+                    <div class="input-group">
+                        <label class="input-label" for="page-name">ページ名（内部）</label>
+                        <input id="page-name" class="text-input" placeholder="sample-page" />
+                    </div>
+                    <div class="input-group" style="flex:1; min-width: 260px;">
+                        <label class="input-label" for="page-title">ページタイトル（表示）</label>
+                        <input id="page-title" class="text-input" placeholder="ページタイトル" />
+                    </div>
+                    <div class="header-actions">
+                        <button id="add-child-page" class="btn">子ページを追加</button>
+                        <button id="save-page" class="btn btn-primary">保存</button>
+                    </div>
+                </div>
+            </div>
+            <div class="editor-wrapper">
+                <div class="editor-container">
+                    <div class="toolbar" id="toolbar"></div>
+                    <div class="editor-content">
+                        <div id="editor" class="editor"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="status-bar">
+                <div id="status-message" class="status-message"></div>
+                <div id="updated-at" class="status-message"></div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { Editor } from 'https://esm.sh/@tiptap/core';
+        import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
+        import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
+        import { Table } from 'https://esm.sh/@tiptap/extension-table';
+        import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
+        import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
+        import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
+        import { WikiDataService } from './scripts/wikiDataService.js';
+
+        /**
+         * Apps Script endpoints
+         * - wiki-backend.gs (spreadsheet storage)
+         * - extensions/driveImage/DriveImageAppsScript.gs (Drive image management)
+         */
+        const WIKI_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzg5z7gt9ILWlVLFAt5vANfdAgi7kFbLa_K5w03Qt14IKfAJU3soOtf5dfIf6AVKjTIYg/exec';
+        const DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbytAAym-sjES9hdBK_0LES7nQ6H4mwxCgADk7u9xY--YRIWlkEJrvK2FMHmJG74zQ7E/exec';
+
+        const APPS_SCRIPT_ENDPOINT = WIKI_APPS_SCRIPT_ENDPOINT;
+
+        window.APP_ENDPOINTS = {
+          wiki: WIKI_APPS_SCRIPT_ENDPOINT,
+          driveImage: DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT
+        };
+
+        const dataService = new WikiDataService({ endpoint: APPS_SCRIPT_ENDPOINT });
+
+        const state = {
+            editor: null,
+            isDirty: false,
+            pageTree: [],
+            pageMap: new Map(),
+            currentPageId: null,
+            currentParentId: null,
+            isNewPage: false,
+            isApplyingContent: false
+        };
+
+        const elements = {
+            pageTree: document.getElementById('page-tree'),
+            breadcrumb: document.getElementById('breadcrumb'),
+            pageName: document.getElementById('page-name'),
+            pageTitle: document.getElementById('page-title'),
+            addChildPage: document.getElementById('add-child-page'),
+            savePage: document.getElementById('save-page'),
+            createRootPage: document.getElementById('create-root-page'),
+            reloadPages: document.getElementById('reload-pages'),
+            toolbar: document.getElementById('toolbar'),
+            editor: document.getElementById('editor'),
+            statusMessage: document.getElementById('status-message'),
+            updatedAt: document.getElementById('updated-at')
+        };
+
+        function normalizeSlug(value) {
+            return value.trim().replace(/\s+/g, '-');
+        }
+
+        function getParentId(id) {
+            if (!id) return null;
+            const parts = id.split('/');
+            parts.pop();
+            return parts.length ? parts.join('/') : null;
+        }
+
+        function getSlug(id) {
+            if (!id) return '';
+            const parts = id.split('/');
+            return parts.pop();
+        }
+
+        function updateBreadcrumb(id) {
+            elements.breadcrumb.innerHTML = '';
+            if (!id) return;
+            const fragments = id.split('/');
+            const parts = [];
+            for (let i = 0; i < fragments.length; i++) {
+                const segment = fragments.slice(0, i + 1).join('/');
+                parts.push({ id: segment, label: state.pageMap.get(segment)?.title || fragments[i] });
+            }
+            parts.forEach((part, index) => {
+                const span = document.createElement('span');
+                span.textContent = part.label || part.id;
+                span.dataset.id = part.id;
+                span.style.cursor = 'pointer';
+                span.addEventListener('click', () => {
+                    if (state.currentPageId === part.id) return;
+                    navigateToPage(part.id);
+                });
+                elements.breadcrumb.appendChild(span);
+            });
+        }
+
+        function createToolbarButton(label, command, isActive) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = label;
+            button.addEventListener('click', command);
+            if (isActive && isActive()) {
+                button.classList.add('active');
+            }
+            return button;
+        }
+
+        function renderToolbar() {
+            elements.toolbar.innerHTML = '';
+            const editor = state.editor;
+            if (!editor) return;
+
+            const buttons = [
+                createToolbarButton('B', () => editor.chain().focus().toggleBold().run(), () => editor.isActive('bold')),
+                createToolbarButton('I', () => editor.chain().focus().toggleItalic().run(), () => editor.isActive('italic')),
+                createToolbarButton('H1', () => editor.chain().focus().toggleHeading({ level: 1 }).run(), () => editor.isActive('heading', { level: 1 })),
+                createToolbarButton('H2', () => editor.chain().focus().toggleHeading({ level: 2 }).run(), () => editor.isActive('heading', { level: 2 })),
+                createToolbarButton('H3', () => editor.chain().focus().toggleHeading({ level: 3 }).run(), () => editor.isActive('heading', { level: 3 })),
+                createToolbarButton('UL', () => editor.chain().focus().toggleBulletList().run(), () => editor.isActive('bulletList')),
+                createToolbarButton('OL', () => editor.chain().focus().toggleOrderedList().run(), () => editor.isActive('orderedList')),
+                createToolbarButton('""', () => editor.chain().focus().toggleBlockquote().run(), () => editor.isActive('blockquote')),
+                createToolbarButton('コード', () => editor.chain().focus().toggleCodeBlock().run(), () => editor.isActive('codeBlock')),
+                createToolbarButton('表', () => editor.chain().focus().insertTable({ rows: 3, cols: 3 }).run(), () => false)
+            ];
+
+            buttons.forEach(button => elements.toolbar.appendChild(button));
+        }
+
+        function buildPageTree(pages) {
+            const map = new Map();
+            pages.forEach(page => {
+                const node = {
+                    id: page.id,
+                    title: page.title || '無題',
+                    updatedAt: page.updatedAt || '',
+                    parentId: getParentId(page.id),
+                    slug: getSlug(page.id),
+                    children: []
+                };
+                map.set(node.id, node);
+            });
+
+            const roots = [];
+            map.forEach(node => {
+                if (node.parentId && map.has(node.parentId)) {
+                    map.get(node.parentId).children.push(node);
+                } else {
+                    roots.push(node);
+                }
+            });
+
+            const sortNodes = nodes => {
+                nodes.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+                nodes.forEach(child => sortNodes(child.children));
+            };
+
+            sortNodes(roots);
+
+            state.pageMap = map;
+            state.pageTree = roots;
+        }
+
+        function insertNode(node) {
+            state.pageMap.set(node.id, node);
+            if (node.parentId && state.pageMap.has(node.parentId)) {
+                const parent = state.pageMap.get(node.parentId);
+                parent.children.push(node);
+                parent.children.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+            } else {
+                state.pageTree.push(node);
+                state.pageTree.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+            }
+        }
+
+        function removeNode(id) {
+            const node = state.pageMap.get(id);
+            if (!node) return;
+            if (node.parentId && state.pageMap.has(node.parentId)) {
+                const parent = state.pageMap.get(node.parentId);
+                parent.children = parent.children.filter(child => child.id !== id);
+            } else {
+                state.pageTree = state.pageTree.filter(root => root.id !== id);
+            }
+            state.pageMap.delete(id);
+        }
+
+        function renderTree() {
+            elements.pageTree.innerHTML = '';
+            if (!state.pageTree.length) {
+                const empty = document.createElement('div');
+                empty.className = 'empty-state';
+                empty.textContent = 'ページがありません。「新規ページ」を押して作成してください。';
+                elements.pageTree.appendChild(empty);
+                return;
+            }
+
+            const list = document.createElement('ul');
+            list.className = 'tree-list';
+            state.pageTree.forEach(node => list.appendChild(renderTreeNode(node)));
+            elements.pageTree.appendChild(list);
+        }
+
+        function renderTreeNode(node) {
+            const item = document.createElement('li');
+            const label = document.createElement('div');
+            label.className = 'tree-item';
+            if (node.id === state.currentPageId) {
+                label.classList.add('active');
+            }
+            label.textContent = node.title;
+            label.addEventListener('click', () => navigateToPage(node.id));
+            item.appendChild(label);
+
+            if (node.children.length) {
+                const childList = document.createElement('ul');
+                childList.className = 'tree-children';
+                node.children.forEach(child => childList.appendChild(renderTreeNode(child)));
+                item.appendChild(childList);
+            }
+
+            return item;
+        }
+
+        function setStatus(message, type = 'info') {
+            elements.statusMessage.textContent = message || '';
+            elements.statusMessage.classList.remove('status-success', 'status-error');
+            if (type === 'success') {
+                elements.statusMessage.classList.add('status-success');
+            } else if (type === 'error') {
+                elements.statusMessage.classList.add('status-error');
+            }
+        }
+
+        function setUpdatedAt(text) {
+            elements.updatedAt.textContent = text || '';
+        }
+
+        async function loadPages(selectId) {
+            try {
+                setStatus('ページ一覧を読み込み中...');
+                const pages = await dataService.getPages();
+                buildPageTree(pages);
+                renderTree();
+                setStatus('ページ一覧を更新しました', 'success');
+                if (selectId) {
+                    await navigateToPage(selectId);
+                } else if (!state.currentPageId && pages.length) {
+                    await navigateToPage(pages[0].id);
+                } else {
+                    renderTree();
+                }
+            } catch (error) {
+                console.error('ページ一覧の読み込みに失敗しました', error);
+                setStatus('ページ一覧の読み込みに失敗しました: ' + error.message, 'error');
+            }
+        }
+
+        async function navigateToPage(id) {
+            if (!id) return;
+            if (state.isNewPage && state.currentPageId === id) {
+                renderTree();
+                return;
+            }
+            if (state.isDirty && !confirm('未保存の変更があります。ページを切り替えますか？')) {
+                return;
+            }
+            try {
+                setStatus('ページを読み込み中...');
+                const page = await dataService.getPage(id);
+                state.currentPageId = page.id;
+                state.currentParentId = getParentId(page.id);
+                state.isNewPage = false;
+                state.isDirty = false;
+                if (state.pageMap.has(page.id)) {
+                    const node = state.pageMap.get(page.id);
+                    node.title = page.title || '無題';
+                    node.updatedAt = page.updatedAt || '';
+                }
+                elements.pageName.value = getSlug(page.id);
+                elements.pageName.disabled = true;
+                elements.pageTitle.value = page.title || '無題';
+                state.isApplyingContent = true;
+                state.editor.commands.setContent(page.content || '', false);
+                state.isApplyingContent = false;
+                renderToolbar();
+                setUpdatedAt(page.updatedAt ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}` : '');
+                setStatus('ページを読み込みました', 'success');
+                updateBreadcrumb(page.id);
+                renderTree();
+            } catch (error) {
+                console.error('ページ読み込みエラー', error);
+                setStatus('ページの読み込みに失敗しました: ' + error.message, 'error');
+            }
+        }
+
+        function prepareToolbarUpdates() {
+            if (!state.editor) return;
+            state.editor.on('update', () => {
+                if (!state.isApplyingContent) {
+                    state.isDirty = true;
+                }
+                renderToolbar();
+            });
+            state.editor.on('selectionUpdate', () => {
+                renderToolbar();
+            });
+        }
+
+        async function saveCurrentPage() {
+            const slugInput = normalizeSlug(elements.pageName.value || '');
+            const titleInput = elements.pageTitle.value.trim();
+            if (!slugInput) {
+                alert('ページ名を入力してください。');
+                elements.pageName.focus();
+                return;
+            }
+
+            const parentId = state.currentParentId;
+            const id = parentId ? `${parentId}/${slugInput}` : slugInput;
+
+            if (state.pageMap.has(id) && state.currentPageId !== id) {
+                alert('同じページ名のページが既に存在します。別の名前を指定してください。');
+                return;
+            }
+
+            if (!state.isNewPage && id !== state.currentPageId) {
+                alert('既存ページのページ名は変更できません。子ページとして作成するか、新規ページを作成してください。');
+                elements.pageName.value = getSlug(state.currentPageId);
+                return;
+            }
+
+            const payload = {
+                id,
+                title: titleInput || slugInput,
+                content: state.editor.getHTML()
+            };
+
+            try {
+                setStatus('保存中です...');
+                const response = await dataService.savePage(payload);
+                if (response.updatedAt) {
+                    setUpdatedAt(`最終更新: ${new Date(response.updatedAt).toLocaleString('ja-JP')}`);
+                }
+                state.isDirty = false;
+                state.isNewPage = false;
+                state.currentPageId = id;
+                elements.pageName.disabled = true;
+                await loadPages(id);
+                setStatus('保存しました', 'success');
+            } catch (error) {
+                console.error('保存エラー', error);
+                setStatus('保存に失敗しました: ' + error.message, 'error');
+            }
+        }
+
+        function createNewPage(parentId = null) {
+            const defaultName = parentId ? `${getSlug(parentId)}-child` : 'new-page';
+            const pageName = normalizeSlug(prompt('ページ名（内部識別子）を入力してください', defaultName) || '');
+            if (!pageName) {
+                return;
+            }
+            if (state.isNewPage && state.currentPageId) {
+                removeNode(state.currentPageId);
+            }
+            const pageTitle = prompt('ページタイトル（表示名）を入力してください', pageName) || pageName;
+            const id = parentId ? `${parentId}/${pageName}` : pageName;
+            if (state.pageMap.has(id) && state.currentPageId !== id) {
+                alert('同じページ名のページが既に存在します。別の名前を指定してください。');
+                return;
+            }
+
+            state.currentParentId = parentId;
+            state.currentPageId = id;
+            state.isNewPage = true;
+            state.isDirty = true;
+            elements.pageName.disabled = false;
+            elements.pageName.value = pageName;
+            elements.pageTitle.value = pageTitle;
+            state.isApplyingContent = true;
+            state.editor.commands.setContent('', false);
+            state.isApplyingContent = false;
+            renderToolbar();
+            const node = {
+                id,
+                title: pageTitle || '無題',
+                updatedAt: '',
+                parentId,
+                slug: pageName,
+                children: []
+            };
+            insertNode(node);
+            updateBreadcrumb(id);
+            setUpdatedAt('');
+            setStatus('新しいページを作成しました。保存して反映してください。');
+            renderTree();
+        }
+
+        function attachEventListeners() {
+            elements.savePage.addEventListener('click', saveCurrentPage);
+            elements.createRootPage.addEventListener('click', () => createNewPage(null));
+            elements.addChildPage.addEventListener('click', () => {
+                if (!state.currentPageId) {
+                    alert('子ページを作成する親ページを選択してください。');
+                    return;
+                }
+                createNewPage(state.currentPageId);
+            });
+            elements.reloadPages.addEventListener('click', () => loadPages(state.currentPageId));
+            elements.pageTitle.addEventListener('input', () => {
+                state.isDirty = true;
+                if (state.isNewPage && state.currentPageId && state.pageMap.has(state.currentPageId)) {
+                    const node = state.pageMap.get(state.currentPageId);
+                    node.title = elements.pageTitle.value.trim() || node.slug || '無題';
+                    renderTree();
+                }
+            });
+            elements.pageName.addEventListener('input', () => {
+                state.isDirty = true;
+                if (state.isNewPage) {
+                    const slug = normalizeSlug(elements.pageName.value || '');
+                    const prospectiveId = slug
+                        ? (state.currentParentId ? `${state.currentParentId}/${slug}` : slug)
+                        : state.currentPageId;
+                    updateBreadcrumb(prospectiveId);
+                }
+            });
+            window.addEventListener('beforeunload', event => {
+                if (state.isDirty) {
+                    event.preventDefault();
+                    event.returnValue = '';
+                }
+            });
+        }
+
+        function initEditor() {
+            state.editor = new Editor({
+                element: elements.editor,
+                extensions: [
+                    StarterKit.configure({
+                        heading: {
+                            levels: [1, 2, 3]
+                        }
+                    }),
+                    Placeholder.configure({
+                        placeholder: 'ここにコンテンツを入力してください...'
+                    }),
+                    Table.configure({ resizable: true }),
+                    TableRow,
+                    TableHeader,
+                    TableCell
+                ],
+                content: '',
+                onUpdate() {
+                    if (!state.isApplyingContent) {
+                        state.isDirty = true;
+                    }
+                }
+            });
+            renderToolbar();
+            prepareToolbarUpdates();
+        }
+
+        function initialize() {
+            initEditor();
+            attachEventListeners();
+            loadPages();
+        }
+
+        initialize();
+    </script>
+</body>
+</html>
