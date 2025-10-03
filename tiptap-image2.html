@@ -1187,24 +1187,6 @@
                 const viewUrl = `./view.html?page=${encodeURIComponent(targetId)}`;
                 window.open(viewUrl, '_blank', 'noopener,noreferrer');
             });
-            elements.viewPage.addEventListener('click', () => {
-                let targetId = state.currentPageId;
-                if (state.isNewPage) {
-                    const slug = normalizeSlug(elements.pageName.value || '');
-                    if (!slug) {
-                        alert('ページ名を入力してください。');
-                        elements.pageName.focus();
-                        return;
-                    }
-                    targetId = state.currentParentId ? `${state.currentParentId}/${slug}` : slug;
-                }
-                if (!targetId) {
-                    alert('ページを選択してください。');
-                    return;
-                }
-                const viewUrl = `./view.html?page=${encodeURIComponent(targetId)}`;
-                window.open(viewUrl, '_blank', 'noopener,noreferrer');
-            });
             window.addEventListener('beforeunload', event => {
                 if (state.isDirty) {
                     event.preventDefault();

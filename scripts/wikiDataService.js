@@ -78,7 +78,11 @@ export class WikiDataService {
   }
 
   async #apiCall(action, data = {}) {
-    const payload = { action, ...data };
+    const payload = {
+      action,
+      origin: typeof window !== 'undefined' && window.location ? window.location.origin : '',
+      ...data,
+    };
 
     let response;
     try {

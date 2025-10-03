@@ -19,17 +19,17 @@ function doGet(e) {
       success: true,
       message: 'Wiki backend is running',
       timestamp: new Date().toISOString(),
-    });
+    }, e);
   }
 
   try {
     const result = routeAction(data);
-    return createJsonOutput(result);
+    return createJsonOutput(result, e);
   } catch (error) {
     return createJsonOutput({
       success: false,
       message: 'Internal server error: ' + error,
-    });
+    }, e);
   }
 }
 
@@ -37,28 +37,46 @@ function doPost(e) {
   try {
     const data = parseRequestData(e);
     const result = routeAction(data);
-    return createJsonOutput(result);
+    return createJsonOutput(result, e);
   } catch (error) {
     return createJsonOutput({
       success: false,
       message: 'Internal server error: ' + error
-    });
+    }, e);
   }
 }
 
-function createJsonOutput(data) {
+function doOptions(e) {
+  return applyCorsHeaders(ContentService.createTextOutput(''), e);
+}
+
+function createJsonOutput(data, e) {
   const textOutput = ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 
+  return applyCorsHeaders(textOutput, e);
+}
+
+function applyCorsHeaders(output, e) {
   const allowedOrigins = CONFIG.ALLOWED_ORIGINS || [];
-  const originValue = allowedOrigins.length > 0 ? allowedOrigins[0] : '*';
+  const originFromQuery = (e && e.parameter && e.parameter.origin) || '';
 
-  textOutput.setHeader('Access-Control-Allow-Origin', originValue);
-  textOutput.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  textOutput.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  let originValue = '*';
+  if (allowedOrigins.indexOf('*') !== -1) {
+    originValue = '*';
+  } else if (originFromQuery && allowedOrigins.indexOf(originFromQuery) !== -1) {
+    originValue = originFromQuery;
+  } else if (allowedOrigins.length > 0) {
+    originValue = allowedOrigins[0];
+  }
 
-  return textOutput;
+  output.setHeader('Access-Control-Allow-Origin', originValue);
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  output.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  output.setHeader('Vary', 'Origin');
+
+  return output;
 }
 
 function parseRequestData(e) {
