@@ -47,9 +47,18 @@ function doPost(e) {
 }
 
 function createJsonOutput(data) {
-  return ContentService
+  const textOutput = ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+
+  const allowedOrigins = CONFIG.ALLOWED_ORIGINS || [];
+  const originValue = allowedOrigins.length > 0 ? allowedOrigins[0] : '*';
+
+  textOutput.setHeader('Access-Control-Allow-Origin', originValue);
+  textOutput.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  textOutput.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  return textOutput;
 }
 
 function parseRequestData(e) {
