@@ -40,10 +40,37 @@
     .breadcrumb {
       font-size: 14px;
       color: #6b6b67;
-      margin-bottom: 12px;
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+    }
+
+    .view-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+
+    .edit-button {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid #d3d2ce;
+      background: #fff;
+      color: #37352f;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s, border 0.2s;
+    }
+
+    .edit-button:hover {
+      background: #f7f6f3;
+    }
+
+    .edit-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .breadcrumb a {
@@ -161,7 +188,10 @@
 </head>
 <body>
   <div class="view-container">
-    <nav class="breadcrumb" id="breadcrumb"></nav>
+    <div class="view-header">
+      <nav class="breadcrumb" id="breadcrumb"></nav>
+      <button id="editPageButton" class="edit-button" type="button" disabled>編集</button>
+    </div>
     <div id="loader" class="loading-spinner"></div>
     <section class="page-card hidden" id="pageCard">
       <h1 class="page-title" id="pageTitle"></h1>
@@ -279,6 +309,7 @@
       childSection: document.getElementById('childPagesSection'),
       childList: document.getElementById('childPageList'),
       status: document.getElementById('statusMessage'),
+      editButton: document.getElementById('editPageButton'),
     };
 
     const normalizePageId = (pageId) => {
@@ -362,6 +393,8 @@
     async function displayPage(pageId) {
       const normalizedId = normalizePageId(pageId);
       renderBreadcrumb(normalizedId);
+      elements.editButton.dataset.pageId = normalizedId;
+      elements.editButton.disabled = false;
       showStatus('');
       elements.loader.classList.remove('hidden');
       elements.card.classList.add('hidden');
@@ -387,6 +420,7 @@
         elements.content.innerHTML = '';
         elements.childSection.classList.add('hidden');
         showStatus(error.message || 'ページの取得に失敗しました。', true);
+        elements.editButton.disabled = true;
       } finally {
         elements.loader.classList.add('hidden');
         elements.card.classList.remove('hidden');
@@ -423,6 +457,15 @@
     window.addEventListener('popstate', (event) => {
       const pageId = normalizePageId(event.state?.pageId || getPageIdFromQuery());
       void displayPage(pageId);
+    });
+
+    elements.editButton.addEventListener('click', () => {
+      const pageId = elements.editButton.dataset.pageId;
+      if (!pageId) {
+        return;
+      }
+      const url = `./tiptap-image2.html?page=${encodeURIComponent(pageId)}`;
+      window.location.href = url;
     });
 
     navigateTo(getPageIdFromQuery(), { replace: true });
