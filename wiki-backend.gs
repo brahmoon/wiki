@@ -99,6 +99,11 @@ function routeAction(data) {
       return getPages();
     case 'getPage':
       return getPage(data.id);
+    case 'renamePageTree':
+      return renamePageTree({
+        originalId: data.originalId,
+        newId: data.newId,
+      });
     default:
       return {
         success: false,
@@ -197,6 +202,81 @@ function savePage(page) {
     return { success: true, message: 'Page created', updatedAt };
   } catch (error) {
     return { success: false, message: 'Failed to save page: ' + error };
+  }
+}
+
+function renamePageTree({ originalId, newId }) {
+  try {
+    if (!originalId || !newId) {
+      return { success: false, message: 'Both originalId and newId are required' };
+    }
+
+    if (originalId === newId) {
+      return { success: true, message: 'No changes required' };
+    }
+
+    const sheet = getOrCreateSheet();
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, message: 'Page not found' };
+    }
+
+    const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    const updates = [];
+    const prefix = originalId + '/';
+
+    data.forEach((row, index) => {
+      const id = row[0];
+      if (!id) {
+        return;
+      }
+      const idString = id.toString();
+      if (idString === originalId || idString.indexOf(prefix) === 0) {
+        const suffix = idString === originalId ? '' : idString.substring(originalId.length);
+        const targetId = `${newId}${suffix}`;
+        updates.push({ rowIndex: index, targetId });
+      }
+    });
+
+    if (!updates.length) {
+      return { success: false, message: 'Page not found' };
+    }
+
+    const updatedRows = new Set(updates.map(item => item.rowIndex));
+    const existingIds = new Set();
+    data.forEach((row, index) => {
+      const id = row[0];
+      if (!id) {
+        return;
+      }
+      if (!updatedRows.has(index)) {
+        existingIds.add(id.toString());
+      }
+    });
+
+    const newIdsSet = new Set();
+    for (let i = 0; i < updates.length; i++) {
+      const targetId = updates[i].targetId;
+      if (!targetId) {
+        return { success: false, message: 'Invalid target Page ID' };
+      }
+      const targetIdStr = targetId.toString();
+      if (existingIds.has(targetIdStr)) {
+        return { success: false, message: 'Target Page ID already exists: ' + targetIdStr };
+      }
+      if (newIdsSet.has(targetIdStr)) {
+        return { success: false, message: 'Duplicate target Page ID detected: ' + targetIdStr };
+      }
+      newIdsSet.add(targetIdStr);
+    }
+
+    updates.forEach(update => {
+      sheet.getRange(update.rowIndex + 2, 1).setValue(update.targetId);
+    });
+
+    return { success: true, message: 'Page tree renamed' };
+  } catch (error) {
+    return { success: false, message: 'Failed to rename page tree: ' + error };
   }
 }
 
