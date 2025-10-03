@@ -1,10 +1,6 @@
 /**
  * Notion風Wikiバックエンド
  * JSONP / フォームPOST両対応
- *
- * このスクリプトは DriveImage 用 Apps Script とは別に独立した Web アプリとして
- * デプロイし、フロントエンド（tiptap-image2.html 等）から Web App URL を指定して
- * 呼び出してください。GitHub 上で直接実行することはありません。
  */
 const CONFIG = {
   SHEET_ID: '1ZN1LQdk2TDNmtMOdx6mXBNe3jQjFfM6CXWYc2Z4vXDk',
