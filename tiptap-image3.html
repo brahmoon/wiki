@@ -114,6 +114,28 @@
             outline-offset: 2px;
         }
 
+        .tree-drop-zone {
+            position: relative;
+            height: 8px;
+            margin: 2px 0;
+            border-radius: 999px;
+            list-style: none;
+        }
+
+        .tree-drop-zone::after {
+            content: '';
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-top: 2px dashed transparent;
+        }
+
+        .tree-drop-zone.active::after {
+            border-color: #2383e2;
+        }
+
         .tree-children {
             margin-left: 12px;
             border-left: 1px solid #e0dfdc;
@@ -954,6 +976,16 @@
             hideLinkEditor();
         }
 
+        function preventEditorLinkNavigation(event) {
+            const anchor = event.target.closest('a');
+            if (!anchor || !elements.editor?.contains(anchor)) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            state.editor?.commands.focus();
+        }
+
         function syncLinkEditorFromSelection() {
             if (!state.linkEditor.visible) {
                 return;
@@ -1106,6 +1138,22 @@
             return list;
         }
 
+        function createDropZoneItem(parentId, referenceId, position) {
+            const zone = document.createElement('li');
+            zone.className = 'tree-drop-zone';
+            zone.dataset.parentId = parentId || '';
+            if (referenceId) {
+                zone.dataset.referenceId = referenceId;
+            } else {
+                delete zone.dataset.referenceId;
+            }
+            zone.dataset.position = position;
+            zone.addEventListener('dragover', handleDropZoneDragOver);
+            zone.addEventListener('dragleave', handleDropZoneDragLeave);
+            zone.addEventListener('drop', handleDropZoneDrop);
+            return zone;
+        }
+
         function handleListDragOver(event) {
             if (!dragState.sourceId) {
                 return;
@@ -1250,6 +1298,8 @@
         function clearDropIndicators() {
             document.querySelectorAll('.drop-target, .drop-before, .drop-after, .drop-inside')
                 .forEach(el => el.classList.remove('drop-target', 'drop-before', 'drop-after', 'drop-inside'));
+            document.querySelectorAll('.tree-drop-zone.active')
+                .forEach(el => el.classList.remove('active'));
             dragState.dropTargetId = null;
             dragState.dropPosition = null;
         }
@@ -1265,7 +1315,11 @@
             }
 
             const list = createTreeList(null);
-            state.pageTree.forEach(node => list.appendChild(renderTreeNode(node)));
+            state.pageTree.forEach(node => {
+                list.appendChild(createDropZoneItem(null, node.id, 'before'));
+                list.appendChild(renderTreeNode(node));
+            });
+            list.appendChild(createDropZoneItem(null, null, 'end'));
             elements.pageTree.appendChild(list);
         }
 
@@ -1289,10 +1343,83 @@
             item.appendChild(label);
 
             const childList = createTreeList(node.id);
-            node.children.forEach(child => childList.appendChild(renderTreeNode(child)));
+            node.children.forEach(child => {
+                childList.appendChild(createDropZoneItem(node.id, child.id, 'before'));
+                childList.appendChild(renderTreeNode(child));
+            });
+            childList.appendChild(createDropZoneItem(node.id, null, 'end'));
             item.appendChild(childList);
 
             return item;
+        }
+
+        function handleDropZoneDragOver(event) {
+            if (!dragState.sourceId) {
+                return;
+            }
+            const zone = event.currentTarget;
+            const parentId = zone.dataset.parentId || '';
+            const referenceId = zone.dataset.referenceId || '';
+            const position = zone.dataset.position;
+            if (!position) {
+                return;
+            }
+            if (parentId && isDescendantId(parentId, dragState.sourceId)) {
+                return;
+            }
+            if (referenceId && (referenceId === dragState.sourceId || isDescendantId(referenceId, dragState.sourceId))) {
+                return;
+            }
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            zone.classList.add('active');
+            dragState.dropTargetId = referenceId || null;
+            dragState.dropPosition = position;
+        }
+
+        function handleDropZoneDragLeave(event) {
+            const zone = event.currentTarget;
+            zone.classList.remove('active');
+            const referenceId = zone.dataset.referenceId || null;
+            const position = zone.dataset.position || null;
+            if (dragState.dropTargetId === (referenceId || null) && dragState.dropPosition === position) {
+                dragState.dropTargetId = null;
+                dragState.dropPosition = null;
+            }
+        }
+
+        function handleDropZoneDrop(event) {
+            if (!dragState.sourceId) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            const zone = event.currentTarget;
+            const parentId = zone.dataset.parentId || '';
+            const referenceId = zone.dataset.referenceId || '';
+            const position = zone.dataset.position;
+            zone.classList.remove('active');
+            if (!position) {
+                return;
+            }
+            if (parentId && isDescendantId(parentId, dragState.sourceId)) {
+                setStatus('子ページの下へは移動できません。', 'error');
+                dragState.dropTargetId = null;
+                dragState.dropPosition = null;
+                return;
+            }
+            if ((position === 'before' || position === 'after') && (!referenceId || referenceId === dragState.sourceId || isDescendantId(referenceId, dragState.sourceId))) {
+                dragState.dropTargetId = null;
+                dragState.dropPosition = null;
+                return;
+            }
+            if (position === 'before' || position === 'after') {
+                movePageRelative(dragState.sourceId, referenceId, position);
+            } else {
+                movePage(dragState.sourceId, parentId ? parentId : null);
+            }
+            dragState.dropTargetId = null;
+            dragState.dropPosition = null;
         }
 
         async function movePage(pageId, newParentId) {
@@ -1695,6 +1822,8 @@
                 }
             });
             elements.editorWrapper?.addEventListener('scroll', updateToolbarShadow);
+            elements.editor?.addEventListener('click', preventEditorLinkNavigation);
+            elements.editor?.addEventListener('auxclick', preventEditorLinkNavigation);
             window.addEventListener('resize', () => {
                 requestAnimationFrame(updateToolbarMetrics);
             });
