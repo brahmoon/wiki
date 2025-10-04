@@ -67,33 +67,46 @@
       font-weight: 600;
     }
 
-    .sidebar-list {
+    .sidebar-list,
+    .sidebar-sublist {
       list-style: none;
       margin: 0;
       padding: 0;
     }
 
     .sidebar-item {
-      padding: 6px 20px;
+      padding: 0;
+      margin: 2px 0;
     }
 
-    .sidebar-item a {
+    .sidebar-link {
       display: block;
       text-decoration: none;
       color: inherit;
       font-size: 14px;
-      padding: 6px 10px;
+      padding: 6px 12px;
+      padding-left: calc(12px + var(--sidebar-indent-level, 0) * 16px);
       border-radius: 6px;
       transition: background 0.1s ease;
+      margin: 0 12px;
     }
 
-    .sidebar-item a:hover {
+    .sidebar-link:hover {
       background: #e9e9e7;
     }
 
-    .sidebar-item.active a {
+    .sidebar-item.active > .sidebar-link {
       background: #2383e2;
       color: #fff;
+    }
+
+    .sidebar-item.active-ancestor > .sidebar-link {
+      background: #e9e9e7;
+      font-weight: 600;
+    }
+
+    .sidebar-sublist {
+      margin-top: 4px;
     }
 
     .view-main {
@@ -497,6 +510,151 @@
       return trimmed || 'top';
     };
 
+    function getParentId(pageId) {
+      if (!pageId || pageId === 'top') {
+        return null;
+      }
+      const parts = pageId.split('/').filter(Boolean);
+      if (parts.length <= 1) {
+        return null;
+      }
+      parts.pop();
+      return parts.join('/');
+    }
+
+    function getSlug(pageId) {
+      if (!pageId) {
+        return '';
+      }
+      const parts = pageId.split('/').filter(Boolean);
+      return parts[parts.length - 1] || '';
+    }
+
+    function isDescendantId(targetId, ancestorId) {
+      if (!targetId || !ancestorId || targetId === ancestorId) {
+        return false;
+      }
+      return targetId.startsWith(`${ancestorId}/`);
+    }
+
+    function buildSidebarTree(pages) {
+      const nodes = [];
+      (pages || []).forEach((page, index) => {
+        if (!page?.id) {
+          return;
+        }
+        const normalizedId = normalizePageId(page.id);
+        const parentId = getParentId(normalizedId);
+        const parsedOrder = Number(page.order);
+        nodes.push({
+          id: normalizedId,
+          title: page.title || getSlug(normalizedId) || '無題',
+          parentId: parentId ? normalizePageId(parentId) : null,
+          order: Number.isFinite(parsedOrder) ? parsedOrder : index + 1,
+          children: [],
+        });
+      });
+
+      const map = new Map();
+      nodes.forEach(node => map.set(node.id, node));
+
+      const roots = [];
+      nodes.forEach(node => {
+        if (node.parentId && map.has(node.parentId)) {
+          map.get(node.parentId).children.push(node);
+        } else {
+          node.parentId = null;
+          roots.push(node);
+        }
+      });
+
+      if (!map.has('top')) {
+        const topChildren = [];
+        const remainingRoots = [];
+        roots.forEach(node => {
+          if (node.id !== 'top' && node.id.startsWith('top/')) {
+            node.parentId = 'top';
+            topChildren.push(node);
+          } else if (node.id !== 'top') {
+            remainingRoots.push(node);
+          }
+        });
+        const topNode = {
+          id: 'top',
+          title: 'top',
+          parentId: null,
+          order: Number.MIN_SAFE_INTEGER,
+          children: topChildren,
+        };
+        map.set('top', topNode);
+        roots.length = 0;
+        roots.push(topNode, ...remainingRoots);
+      } else {
+        const topNode = map.get('top');
+        if (topNode) {
+          const topIndex = roots.indexOf(topNode);
+          if (topIndex === -1) {
+            roots.unshift(topNode);
+          } else if (topIndex > 0) {
+            roots.splice(0, 0, roots.splice(topIndex, 1)[0]);
+          }
+        }
+      }
+
+      const sortNodes = (list) => {
+        list.sort((a, b) => {
+          if (a.id === 'top') {
+            return -1;
+          }
+          if (b.id === 'top') {
+            return 1;
+          }
+          const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+          const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+          if (orderA !== orderB) {
+            return orderA - orderB;
+          }
+          return (a.title || '').localeCompare(b.title || '', 'ja');
+        });
+        list.forEach(child => sortNodes(child.children));
+      };
+
+      sortNodes(roots);
+      return roots;
+    }
+
+    function createSidebarNode(node, activePageId, level) {
+      const li = document.createElement('li');
+      li.className = 'sidebar-item';
+      li.style.setProperty('--sidebar-indent-level', level);
+
+      const link = document.createElement('a');
+      link.className = 'sidebar-link';
+      link.href = `./view.html?page=${encodeURIComponent(node.id)}`;
+      link.dataset.pageId = node.id;
+      link.textContent = node.title || node.id || '無題';
+
+      if (node.id === activePageId) {
+        li.classList.add('active');
+        link.setAttribute('aria-current', 'page');
+      } else if (isDescendantId(activePageId, node.id)) {
+        li.classList.add('active-ancestor');
+      }
+
+      li.appendChild(link);
+
+      if (Array.isArray(node.children) && node.children.length) {
+        const childList = document.createElement('ul');
+        childList.className = 'sidebar-sublist';
+        node.children.forEach(child => {
+          childList.appendChild(createSidebarNode(child, activePageId, level + 1));
+        });
+        li.appendChild(childList);
+      }
+
+      return li;
+    }
+
     const SIDEBAR_BREAKPOINT = 960;
     const sidebarState = {
       open: window.innerWidth >= SIDEBAR_BREAKPOINT,
@@ -532,30 +690,12 @@
       }
 
       const normalizedActiveId = normalizePageId(activePageId);
-      const seen = new Set();
+      const tree = buildSidebarTree(pages);
       const fragment = document.createDocumentFragment();
 
-      const appendItem = (page) => {
-        const normalizedId = normalizePageId(page.id);
-        if (seen.has(normalizedId)) {
-          return;
-        }
-        seen.add(normalizedId);
-
-        const li = document.createElement('li');
-        li.className = 'sidebar-item' + (normalizedId === normalizedActiveId ? ' active' : '');
-
-        const link = document.createElement('a');
-        link.href = `./view.html?page=${encodeURIComponent(normalizedId)}`;
-        link.dataset.pageId = normalizedId;
-        link.textContent = page.title || normalizedId || '無題';
-
-        li.appendChild(link);
-        fragment.appendChild(li);
-      };
-
-      appendItem({ id: 'top', title: 'top' });
-      (pages || []).forEach(page => appendItem(page));
+      tree.forEach(node => {
+        fragment.appendChild(createSidebarNode(node, normalizedActiveId, 0));
+      });
 
       elements.sidebarList.innerHTML = '';
       elements.sidebarList.appendChild(fragment);
