@@ -31,10 +31,117 @@
       color: #37352f;
     }
 
+    .view-app {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+      background: inherit;
+      transition: grid-template-columns 0.3s ease;
+    }
+
+    .view-app.sidebar-closed {
+      grid-template-columns: 0 1fr;
+    }
+
+    .view-app.sidebar-closed .sidebar {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .sidebar {
+      background: #f7f6f3;
+      border-right: 1px solid #e9e9e7;
+      padding: 24px 0;
+      overflow-y: auto;
+      transition: opacity 0.2s ease;
+    }
+
+    .sidebar-header {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid #e9e9e7;
+      margin-bottom: 16px;
+    }
+
+    .sidebar-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .sidebar-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .sidebar-item {
+      padding: 6px 20px;
+    }
+
+    .sidebar-item a {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: background 0.1s ease;
+    }
+
+    .sidebar-item a:hover {
+      background: #e9e9e7;
+    }
+
+    .sidebar-item.active a {
+      background: #2383e2;
+      color: #fff;
+    }
+
+    .view-main {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
     .view-container {
+      flex: 1;
       max-width: 900px;
       margin: 0 auto;
       padding: 48px 24px 80px;
+      width: 100%;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar-toggle {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid #d3d2ce;
+      background: #fff;
+      cursor: pointer;
+      transition: background 0.2s, border 0.2s;
+    }
+
+    .sidebar-toggle:hover {
+      background: #f7f6f3;
+    }
+
+    .sidebar-toggle span {
+      width: 18px;
+      height: 2px;
+      background: #37352f;
+      border-radius: 99px;
     }
 
     .breadcrumb {
@@ -43,11 +150,13 @@
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .view-header {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       margin-bottom: 12px;
       gap: 16px;
@@ -184,26 +293,81 @@
     .hidden {
       display: none !important;
     }
+
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.3);
+      z-index: 80;
+    }
+
+    @media (max-width: 960px) {
+      .view-app {
+        display: block;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 260px;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 90;
+      }
+
+      .view-app.sidebar-open .sidebar {
+        transform: translateX(0);
+      }
+
+      .view-app.sidebar-closed .sidebar {
+        transform: translateX(-100%);
+      }
+
+      .view-app.sidebar-closed {
+        grid-template-columns: 0 1fr;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="view-container">
-    <div class="view-header">
-      <nav class="breadcrumb" id="breadcrumb"></nav>
-      <button id="editPageButton" class="edit-button" type="button" disabled>編集</button>
+  <div class="view-app" id="viewApp">
+    <aside class="sidebar" id="pageSidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">ページ一覧</div>
+      </div>
+      <ul class="sidebar-list" id="sidebarPageList"></ul>
+    </aside>
+    <div class="view-main">
+      <div class="view-container">
+        <div class="view-header">
+          <div class="header-left">
+            <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="ページ一覧" aria-expanded="false">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <nav class="breadcrumb" id="breadcrumb"></nav>
+          </div>
+          <button id="editPageButton" class="edit-button" type="button" disabled>編集</button>
+        </div>
+        <div id="loader" class="loading-spinner"></div>
+        <section class="page-card hidden" id="pageCard">
+          <h1 class="page-title" id="pageTitle"></h1>
+          <div class="page-updated" id="pageUpdated"></div>
+          <article class="page-content ProseMirror" id="pageContent"></article>
+          <section class="child-pages hidden" id="childPagesSection">
+            <h2 class="child-pages-title">サブページ</h2>
+            <ul class="child-page-list" id="childPageList"></ul>
+          </section>
+          <div class="status-message hidden" id="statusMessage"></div>
+        </section>
+      </div>
     </div>
-    <div id="loader" class="loading-spinner"></div>
-    <section class="page-card hidden" id="pageCard">
-      <h1 class="page-title" id="pageTitle"></h1>
-      <div class="page-updated" id="pageUpdated"></div>
-      <article class="page-content ProseMirror" id="pageContent"></article>
-      <section class="child-pages hidden" id="childPagesSection">
-        <h2 class="child-pages-title">サブページ</h2>
-        <ul class="child-page-list" id="childPageList"></ul>
-      </section>
-      <div class="status-message hidden" id="statusMessage"></div>
-    </section>
   </div>
+  <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
 
   <script>
     const DEFAULT_TIMEOUT = 25000;
@@ -282,10 +446,18 @@
       return result;
     }
 
+    const pageCache = { value: null };
+
     const dataService = {
       async getPages() {
+        if (Array.isArray(pageCache.value)) {
+          return pageCache.value;
+        }
+
         const response = await apiCall('getPages');
-        return response.pages || [];
+        const pages = response.pages || [];
+        pageCache.value = pages;
+        return pages;
       },
       async getPage(id) {
         if (!id) {
@@ -297,9 +469,13 @@
         }
         return response.page;
       },
+      getCachedPages() {
+        return pageCache.value;
+      },
     };
 
     const elements = {
+      app: document.getElementById('viewApp'),
       loader: document.getElementById('loader'),
       card: document.getElementById('pageCard'),
       title: document.getElementById('pageTitle'),
@@ -310,12 +486,80 @@
       childList: document.getElementById('childPageList'),
       status: document.getElementById('statusMessage'),
       editButton: document.getElementById('editPageButton'),
+      sidebar: document.getElementById('pageSidebar'),
+      sidebarList: document.getElementById('sidebarPageList'),
+      sidebarToggle: document.getElementById('sidebarToggle'),
+      sidebarOverlay: document.getElementById('sidebarOverlay'),
     };
 
     const normalizePageId = (pageId) => {
       const trimmed = (pageId || '').trim();
       return trimmed || 'top';
     };
+
+    const SIDEBAR_BREAKPOINT = 960;
+    const sidebarState = {
+      open: window.innerWidth >= SIDEBAR_BREAKPOINT,
+    };
+
+    function isDesktop() {
+      return window.innerWidth >= SIDEBAR_BREAKPOINT;
+    }
+
+    function setSidebar(open) {
+      sidebarState.open = open;
+      if (elements.app) {
+        elements.app.classList.toggle('sidebar-open', open);
+        elements.app.classList.toggle('sidebar-closed', !open);
+      }
+
+      if (elements.sidebarOverlay) {
+        if (!isDesktop()) {
+          elements.sidebarOverlay.classList.toggle('hidden', !open);
+        } else {
+          elements.sidebarOverlay.classList.add('hidden');
+        }
+      }
+
+      if (elements.sidebarToggle) {
+        elements.sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+    }
+
+    function renderSidebarPages(pages, activePageId) {
+      if (!elements.sidebarList) {
+        return;
+      }
+
+      const normalizedActiveId = normalizePageId(activePageId);
+      const seen = new Set();
+      const fragment = document.createDocumentFragment();
+
+      const appendItem = (page) => {
+        const normalizedId = normalizePageId(page.id);
+        if (seen.has(normalizedId)) {
+          return;
+        }
+        seen.add(normalizedId);
+
+        const li = document.createElement('li');
+        li.className = 'sidebar-item' + (normalizedId === normalizedActiveId ? ' active' : '');
+
+        const link = document.createElement('a');
+        link.href = `./view.html?page=${encodeURIComponent(normalizedId)}`;
+        link.dataset.pageId = normalizedId;
+        link.textContent = page.title || normalizedId || '無題';
+
+        li.appendChild(link);
+        fragment.appendChild(li);
+      };
+
+      appendItem({ id: 'top', title: 'top' });
+      (pages || []).forEach(page => appendItem(page));
+
+      elements.sidebarList.innerHTML = '';
+      elements.sidebarList.appendChild(fragment);
+    }
 
     function getPageIdFromQuery() {
       const params = new URLSearchParams(window.location.search);
@@ -393,6 +637,7 @@
     async function displayPage(pageId) {
       const normalizedId = normalizePageId(pageId);
       renderBreadcrumb(normalizedId);
+      renderSidebarPages(dataService.getCachedPages() || [], normalizedId);
       elements.editButton.dataset.pageId = normalizedId;
       elements.editButton.disabled = false;
       showStatus('');
@@ -412,6 +657,7 @@
           : '';
         elements.content.innerHTML = page.content || '';
         renderChildPages(normalizedId, pages);
+        renderSidebarPages(pages, normalizedId);
         showStatus('');
       } catch (error) {
         document.title = 'ページを表示できません';
@@ -440,6 +686,24 @@
       void displayPage(normalizedId);
     }
 
+    setSidebar(sidebarState.open);
+
+    if (elements.sidebarToggle) {
+      elements.sidebarToggle.addEventListener('click', () => {
+        setSidebar(!sidebarState.open);
+      });
+    }
+
+    if (elements.sidebarOverlay) {
+      elements.sidebarOverlay.addEventListener('click', () => {
+        setSidebar(false);
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      setSidebar(sidebarState.open);
+    });
+
     document.addEventListener('click', (event) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
@@ -452,6 +716,10 @@
 
       event.preventDefault();
       navigateTo(anchor.dataset.pageId);
+
+      if (anchor.closest('.sidebar') && !isDesktop()) {
+        setSidebar(false);
+      }
     });
 
     window.addEventListener('popstate', (event) => {
