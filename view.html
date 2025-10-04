@@ -24,10 +24,6 @@
     })();
   </script>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -35,130 +31,26 @@
       color: #37352f;
     }
 
-    .view-app {
-      display: flex;
-      min-height: 100vh;
-      background: #f5f5f5;
+    .view-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
     }
 
-    .view-sidebar {
-      width: 280px;
-      flex: 0 0 280px;
-      background: #f7f6f3;
-      border-right: 1px solid #e9e9e7;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .view-sidebar[hidden] {
-      display: none;
-    }
-
-    .sidebar-header {
-      padding: 20px 24px 12px;
-      border-bottom: 1px solid #e9e9e7;
-    }
-
-    .sidebar-title {
+    .breadcrumb {
       font-size: 14px;
-      font-weight: 600;
-    }
-
-    .page-tree {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px 8px 24px 16px;
-    }
-
-    .tree-list,
-    .tree-list ul {
-      list-style: none;
-      margin: 0;
-      padding-left: 16px;
-    }
-
-    .tree-list > li {
-      padding-left: 0;
-    }
-
-    .tree-item {
+      color: #6b6b67;
       display: flex;
-      align-items: center;
+      flex-wrap: wrap;
       gap: 6px;
-      padding: 4px 8px;
-      border-radius: 6px;
-      color: #37352f;
-      font-size: 14px;
-      text-decoration: none;
-      cursor: pointer;
-      transition: background 0.2s ease, color 0.2s ease;
     }
 
-    .tree-item:hover {
-      background: #e9e9e7;
-    }
-
-    .tree-item.active {
-      background: #2383e2;
-      color: #fff;
-    }
-
-    .tree-item.active:hover {
-      background: #1a6bc2;
-      color: #fff;
-    }
-
-    .tree-children {
-      margin-left: 12px;
-      border-left: 1px solid #e0dfdc;
-      padding-left: 12px;
-    }
-
-    .view-main {
-      flex: 1;
+    .view-header {
       display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-
-    .view-topbar {
-      display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
+      margin-bottom: 12px;
       gap: 16px;
-      padding: 16px 24px;
-      border-bottom: 1px solid #e9e9e7;
-      background: #fff;
-      position: sticky;
-      top: 0;
-      z-index: 40;
-    }
-
-    .topbar-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex: 1;
-      min-width: 0;
-    }
-
-    .menu-button {
-      width: 40px;
-      height: 36px;
-      border-radius: 6px;
-      border: 1px solid #d3d2ce;
-      background: #fff;
-      color: #37352f;
-      font-size: 20px;
-      line-height: 1;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .menu-button:hover {
-      background: #f7f6f3;
     }
 
     .edit-button {
@@ -181,22 +73,6 @@
       cursor: not-allowed;
     }
 
-    .breadcrumb {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 6px;
-      font-size: 14px;
-      color: #6b6b67;
-      min-width: 0;
-    }
-
-    .breadcrumb span,
-    .breadcrumb a {
-      white-space: nowrap;
-    }
-
     .breadcrumb a {
       color: inherit;
       text-decoration: none;
@@ -204,24 +80,6 @@
 
     .breadcrumb a:hover {
       text-decoration: underline;
-    }
-
-    .breadcrumb [aria-current="page"] {
-      font-weight: 600;
-      color: #37352f;
-    }
-
-    .view-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 32px;
-      background: #f8f8f7;
-    }
-
-    .view-container {
-      max-width: 900px;
-      margin: 0 auto;
-      width: 100%;
     }
 
     .page-card {
@@ -326,89 +184,25 @@
     .hidden {
       display: none !important;
     }
-
-    .empty-state {
-      padding: 24px;
-      text-align: center;
-      color: #9b9a97;
-      font-size: 14px;
-    }
-
-    .sidebar-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(55, 53, 47, 0.25);
-      z-index: 35;
-    }
-
-    .sidebar-overlay[hidden] {
-      display: none;
-    }
-
-    @media (max-width: 960px) {
-      .view-app {
-        position: relative;
-      }
-
-      .view-sidebar {
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        left: 0;
-        right: auto;
-        width: min(80vw, 320px);
-        max-width: 320px;
-        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
-        z-index: 60;
-      }
-
-      .view-sidebar[hidden] {
-        display: none;
-      }
-
-      .view-content {
-        padding: 24px 20px 40px;
-      }
-
-      .page-card {
-        padding: 32px 24px;
-      }
-    }
   </style>
 </head>
 <body>
-  <div class="view-app">
-    <aside class="view-sidebar" id="pageSidebar" hidden>
-      <div class="sidebar-header">
-        <div class="sidebar-title">ページ一覧</div>
-      </div>
-      <div id="pageTree" class="page-tree"></div>
-    </aside>
-    <div id="sidebarOverlay" class="sidebar-overlay" hidden></div>
-    <div class="view-main">
-      <header class="view-topbar">
-        <div class="topbar-left">
-          <button id="toggleSidebar" class="menu-button" type="button" aria-expanded="false" aria-controls="pageSidebar" aria-label="ページ一覧を表示">☰</button>
-          <nav class="breadcrumb" id="breadcrumb"></nav>
-        </div>
-        <button id="editPageButton" class="edit-button" type="button" disabled>編集</button>
-      </header>
-      <div class="view-content">
-        <div class="view-container">
-          <div id="loader" class="loading-spinner"></div>
-          <section class="page-card hidden" id="pageCard">
-            <h1 class="page-title" id="pageTitle"></h1>
-            <div class="page-updated" id="pageUpdated"></div>
-            <article class="page-content ProseMirror" id="pageContent"></article>
-            <section class="child-pages hidden" id="childPagesSection">
-              <h2 class="child-pages-title">サブページ</h2>
-              <ul class="child-page-list" id="childPageList"></ul>
-            </section>
-            <div class="status-message hidden" id="statusMessage"></div>
-          </section>
-        </div>
-      </div>
+  <div class="view-container">
+    <div class="view-header">
+      <nav class="breadcrumb" id="breadcrumb"></nav>
+      <button id="editPageButton" class="edit-button" type="button" disabled>編集</button>
     </div>
+    <div id="loader" class="loading-spinner"></div>
+    <section class="page-card hidden" id="pageCard">
+      <h1 class="page-title" id="pageTitle"></h1>
+      <div class="page-updated" id="pageUpdated"></div>
+      <article class="page-content ProseMirror" id="pageContent"></article>
+      <section class="child-pages hidden" id="childPagesSection">
+        <h2 class="child-pages-title">サブページ</h2>
+        <ul class="child-page-list" id="childPageList"></ul>
+      </section>
+      <div class="status-message hidden" id="statusMessage"></div>
+    </section>
   </div>
 
   <script>
@@ -416,7 +210,7 @@
 
     const WIKI_APPS_SCRIPT_ENDPOINT = (window.APP_ENDPOINTS && window.APP_ENDPOINTS.wiki)
       ? window.APP_ENDPOINTS.wiki
-      : 'https://script.google.com/macros/s/AKfycbxkzVroCbSCqvxaVyPjk-QZy6CMlvzXPnOHTWLH3HKUaRqnSQRhKjl_mahsXf52qD2XZQ/exec';
+      : 'https://script.google.com/macros/s/AKfycbxkzVroCbSCqvxaVyPjk-QZy6CMlvzXPnOHTWLH3HKUaqnSQRhKjl_mahsXf52qD2XZQ/exec';
 
     function fetchWithoutPreflight(url, options = {}, timeout = DEFAULT_TIMEOUT) {
       return new Promise((resolve, reject) => {
@@ -516,68 +310,12 @@
       childList: document.getElementById('childPageList'),
       status: document.getElementById('statusMessage'),
       editButton: document.getElementById('editPageButton'),
-      sidebar: document.getElementById('pageSidebar'),
-      sidebarOverlay: document.getElementById('sidebarOverlay'),
-      toggleSidebar: document.getElementById('toggleSidebar'),
-      pageTree: document.getElementById('pageTree'),
     };
 
-    const state = {
-      pages: null,
-      pageTree: [],
-      pageMap: new Map(),
-      pagesPromise: null,
-      currentPageId: null,
-      treeRendered: false,
-      sidebarOpen: true,
-    };
-
-    const layoutQuery = window.matchMedia('(max-width: 960px)');
-
-    function isCompactLayout() {
-      return layoutQuery.matches;
-    }
-
-    function escapeSelector(value) {
-      if (typeof window.CSS !== 'undefined' && typeof window.CSS.escape === 'function') {
-        return window.CSS.escape(value);
-      }
-      return String(value).replace(/["\\']/g, '\\$&');
-    }
-
-    function setSidebarVisibility(visible) {
-      state.sidebarOpen = visible;
-      if (elements.sidebar) {
-        elements.sidebar.hidden = !visible;
-      }
-      if (elements.sidebarOverlay) {
-        if (visible && isCompactLayout()) {
-          elements.sidebarOverlay.hidden = false;
-        } else {
-          elements.sidebarOverlay.hidden = true;
-        }
-      }
-      if (elements.toggleSidebar) {
-        elements.toggleSidebar.setAttribute('aria-expanded', visible ? 'true' : 'false');
-        const label = visible ? 'ページ一覧を隠す' : 'ページ一覧を表示';
-        elements.toggleSidebar.setAttribute('aria-label', label);
-      }
-    }
-
-    function handleLayoutChange() {
-      setSidebarVisibility(state.sidebarOpen);
-    }
-
-    if (typeof layoutQuery.addEventListener === 'function') {
-      layoutQuery.addEventListener('change', handleLayoutChange);
-    } else if (typeof layoutQuery.addListener === 'function') {
-      layoutQuery.addListener(handleLayoutChange);
-    }
-
-    function normalizePageId(pageId) {
+    const normalizePageId = (pageId) => {
       const trimmed = (pageId || '').trim();
       return trimmed || 'top';
-    }
+    };
 
     function getPageIdFromQuery() {
       const params = new URLSearchParams(window.location.search);
@@ -585,9 +323,6 @@
     }
 
     function showStatus(message, isError = false) {
-      if (!elements.status) {
-        return;
-      }
       if (!message) {
         elements.status.classList.add('hidden');
         elements.status.textContent = '';
@@ -599,237 +334,42 @@
       elements.status.classList.remove('hidden');
     }
 
-    function getParentId(id) {
-      if (!id) return null;
-      const parts = id.split('/');
-      parts.pop();
-      return parts.length ? parts.join('/') : null;
-    }
-
-    function getSlug(id) {
-      if (!id) return '';
-      const parts = id.split('/');
-      return parts.pop();
-    }
-
-    function buildPageTree(pages) {
-      const nodes = [];
-      pages.forEach((page, index) => {
-        if (!page.id) {
-          return;
-        }
-        const parentId = getParentId(page.id);
-        const parsedOrder = Number(page.order);
-        nodes.push({
-          id: page.id,
-          title: page.title || '無題',
-          parentId,
-          slug: getSlug(page.id),
-          order: Number.isFinite(parsedOrder) ? parsedOrder : index + 1,
-          children: [],
-        });
-      });
-
-      const map = new Map();
-      nodes.forEach(node => map.set(node.id, node));
-
-      const buckets = new Map();
-      nodes.forEach(node => {
-        const parentExists = node.parentId && map.has(node.parentId);
-        const key = parentExists ? node.parentId : null;
-        if (!parentExists) {
-          node.parentId = null;
-        }
-        if (!buckets.has(key)) {
-          buckets.set(key, []);
-        }
-        buckets.get(key).push(node);
-      });
-
-      const sortNodes = list => {
-        list.sort((a, b) => {
-          const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
-          const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
-          if (orderA !== orderB) {
-            return orderA - orderB;
-          }
-          return (a.title || '').localeCompare(b.title || '', 'ja');
-        });
-      };
-
-      const roots = [];
-      const buildChildren = parentId => {
-        const key = parentId || null;
-        const list = buckets.get(key) || [];
-        sortNodes(list);
-        list.forEach(child => {
-          if (parentId) {
-            const parentNode = map.get(parentId);
-            if (parentNode) {
-              parentNode.children.push(child);
-            }
-          } else {
-            roots.push(child);
-          }
-          buildChildren(child.id);
-        });
-      };
-
-      buildChildren(null);
-
-      state.pageMap = map;
-      state.pageTree = roots;
-      state.treeRendered = false;
-    }
-
-    function renderTreeNode(node) {
-      const item = document.createElement('li');
-      const link = document.createElement('a');
-      link.className = 'tree-item';
-      link.href = `./view.html?page=${encodeURIComponent(node.id)}`;
-      link.dataset.pageId = node.id;
-      link.textContent = node.title || node.slug || node.id;
-      if (node.id === state.currentPageId) {
-        link.classList.add('active');
-        link.setAttribute('aria-current', 'page');
-      }
-      item.appendChild(link);
-      if (node.children && node.children.length) {
-        const childList = document.createElement('ul');
-        childList.className = 'tree-children';
-        node.children.forEach(child => {
-          childList.appendChild(renderTreeNode(child));
-        });
-        item.appendChild(childList);
-      }
-      return item;
-    }
-
-    function renderPageTree() {
-      if (!elements.pageTree) {
-        return;
-      }
-      elements.pageTree.innerHTML = '';
-      if (!state.pageTree.length) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        empty.textContent = 'ページがありません。';
-        elements.pageTree.appendChild(empty);
-        return;
-      }
-      const list = document.createElement('ul');
-      list.className = 'tree-list';
-      state.pageTree.forEach(node => {
-        list.appendChild(renderTreeNode(node));
-      });
-      elements.pageTree.appendChild(list);
-      updateActiveTreeItem(state.currentPageId);
-    }
-
-    function updateActiveTreeItem(pageId) {
-      if (!elements.pageTree) {
-        return;
-      }
-      elements.pageTree.querySelectorAll('.tree-item.active').forEach(item => {
-        item.classList.remove('active');
-        item.removeAttribute('aria-current');
-      });
-      if (!pageId) {
-        return;
-      }
-      const selector = `[data-page-id="${escapeSelector(pageId)}"]`;
-      const target = elements.pageTree.querySelector(selector);
-      if (target) {
-        target.classList.add('active');
-        target.setAttribute('aria-current', 'page');
-        if (typeof target.scrollIntoView === 'function') {
-          target.scrollIntoView({ block: 'nearest' });
-        }
-      }
-    }
-
     function renderBreadcrumb(pageId) {
-      if (!elements.breadcrumb) {
-        return;
-      }
-      const parts = (pageId || '').split('/').filter(Boolean);
+      const parts = pageId.split('/').filter(Boolean);
+      let pathAccumulator = '';
       elements.breadcrumb.innerHTML = '';
 
       if (!parts.length) {
         const span = document.createElement('span');
-        const node = state.pageMap.get(pageId);
-        span.textContent = node?.title || pageId || 'top';
+        span.textContent = 'top';
         elements.breadcrumb.appendChild(span);
         return;
       }
 
-      let path = '';
       parts.forEach((part, index) => {
-        path = index === 0 ? part : `${path}/${part}`;
+        pathAccumulator = index === 0 ? part : `${pathAccumulator}/${part}`;
         if (index > 0) {
           const separator = document.createElement('span');
           separator.textContent = '›';
           elements.breadcrumb.appendChild(separator);
         }
         const link = document.createElement('a');
-        link.href = `./view.html?page=${encodeURIComponent(path)}`;
-        link.dataset.pageId = path;
-        link.textContent = state.pageMap.get(path)?.title || part;
-        if (index === parts.length - 1) {
-          link.setAttribute('aria-current', 'page');
-        }
+        link.href = `./view.html?page=${encodeURIComponent(pathAccumulator)}`;
+        link.dataset.pageId = pathAccumulator;
+        link.textContent = part;
         elements.breadcrumb.appendChild(link);
       });
     }
 
-    async function ensurePagesLoaded() {
-      if (state.pages) {
-        return state.pages;
-      }
-      if (state.pagesPromise) {
-        return state.pagesPromise;
-      }
-      state.pagesPromise = dataService.getPages()
-        .then(pages => {
-          state.pages = pages;
-          buildPageTree(pages);
-          state.pagesPromise = null;
-          return pages;
-        })
-        .catch(error => {
-          state.pagesPromise = null;
-          throw error;
-        });
-      return state.pagesPromise;
-    }
-
-    function renderChildPages(pageId) {
-      if (!elements.childSection || !elements.childList) {
-        return;
-      }
-      let children = [];
-      const node = state.pageMap.get(pageId);
-      if (node) {
-        children = node.children.map(child => ({
-          id: child.id,
-          title: child.title,
-          slug: child.slug,
-        }));
-      } else if (state.pages) {
-        const prefix = `${pageId}/`;
-        children = state.pages
-          .filter(page => page.id && page.id.startsWith(prefix))
-          .map(page => {
-            const remainder = page.id.slice(prefix.length);
-            return {
-              id: page.id,
-              title: page.title || remainder || '無題',
-              slug: remainder,
-            };
-          })
-          .filter(page => page.slug && !page.slug.includes('/'))
-          .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ja'));
-      }
+    function renderChildPages(pageId, pages) {
+      const children = pages
+        .filter(page => page.id.startsWith(`${pageId}/`))
+        .map(page => ({
+          ...page,
+          remainder: page.id.slice(pageId.length + 1),
+        }))
+        .filter(page => page.remainder && !page.remainder.includes('/'))
+        .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
 
       if (!children.length) {
         elements.childSection.classList.add('hidden');
@@ -843,7 +383,7 @@
         const link = document.createElement('a');
         link.href = `./view.html?page=${encodeURIComponent(child.id)}`;
         link.dataset.pageId = child.id;
-        link.textContent = child.title || child.slug || '無題';
+        link.textContent = child.title || child.remainder || '無題';
         li.appendChild(link);
         elements.childList.appendChild(li);
       });
@@ -852,66 +392,38 @@
 
     async function displayPage(pageId) {
       const normalizedId = normalizePageId(pageId);
-      state.currentPageId = normalizedId;
       renderBreadcrumb(normalizedId);
-      if (elements.editButton) {
-        elements.editButton.dataset.pageId = normalizedId;
-        elements.editButton.disabled = false;
-      }
+      elements.editButton.dataset.pageId = normalizedId;
+      elements.editButton.disabled = false;
       showStatus('');
-      elements.loader?.classList.remove('hidden');
-      elements.card?.classList.add('hidden');
-
-      const pagePromise = dataService.getPage(normalizedId);
-      const pagesPromise = ensurePagesLoaded();
+      elements.loader.classList.remove('hidden');
+      elements.card.classList.add('hidden');
 
       try {
-        const [page] = await Promise.all([pagePromise, pagesPromise]);
-        renderBreadcrumb(normalizedId);
-        if (!state.treeRendered) {
-          renderPageTree();
-          state.treeRendered = true;
-        } else {
-          updateActiveTreeItem(normalizedId);
-        }
+        const [page, pages] = await Promise.all([
+          dataService.getPage(normalizedId),
+          dataService.getPages(),
+        ]);
+
         document.title = `${page.title || normalizedId} | Wikiビュー`;
-        if (elements.title) {
-          elements.title.textContent = page.title || normalizedId;
-        }
-        if (elements.updated) {
-          elements.updated.textContent = page.updatedAt
-            ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}`
-            : '';
-        }
-        if (elements.content) {
-          elements.content.innerHTML = page.content || '';
-        }
-        renderChildPages(normalizedId);
+        elements.title.textContent = page.title || normalizedId;
+        elements.updated.textContent = page.updatedAt
+          ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}`
+          : '';
+        elements.content.innerHTML = page.content || '';
+        renderChildPages(normalizedId, pages);
         showStatus('');
       } catch (error) {
-        if (state.pageTree.length && !state.treeRendered) {
-          renderPageTree();
-          state.treeRendered = true;
-        }
-        updateActiveTreeItem(normalizedId);
         document.title = 'ページを表示できません';
-        if (elements.title) {
-          elements.title.textContent = 'ページを表示できません';
-        }
-        if (elements.updated) {
-          elements.updated.textContent = '';
-        }
-        if (elements.content) {
-          elements.content.innerHTML = '';
-        }
-        elements.childSection?.classList.add('hidden');
+        elements.title.textContent = 'ページを表示できません';
+        elements.updated.textContent = '';
+        elements.content.innerHTML = '';
+        elements.childSection.classList.add('hidden');
         showStatus(error.message || 'ページの取得に失敗しました。', true);
-        if (elements.editButton) {
-          elements.editButton.disabled = true;
-        }
+        elements.editButton.disabled = true;
       } finally {
-        elements.loader?.classList.add('hidden');
-        elements.card?.classList.remove('hidden');
+        elements.loader.classList.add('hidden');
+        elements.card.classList.remove('hidden');
       }
     }
 
@@ -925,28 +437,10 @@
         history.pushState({ pageId: normalizedId }, '', url);
       }
 
-      if (isCompactLayout()) {
-        setSidebarVisibility(false);
-      }
-
       void displayPage(normalizedId);
     }
 
-    elements.toggleSidebar?.addEventListener('click', () => {
-      setSidebarVisibility(!state.sidebarOpen);
-    });
-
-    elements.sidebarOverlay?.addEventListener('click', () => {
-      setSidebarVisibility(false);
-    });
-
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && state.sidebarOpen && isCompactLayout()) {
-        setSidebarVisibility(false);
-      }
-    });
-
-    document.addEventListener('click', event => {
+    document.addEventListener('click', (event) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
       }
@@ -960,13 +454,13 @@
       navigateTo(anchor.dataset.pageId);
     });
 
-    window.addEventListener('popstate', event => {
+    window.addEventListener('popstate', (event) => {
       const pageId = normalizePageId(event.state?.pageId || getPageIdFromQuery());
       void displayPage(pageId);
     });
 
-    elements.editButton?.addEventListener('click', () => {
-      const pageId = elements.editButton?.dataset.pageId;
+    elements.editButton.addEventListener('click', () => {
+      const pageId = elements.editButton.dataset.pageId;
       if (!pageId) {
         return;
       }
@@ -974,7 +468,6 @@
       window.location.href = url;
     });
 
-    setSidebarVisibility(!isCompactLayout());
     navigateTo(getPageIdFromQuery(), { replace: true });
   </script>
 </body>
