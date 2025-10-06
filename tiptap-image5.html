@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TipTap UIテンプレートビルダー</title>
+  <link rel="stylesheet" href="./styles/editor.css" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --border: #dde1eb;
+      --primary: #2563eb;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(180deg, rgba(241, 245, 249, 0.8), rgba(226, 232, 240, 1));
+      color: var(--text);
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header.app-header {
+      padding: 24px 32px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .header-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .header-subtitle {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .config-panel {
+      display: flex;
+      gap: 16px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.75);
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(203, 213, 225, 0.5);
+      backdrop-filter: blur(12px);
+    }
+
+    .config-panel label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      min-width: 240px;
+    }
+
+    .config-panel input {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+    }
+
+    .config-panel button {
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 14px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .config-panel button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.25);
+    }
+
+    .editor-container {
+      flex: 1;
+      padding: 0 32px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .editor-surface {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid rgba(203, 213, 225, 0.6);
+      box-shadow: 0 24px 48px -32px rgba(15, 23, 42, 0.35);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 480px;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+      background: rgba(249, 250, 251, 0.9);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      backdrop-filter: blur(10px);
+    }
+
+    .toolbar-button {
+      border: 1px solid transparent;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .toolbar-button:hover {
+      border-color: rgba(148, 163, 184, 0.35);
+      background: rgba(148, 163, 184, 0.2);
+    }
+
+    .toolbar-button.active {
+      background: rgba(37, 99, 235, 0.12);
+      color: var(--primary);
+      border-color: rgba(37, 99, 235, 0.45);
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35);
+    }
+
+    .editor-content {
+      flex: 1;
+      padding: 24px 28px 48px;
+    }
+
+    .editor-content .ProseMirror {
+      min-height: 420px;
+      outline: none;
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .editor-content .ProseMirror p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      color: rgba(148, 163, 184, 0.75);
+      float: left;
+      height: 0;
+      pointer-events: none;
+    }
+
+    .status-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(248, 250, 252, 0.8);
+      border-top: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    /* Template builder modal styles */
+    .template-builder-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 24px;
+      overflow: auto;
+      z-index: 100;
+    }
+
+    .template-builder-overlay[data-visible="true"] {
+      display: flex;
+    }
+
+    .template-builder-dialog {
+      width: min(1200px, 100%);
+      background: #ffffff;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 40px 60px -30px rgba(15, 23, 42, 0.45);
+      overflow: hidden;
+      animation: popIn 0.25s ease;
+    }
+
+    @keyframes popIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .template-builder-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #edeff5;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .template-builder-header h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .template-builder-sub {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .template-builder-close {
+      border: none;
+      background: rgba(148, 163, 184, 0.16);
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .template-builder-body {
+      display: flex;
+      min-height: 640px;
+    }
+
+    .template-builder-sidebar {
+      width: 240px;
+      border-right: 1px solid #edeff5;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .template-list-toolbar {
+      display: flex;
+      gap: 8px;
+      padding: 16px;
+    }
+
+    .template-list-toolbar button {
+      flex: 1;
+      border: none;
+      background: rgba(148, 163, 184, 0.2);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .template-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .template-list-empty {
+      font-size: 13px;
+      color: #94a3b8;
+      text-align: center;
+      padding: 24px 8px;
+    }
+
+    .template-list-item {
+      border: 1px solid transparent;
+      background: #ffffff;
+      padding: 12px 14px;
+      border-radius: 12px;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+
+    .template-list-item:hover {
+      border-color: rgba(37, 99, 235, 0.35);
+      box-shadow: 0 8px 20px -14px rgba(37, 99, 235, 0.6);
+    }
+
+    .template-list-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .template-list-meta {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .template-builder-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      gap: 20px;
+    }
+
+    .template-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .template-meta-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .template-meta-field input {
+      border: 1px solid #dbe1f0;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    .breakpoint-toggle {
+      display: inline-flex;
+      gap: 6px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 4px;
+    }
+
+    .breakpoint-toggle button {
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .breakpoint-toggle button.active {
+      background: #ffffff;
+      color: #2563eb;
+      font-weight: 600;
+      box-shadow: 0 4px 12px -6px rgba(37, 99, 235, 0.6);
+    }
+
+    .template-workspace {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .template-canvas {
+      border: 1px dashed rgba(148, 163, 184, 0.6);
+      border-radius: 16px;
+      padding: 16px;
+      background: #fbfdff;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .canvas-node {
+      border: 1px solid rgba(203, 213, 225, 0.9);
+      border-radius: 12px;
+      background: #ffffff;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+
+    .canvas-node.selected {
+      border-color: rgba(37, 99, 235, 0.6);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    }
+
+    .canvas-node-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .canvas-node-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .canvas-node-actions {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .canvas-node-actions button {
+      border: none;
+      background: rgba(148, 163, 184, 0.16);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .canvas-node-children {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-left: 12px;
+      border-left: 2px dashed rgba(203, 213, 225, 0.8);
+    }
+
+    .canvas-add-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 10px;
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .canvas-add-buttons button {
+      border: none;
+      background: #ffffff;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid rgba(203, 213, 225, 0.7);
+    }
+
+    .canvas-add-none {
+      font-size: 12px;
+      color: #94a3b8;
+      margin: 0;
+    }
+
+    .canvas-add-menu {
+      position: absolute;
+      background: #ffffff;
+      border: 1px solid rgba(203, 213, 225, 0.9);
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 18px 30px -18px rgba(15, 23, 42, 0.45);
+      z-index: 200;
+    }
+
+    .canvas-add-menu button {
+      border: none;
+      background: transparent;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .canvas-add-menu button:hover {
+      background: rgba(37, 99, 235, 0.1);
+    }
+
+    .template-properties {
+      border: 1px solid rgba(203, 213, 225, 0.8);
+      border-radius: 16px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      max-height: 480px;
+    }
+
+    .properties-header {
+      padding: 16px 18px;
+      border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .properties-header h3 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .properties-node-info {
+      font-size: 12px;
+      color: #94a3b8;
+      word-break: break-all;
+    }
+
+    .properties-content {
+      padding: 16px 18px;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .properties-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .property-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .property-field input,
+    .property-field select,
+    .property-field textarea {
+      border: 1px solid rgba(203, 213, 225, 0.9);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .property-field textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .properties-actions {
+      border-top: 1px solid rgba(229, 231, 235, 0.8);
+      padding: 12px 18px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .properties-actions .danger {
+      border: none;
+      background: rgba(248, 113, 113, 0.15);
+      color: #b91c1c;
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .template-preview {
+      border: 1px solid rgba(203, 213, 225, 0.8);
+      border-radius: 16px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-toolbar {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .preview-breakpoints {
+      display: inline-flex;
+      gap: 6px;
+      margin-right: auto;
+    }
+
+    .preview-breakpoints button {
+      border: none;
+      background: rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .preview-breakpoints button.active {
+      background: rgba(37, 99, 235, 0.14);
+      color: #2563eb;
+    }
+
+    .preview-toolbar .primary {
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .preview-viewport {
+      padding: 24px;
+      background: #f8fafc;
+      min-height: 280px;
+    }
+
+    .preview-wrapper {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      min-height: 200px;
+      box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.5);
+    }
+
+    .preview-wrapper.preview-tablet {
+      width: 720px;
+      margin: 0 auto;
+    }
+
+    .preview-wrapper.preview-mobile {
+      width: 420px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 960px) {
+      .template-builder-body {
+        flex-direction: column;
+      }
+      .template-builder-sidebar {
+        width: auto;
+        border-right: none;
+        border-bottom: 1px solid #edeff5;
+      }
+      .template-workspace {
+        grid-template-columns: 1fr;
+      }
+      .preview-wrapper.preview-tablet,
+      .preview-wrapper.preview-mobile {
+        width: auto;
+      }
+    }
+  </style>
+  <script>
+    const storedTemplateBackend = localStorage.getItem('template-backend-url') || '';
+    const storedDriveBackend = localStorage.getItem('drive-image-webapp-url') || '';
+    window.TEMPLATE_BACKEND_URL = storedTemplateBackend;
+    window.DRIVE_IMAGE_WEBAPP_URL = storedDriveBackend;
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <h1 class="header-title">UIテンプレートビルダー付き TipTap</h1>
+        <p class="header-subtitle">レスポンシブなテンプレートを設計し、Wiki本文に挿入できます。</p>
+      </div>
+      <div class="config-panel">
+        <label>
+          Template Backend URL
+          <input id="template-backend-url" type="url" placeholder="https://script.google.com/.../exec" value="" />
+        </label>
+        <label>
+          DriveImage WebApp URL
+          <input id="drive-backend-url" type="url" placeholder="https://script.google.com/.../exec" value="" />
+        </label>
+        <button id="save-config" type="button">設定を保存して再読み込み</button>
+      </div>
+    </header>
+
+    <main class="editor-container">
+      <section class="editor-surface">
+        <div id="editor-toolbar" class="editor-toolbar"></div>
+        <div class="editor-content">
+          <div id="editor" class="editor"></div>
+        </div>
+        <footer class="status-footer">
+          <span id="status-message">テンプレートビルダーは「テンプレート」ボタンから開きます。</span>
+          <span id="status-meta"></span>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { Editor } from 'https://esm.sh/@tiptap/core';
+    import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
+    import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
+    import { Link } from 'https://esm.sh/@tiptap/extension-link';
+    import { TemplateBuilderExtension } from './extensions/templateBuilder/TemplateBuilderExtension.js';
+    import { TemplateStore } from './scripts/templateStore.js';
+    import { DriveImageExtension } from './extensions/driveImage/DriveImageExtension.js';
+    import { ResizableImage } from './extensions/resizableImage/ResizableImage.js';
+
+    const templateBackendInput = document.getElementById('template-backend-url');
+    const driveBackendInput = document.getElementById('drive-backend-url');
+    const saveConfigButton = document.getElementById('save-config');
+
+    templateBackendInput.value = window.TEMPLATE_BACKEND_URL || '';
+    driveBackendInput.value = window.DRIVE_IMAGE_WEBAPP_URL || '';
+
+    saveConfigButton.addEventListener('click', () => {
+      localStorage.setItem('template-backend-url', templateBackendInput.value.trim());
+      localStorage.setItem('drive-image-webapp-url', driveBackendInput.value.trim());
+      window.location.reload();
+    });
+
+    const toolbarElement = document.getElementById('editor-toolbar');
+
+    function createToolbarButton(label, command) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'toolbar-button';
+      button.textContent = label;
+      button.addEventListener('click', () => {
+        command();
+        updateToolbarState();
+      });
+      return button;
+    }
+
+    const templateStore = window.TEMPLATE_BACKEND_URL
+      ? new TemplateStore({ endpoint: window.TEMPLATE_BACKEND_URL })
+      : null;
+
+    const editor = new Editor({
+      element: document.querySelector('#editor'),
+      autofocus: true,
+      extensions: [
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3, 4] },
+          bulletList: { keepMarks: true },
+          orderedList: { keepMarks: true }
+        }),
+        Placeholder.configure({
+          placeholder: 'ここにWiki本文を入力し、テンプレートを挿入してください。'
+        }),
+        Link.configure({
+          openOnClick: false,
+          autolink: true,
+          linkOnPaste: true
+        }),
+        ResizableImage.configure({ inline: false }),
+        DriveImageExtension.configure({
+          toolbarSelector: '#editor-toolbar',
+          buttonClass: 'toolbar-button',
+          webAppUrl: window.DRIVE_IMAGE_WEBAPP_URL || '',
+          addToToolbar: true,
+          toolbarButtonHTML: '🖼️',
+          toolbarButtonTitle: 'Drive画像'
+        }),
+        TemplateBuilderExtension.configure({
+          toolbarSelector: '#editor-toolbar',
+          buttonClass: 'toolbar-button',
+          buttonLabel: 'テンプレート',
+          store: templateStore
+        })
+      ],
+      content: `
+        <h2>テンプレートビルダーのサンプルページ</h2>
+        <p>上部ツールバーの <strong>テンプレート</strong> ボタンから新規テンプレートを設計できます。保存すると一覧に反映され、エディタへ挿入が可能です。</p>
+        <p>レスポンシブ設定は Base / Desktop / Tablet / Mobile で切り替えて編集します。</p>
+      `
+    });
+
+    const toolbarButtons = [
+      createToolbarButton('太字', () => editor.chain().focus().toggleBold().run()),
+      createToolbarButton('斜体', () => editor.chain().focus().toggleItalic().run()),
+      createToolbarButton('H2', () => editor.chain().focus().toggleHeading({ level: 2 }).run()),
+      createToolbarButton('箇条書き', () => editor.chain().focus().toggleBulletList().run()),
+      createToolbarButton('番号リスト', () => editor.chain().focus().toggleOrderedList().run()),
+      createToolbarButton('引用', () => editor.chain().focus().toggleBlockquote().run())
+    ];
+
+    toolbarButtons.forEach((btn) => toolbarElement.appendChild(btn));
+
+    function updateToolbarState() {
+      toolbarButtons[0].classList.toggle('active', editor.isActive('bold'));
+      toolbarButtons[1].classList.toggle('active', editor.isActive('italic'));
+      toolbarButtons[2].classList.toggle('active', editor.isActive('heading', { level: 2 }));
+      toolbarButtons[3].classList.toggle('active', editor.isActive('bulletList'));
+      toolbarButtons[4].classList.toggle('active', editor.isActive('orderedList'));
+      toolbarButtons[5].classList.toggle('active', editor.isActive('blockquote'));
+    }
+
+    editor.on('transaction', updateToolbarState);
+    updateToolbarState();
+
+    window.editor = editor;
+  </script>
+</body>
+</html>
