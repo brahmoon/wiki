@@ -6,6 +6,11 @@ const ALIGN_OPTIONS = [
     { value: 'right', label: '右寄せ' }
 ];
 
+const DIRECTION_OPTIONS = [
+    { value: 'column', label: '縦並び' },
+    { value: 'row', label: '横並び' }
+];
+
 let elementIdCounter = 0;
 
 function createElementId() {
@@ -59,6 +64,8 @@ function cloneElement(element) {
         padding: element.padding,
         margin: element.margin,
         align: element.align,
+        direction: element.direction,
+        gap: element.gap,
         content: element.content,
         src: element.src,
         children: (element.children || []).map(child => cloneElement(child))
@@ -77,22 +84,29 @@ function buildElementsMarkup(elements, baseClass, pathPrefix = []) {
         const padding = normalizeSpacing(element.padding);
         const align = element.align || 'left';
         if (type === 'frame') {
+            const direction = element.direction === 'row' ? 'row' : 'column';
+            const gap = normalizeSpacing(element.gap ?? '12px');
             const { html: childHtml, css: childCss } = buildElementsMarkup(element.children || [], baseClass, path);
-            htmlParts.push(`<div class="${className}">${childHtml}</div>`);
-            cssParts.push(`.${className} { display: flex; flex-direction: column; gap: 12px; padding: ${padding}; margin: ${margin}; align-items: ${alignToFlex(align)}; width: 100%; }`);
+            htmlParts.push(`<div class="${className}" data-template-frame="${direction}">${childHtml}</div>`);
+            cssParts.push(`.${className} { display: flex; flex-direction: ${direction}; gap: ${gap}; padding: ${padding}; margin: ${margin}; align-items: ${alignToFlex(align)}; width: 100%; }`);
             if (childCss) {
                 cssParts.push(childCss);
             }
         } else if (type === 'image') {
             const src = escapeAttribute(element.src || '');
-            htmlParts.push(`<div class="${className}">${src ? `<img src="${src}" alt="" />` : ''}</div>`);
+            const placeholderClass = `${className}__placeholder`;
+            const placeholder = `<div class="${placeholderClass}" data-template-image-placeholder="true" aria-label="画像を挿入">画像を挿入</div>`;
+            htmlParts.push(`<div class="${className}" data-template-image="true" data-template-placeholder-class="${placeholderClass}">${src ? `<img src="${src}" alt="" />` : placeholder}</div>`);
             const alignRule = alignToText(align);
             cssParts.push(`.${className} { padding: ${padding}; margin: ${margin}; text-align: ${alignRule}; }`);
             cssParts.push(`.${className} > img { max-width: 100%; height: auto; display: inline-block; }`);
+            cssParts.push(`.${className}__placeholder { border: 1px dashed #adb5bd; border-radius: 8px; color: #868e96; font-size: 14px; padding: 24px 16px; display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 120px; cursor: pointer; background: #f8f9fa; }`);
+            cssParts.push(`.${className}__placeholder:hover { background: #f1f3f5; color: #495057; }`);
         } else {
             const content = escapeHtml(element.content || '');
             const alignRule = alignToText(align);
-            htmlParts.push(`<div class="${className}">${content.replace(/\n/g, '<br>')}</div>`);
+            const displayContent = content ? content.replace(/\n/g, '<br>') : '<span class="ui-template-text-placeholder" data-template-text-placeholder="true">テキストを入力</span>';
+            htmlParts.push(`<div class="${className}" data-template-text="true">${displayContent}</div>`);
             cssParts.push(`.${className} { padding: ${padding}; margin: ${margin}; text-align: ${alignRule}; white-space: pre-wrap; word-break: break-word; }`);
         }
     });
@@ -109,13 +123,14 @@ function buildTemplateOutput(id, elements) {
     const htmlOutput = `<div class="ui-template-block ${baseClass}">${html}</div>`;
     const cssOutput = [
         `.ui-template-block.${baseClass} { display: flex; flex-direction: column; gap: 16px; width: 100%; }`,
+        `.ui-template-block.${baseClass} [data-template-text-placeholder="true"] { color: #adb5bd; font-size: 14px; font-style: italic; }`,
         css
     ].filter(Boolean).join('\n');
     return { html: htmlOutput, css: cssOutput };
 }
 
 function createBaseElement(type = 'text') {
-    return {
+    const base = {
         id: createElementId(),
         type,
         padding: '',
@@ -125,6 +140,11 @@ function createBaseElement(type = 'text') {
         src: '',
         children: []
     };
+    if (type === 'frame') {
+        base.direction = 'column';
+        base.gap = '12px';
+    }
+    return base;
 }
 
 export class TemplateManager {
@@ -142,12 +162,16 @@ export class TemplateManager {
         this.cancelCreateButton = options.cancelCreateButton;
         this.closeButton = options.closeButton;
         this.backdrop = options.backdrop;
+        this.previewContainer = options.previewContainer;
         this.templates = [];
         this.currentDraft = null;
         this.styleElement = null;
         this.appliedTemplateIds = new Set();
+        this.imagePlaceholderHandler = null;
+        this.templateUpdateHandler = null;
         this.bindEvents();
         this.renderTemplateList();
+        this.attachTemplateInteractions();
     }
 
     bindEvents() {
@@ -197,6 +221,7 @@ export class TemplateManager {
         const style = this.ensureStyleElement();
         style.appendChild(document.createTextNode(`\n/* template:${template.id} */\n${template.css}\n`));
         this.appliedTemplateIds.add(template.id);
+        this.attachTemplateInteractions();
     }
 
     open() {
@@ -212,6 +237,9 @@ export class TemplateManager {
         this.modal.setAttribute('aria-hidden', 'true');
         this.currentDraft = null;
         this.templateNameInput && (this.templateNameInput.value = '');
+        if (this.previewContainer) {
+            this.previewContainer.innerHTML = '';
+        }
     }
 
     showListView() {
@@ -222,6 +250,9 @@ export class TemplateManager {
             this.creatorView.setAttribute('hidden', 'true');
         }
         this.renderTemplateList();
+        if (this.previewContainer) {
+            this.previewContainer.innerHTML = '';
+        }
     }
 
     startDraft() {
@@ -275,6 +306,7 @@ export class TemplateManager {
         if (!this.elementList) return;
         this.elementList.innerHTML = '';
         if (!this.currentDraft) {
+            this.renderPreview();
             return;
         }
         const elements = this.currentDraft.elements || [];
@@ -283,12 +315,14 @@ export class TemplateManager {
             hint.className = 'template-empty-elements';
             hint.textContent = '「要素を追加」ボタンからフレーム・テキスト・イメージを追加できます。';
             this.elementList.appendChild(hint);
+            this.renderPreview();
             return;
         }
         elements.forEach((element, index) => {
             const node = this.createElementEditor(element, elements, index, 0);
             this.elementList.appendChild(node);
         });
+        this.renderPreview();
     }
 
     createElementEditor(element, siblings, index, depth) {
@@ -311,11 +345,24 @@ export class TemplateManager {
             typeSelect.appendChild(option);
         });
         typeSelect.addEventListener('change', () => {
-            element.type = typeSelect.value;
-            if (element.type === 'frame') {
+            const selected = typeSelect.value;
+            if (selected === 'frame') {
+                element.type = 'frame';
+                element.content = '';
+                element.src = '';
                 element.children = element.children || [];
-            } else {
+                element.direction = element.direction || 'column';
+                element.gap = element.gap || '12px';
+            } else if (selected === 'image') {
+                element.type = 'image';
                 element.children = [];
+                element.content = '';
+                element.src = element.src || '';
+            } else {
+                element.type = 'text';
+                element.children = [];
+                element.content = element.content || '';
+                element.src = '';
             }
             this.renderCreatorView();
         });
@@ -344,6 +391,7 @@ export class TemplateManager {
         paddingInput.placeholder = '例: 16px 12px';
         paddingInput.addEventListener('input', () => {
             element.padding = paddingInput.value;
+            this.renderPreview();
         });
         paddingLabel.appendChild(paddingInput);
         controls.appendChild(paddingLabel);
@@ -356,6 +404,7 @@ export class TemplateManager {
         marginInput.placeholder = '例: 8px 0';
         marginInput.addEventListener('input', () => {
             element.margin = marginInput.value;
+            this.renderPreview();
         });
         marginLabel.appendChild(marginInput);
         controls.appendChild(marginLabel);
@@ -374,9 +423,44 @@ export class TemplateManager {
         });
         alignSelect.addEventListener('change', () => {
             element.align = alignSelect.value;
+            this.renderPreview();
         });
         alignLabel.appendChild(alignSelect);
         controls.appendChild(alignLabel);
+
+        if (element.type === 'frame') {
+            const directionLabel = document.createElement('label');
+            directionLabel.textContent = 'レイアウト';
+            const directionSelect = document.createElement('select');
+            DIRECTION_OPTIONS.forEach(optionInfo => {
+                const option = document.createElement('option');
+                option.value = optionInfo.value;
+                option.textContent = optionInfo.label;
+                if ((element.direction || 'column') === optionInfo.value) {
+                    option.selected = true;
+                }
+                directionSelect.appendChild(option);
+            });
+            directionSelect.addEventListener('change', () => {
+                element.direction = directionSelect.value;
+                this.renderPreview();
+            });
+            directionLabel.appendChild(directionSelect);
+            controls.appendChild(directionLabel);
+
+            const gapLabel = document.createElement('label');
+            gapLabel.textContent = 'Gap';
+            const gapInput = document.createElement('input');
+            gapInput.type = 'text';
+            gapInput.value = element.gap || '';
+            gapInput.placeholder = '例: 12px';
+            gapInput.addEventListener('input', () => {
+                element.gap = gapInput.value;
+                this.renderPreview();
+            });
+            gapLabel.appendChild(gapInput);
+            controls.appendChild(gapLabel);
+        }
 
         wrapper.appendChild(controls);
 
@@ -388,6 +472,7 @@ export class TemplateManager {
             textarea.rows = 3;
             textarea.addEventListener('input', () => {
                 element.content = textarea.value;
+                this.renderPreview();
             });
             contentLabel.appendChild(textarea);
             wrapper.appendChild(contentLabel);
@@ -400,6 +485,7 @@ export class TemplateManager {
             srcInput.placeholder = 'https://example.com/image.png';
             srcInput.addEventListener('input', () => {
                 element.src = srcInput.value;
+                this.renderPreview();
             });
             srcLabel.appendChild(srcInput);
             wrapper.appendChild(srcLabel);
@@ -433,9 +519,6 @@ export class TemplateManager {
             return false;
         }
         for (const element of elements) {
-            if (element.type === 'image' && !(element.src || '').trim()) {
-                return false;
-            }
             if (element.type === 'frame') {
                 if (!this.validateElements(element.children || [])) {
                     return false;
@@ -443,6 +526,100 @@ export class TemplateManager {
             }
         }
         return true;
+    }
+
+    renderPreview() {
+        if (!this.previewContainer) {
+            return;
+        }
+        this.previewContainer.innerHTML = '';
+        if (!this.currentDraft || !this.currentDraft.elements || !this.currentDraft.elements.length) {
+            const empty = document.createElement('div');
+            empty.className = 'template-preview-empty';
+            empty.textContent = 'テンプレートのプレビューがここに表示されます。';
+            this.previewContainer.appendChild(empty);
+            return;
+        }
+        const previewElements = this.currentDraft.elements.map(element => cloneElement(element));
+        const previewId = `preview-${Date.now()}`;
+        const { html, css } = buildTemplateOutput(previewId, previewElements);
+        const style = document.createElement('style');
+        style.textContent = css;
+        const stage = document.createElement('div');
+        stage.className = 'template-preview-stage';
+        stage.innerHTML = html;
+        this.previewContainer.appendChild(style);
+        this.previewContainer.appendChild(stage);
+    }
+
+    attachTemplateInteractions() {
+        if (this.imagePlaceholderHandler) {
+            return;
+        }
+        const editor = this.getEditor?.();
+        if (!editor) {
+            return;
+        }
+        const editorDom = editor.view?.dom;
+        if (!editorDom) {
+            return;
+        }
+        this.imagePlaceholderHandler = event => {
+            const container = event.target.closest('[data-template-image="true"]');
+            if (!container || !editorDom.contains(container)) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            const view = editor.view;
+            let fromPos = 0;
+            try {
+                fromPos = view.posAtDOM(container, 0) + 1;
+            } catch (error) {
+                fromPos = editor.state.selection.from;
+            }
+            editor.chain().focus().setTextSelection({ from: fromPos, to: fromPos }).run();
+            if (typeof editor.commands.insertImageFromGallery === 'function') {
+                editor.commands.insertImageFromGallery();
+            } else if (typeof editor.commands.openImageModal === 'function') {
+                editor.commands.openImageModal();
+            }
+        };
+        editorDom.addEventListener('click', this.imagePlaceholderHandler);
+
+        if (!this.templateUpdateHandler && typeof editor.on === 'function') {
+            this.templateUpdateHandler = () => {
+                const root = editor.view?.dom;
+                if (!root) {
+                    return;
+                }
+                const containers = root.querySelectorAll('[data-template-image="true"]');
+                containers.forEach(container => {
+                    const placeholderNode = container.querySelector('[data-template-image-placeholder]');
+                    const images = Array.from(container.querySelectorAll('img'));
+                    if (images.length) {
+                        if (placeholderNode) {
+                            placeholderNode.remove();
+                        }
+                        if (images.length > 1) {
+                            images.slice(1).forEach(img => img.remove());
+                        }
+                    } else if (!placeholderNode) {
+                        const placeholderClass = container.getAttribute('data-template-placeholder-class');
+                        if (placeholderClass) {
+                            const placeholder = document.createElement('div');
+                            placeholder.className = placeholderClass;
+                            placeholder.setAttribute('data-template-image-placeholder', 'true');
+                            placeholder.setAttribute('aria-label', '画像を挿入');
+                            placeholder.textContent = '画像を挿入';
+                            container.appendChild(placeholder);
+                        }
+                    }
+                });
+            };
+            editor.on('update', this.templateUpdateHandler);
+            this.templateUpdateHandler();
+        }
     }
 
     saveDraft() {
@@ -455,7 +632,7 @@ export class TemplateManager {
             return;
         }
         if (!this.validateElements(this.currentDraft.elements)) {
-            alert('テンプレートには少なくとも1つの要素が必要です。\n画像要素にはURLを指定してください。');
+            alert('テンプレートには少なくとも1つの要素が必要です。');
             return;
         }
         const id = `tpl-${Date.now()}`;

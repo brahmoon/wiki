@@ -674,6 +674,45 @@
             gap: 14px;
         }
 
+        .template-preview-panel {
+            border: 1px solid #dfe1e5;
+            border-radius: 12px;
+            padding: 16px;
+            background: #fcfcfb;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .template-preview-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #343a40;
+        }
+
+        .template-preview-canvas {
+            border: 1px dashed #ced4da;
+            border-radius: 10px;
+            padding: 16px;
+            min-height: 160px;
+            background: #fff;
+            overflow: auto;
+        }
+
+        .template-preview-stage {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .template-preview-empty {
+            color: #adb5bd;
+            font-size: 13px;
+            text-align: center;
+            padding: 24px 0;
+        }
+
         .template-creator-view label {
             display: flex;
             flex-direction: column;
@@ -849,6 +888,10 @@
                                         </label>
                                         <div id="template-element-list" class="template-element-list"></div>
                                         <button id="template-add-element" class="template-add-element" type="button">要素を追加</button>
+                                        <div class="template-preview-panel">
+                                            <h3 class="template-preview-title">プレビュー</h3>
+                                            <div id="template-preview" class="template-preview-canvas"></div>
+                                        </div>
                                         <div class="template-creator-actions">
                                             <button id="template-save" type="submit">テンプレートを保存</button>
                                             <button id="template-cancel" class="template-cancel-button" type="button">キャンセル</button>
@@ -1083,7 +1126,8 @@
             templateNameInput: document.getElementById('template-name'),
             templateElementList: document.getElementById('template-element-list'),
             templateAddElement: document.getElementById('template-add-element'),
-            templateCancel: document.getElementById('template-cancel')
+            templateCancel: document.getElementById('template-cancel'),
+            templatePreview: document.getElementById('template-preview')
         };
 
         hideLinkEditor();
@@ -2642,7 +2686,8 @@
                 addElementButton: elements.templateAddElement,
                 cancelCreateButton: elements.templateCancel,
                 closeButton: elements.templateModalClose,
-                backdrop: elements.templateModalBackdrop
+                backdrop: elements.templateModalBackdrop,
+                previewContainer: elements.templatePreview
             });
             renderToolbar();
             prepareToolbarUpdates();
