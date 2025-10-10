@@ -523,6 +523,22 @@
       return targetId.startsWith(`${ancestorId}/`);
     }
 
+    function normalizeOrderValue(orderValue) {
+      if (typeof orderValue === 'number' && Number.isFinite(orderValue)) {
+        return orderValue;
+      }
+      if (typeof orderValue === 'string') {
+        const trimmed = orderValue.trim();
+        if (trimmed) {
+          const numeric = Number(trimmed);
+          if (Number.isFinite(numeric)) {
+            return numeric;
+          }
+        }
+      }
+      return null;
+    }
+
     function buildSidebarTree(pages) {
       const nodes = [];
       (pages || []).forEach((page, index) => {
@@ -531,12 +547,12 @@
         }
         const normalizedId = normalizePageId(page.id);
         const parentId = getParentId(normalizedId);
-        const parsedOrder = Number(page.order);
+        const parsedOrder = normalizeOrderValue(page.order);
         nodes.push({
           id: normalizedId,
           title: page.title || getSlug(normalizedId) || '無題',
           parentId: parentId ? normalizePageId(parentId) : null,
-          order: Number.isFinite(parsedOrder) ? parsedOrder : index + 1,
+          order: parsedOrder !== null ? parsedOrder : index + 1,
           children: [],
         });
       });

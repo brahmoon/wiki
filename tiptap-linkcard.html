@@ -1928,6 +1928,22 @@
             }
         }
 
+        function normalizeOrderValue(orderValue) {
+            if (typeof orderValue === 'number' && Number.isFinite(orderValue)) {
+                return orderValue;
+            }
+            if (typeof orderValue === 'string') {
+                const trimmed = orderValue.trim();
+                if (trimmed) {
+                    const numeric = Number(trimmed);
+                    if (Number.isFinite(numeric)) {
+                        return numeric;
+                    }
+                }
+            }
+            return null;
+        }
+
         function buildPageTree(pages) {
             const nodes = [];
             pages.forEach((page, index) => {
@@ -1935,14 +1951,14 @@
                     return;
                 }
                 const parentId = getParentId(page.id);
-                const parsedOrder = Number(page.order);
+                const parsedOrder = normalizeOrderValue(page.order);
                 nodes.push({
                     id: page.id,
                     title: page.title || '無題',
                     updatedAt: page.updatedAt || '',
                     parentId,
                     slug: getSlug(page.id),
-                    order: Number.isFinite(parsedOrder) ? parsedOrder : index + 1,
+                    order: parsedOrder !== null ? parsedOrder : index + 1,
                     children: []
                 });
             });
