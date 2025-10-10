@@ -2,6 +2,22 @@ import { Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
 
 const DEFAULT_CARD_CLASS = 'page-link-card';
 
+function getCardInitial({ title, pageId }) {
+  const source = (title && String(title).trim()) || (pageId && String(pageId).trim());
+  if (!source) {
+    return '📄';
+  }
+  const [firstCharacter] = Array.from(source);
+  if (!firstCharacter) {
+    return '📄';
+  }
+  const upper = firstCharacter.toUpperCase();
+  if (upper.length === 1 && /[A-Z0-9]/i.test(upper)) {
+    return upper;
+  }
+  return firstCharacter;
+}
+
 function createCardAttributes(nodeAttrs = {}, HTMLAttributes = {}) {
   const { pageId = '', title = '', url = '' } = nodeAttrs;
   const {
@@ -13,6 +29,7 @@ function createCardAttributes(nodeAttrs = {}, HTMLAttributes = {}) {
     'data-page-link-card': '',
     'data-page-id': pageId,
     'data-page-title': title,
+    'data-page-initial': getCardInitial({ title, pageId }),
     href: url || '#',
     target: '_blank',
     rel: 'noopener noreferrer',
@@ -67,14 +84,14 @@ export const PageLink = Node.create({
     if (node.attrs.description) {
       attrs['data-page-description'] = node.attrs.description;
     }
-    const children = [
+    const contentChildren = [
       ['div', { class: 'page-link-card__title' }, node.attrs.title || node.attrs.pageId || '未指定のページ'],
     ];
     const metaText = node.attrs.description || node.attrs.pageId;
     if (metaText) {
-      children.push(['div', { class: 'page-link-card__meta' }, metaText]);
+      contentChildren.push(['div', { class: 'page-link-card__meta' }, metaText]);
     }
-    return ['a', attrs, ...children];
+    return ['a', attrs, ['div', { class: 'page-link-card__content' }, ...contentChildren]];
   },
   addCommands() {
     return {
