@@ -4,7 +4,11 @@ const DEFAULT_CARD_CLASS = 'page-link-card';
 
 function createCardAttributes(nodeAttrs = {}, HTMLAttributes = {}) {
   const { pageId = '', title = '', url = '' } = nodeAttrs;
-  const { class: className, ...rest } = HTMLAttributes;
+  const {
+    class: className,
+    'data-page-link-card': _ignoredDataAttr,
+    ...rest
+  } = HTMLAttributes;
   const attributes = mergeAttributes(rest, {
     'data-page-link-card': '',
     'data-page-id': pageId,

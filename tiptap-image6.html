@@ -2748,6 +2748,23 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const body = doc.body;
+            const cleanupCardElement = cardElement => {
+                if (!(cardElement instanceof Element)) {
+                    return;
+                }
+                const descendantsWithAttr = cardElement.querySelectorAll('[data-page-link-card]');
+                descendantsWithAttr.forEach(descendant => {
+                    if (descendant !== cardElement) {
+                        descendant.removeAttribute('data-page-link-card');
+                    }
+                });
+                const contentElements = cardElement.querySelectorAll('.page-link-card__title, .page-link-card__meta');
+                contentElements.forEach(contentElement => {
+                    if (contentElement !== cardElement) {
+                        contentElement.classList.remove('page-link-card');
+                    }
+                });
+            };
             const getPageIdFromHref = href => {
                 if (!href) {
                     return '';
@@ -2769,6 +2786,7 @@
                 const hasCardDataAttr = anchor.hasAttribute('data-page-link-card');
                 const hasCardStructure = Boolean(anchor.querySelector('.page-link-card__title'));
                 if (hasCardDataAttr && hasCardStructure) {
+                    cleanupCardElement(anchor);
                     return;
                 }
                 if (anchor.childElementCount > 0) {
@@ -2784,7 +2802,7 @@
                 const nextElement = paragraph.nextElementSibling;
                 if (nextElement && nextElement.tagName === 'P' && nextElement.childElementCount === 1) {
                     const nextAnchor = nextElement.querySelector(':scope > a.page-link-card');
-                    if (nextAnchor && !nextAnchor.hasAttribute('data-page-link-card') && nextAnchor.childElementCount === 0) {
+                    if (nextAnchor && nextAnchor.childElementCount === 0) {
                         const nextHref = nextAnchor.getAttribute('href') || '';
                         if (!nextHref || nextHref === href) {
                             descriptionText = (nextAnchor.textContent || '').trim();
@@ -2824,6 +2842,7 @@
                     card.appendChild(metaDiv);
                 }
 
+                cleanupCardElement(card);
                 paragraph.replaceWith(card);
             });
 
