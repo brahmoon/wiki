@@ -235,42 +235,6 @@
       border-radius: 6px;
     }
 
-    .child-pages {
-      margin-top: 40px;
-      border-top: 1px solid #e9e9e7;
-      padding-top: 28px;
-    }
-
-    .child-pages-title {
-      font-size: 20px;
-      font-weight: 600;
-      margin: 0 0 16px;
-    }
-
-    .child-page-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: grid;
-      gap: 12px;
-    }
-
-    .child-page-list li a {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 16px;
-      border-radius: 8px;
-      background: #f7f6f3;
-      color: #37352f;
-      text-decoration: none;
-      transition: background 0.2s ease;
-    }
-
-    .child-page-list li a:hover {
-      background: #ebeae7;
-    }
-
     .status-message {
       margin-top: 24px;
       padding: 16px 20px;
@@ -399,10 +363,6 @@
           <h1 class="page-title" id="pageTitle"></h1>
           <div class="page-updated" id="pageUpdated"></div>
           <article class="page-content ProseMirror" id="pageContent"></article>
-          <section class="child-pages hidden" id="childPagesSection">
-            <h2 class="child-pages-title">サブページ</h2>
-            <ul class="child-page-list" id="childPageList"></ul>
-          </section>
           <div class="status-message hidden" id="statusMessage"></div>
         </section>
       </div>
@@ -523,8 +483,6 @@
       updated: document.getElementById('pageUpdated'),
       content: document.getElementById('pageContent'),
       breadcrumb: document.getElementById('breadcrumb'),
-      childSection: document.getElementById('childPagesSection'),
-      childList: document.getElementById('childPageList'),
       status: document.getElementById('statusMessage'),
       editButton: document.getElementById('editPageButton'),
       sidebar: document.getElementById('pageSidebar'),
@@ -773,35 +731,6 @@
       });
     }
 
-    function renderChildPages(pageId, pages) {
-      const children = pages
-        .filter(page => page.id.startsWith(`${pageId}/`))
-        .map(page => ({
-          ...page,
-          remainder: page.id.slice(pageId.length + 1),
-        }))
-        .filter(page => page.remainder && !page.remainder.includes('/'))
-        .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-
-      if (!children.length) {
-        elements.childSection.classList.add('hidden');
-        elements.childList.innerHTML = '';
-        return;
-      }
-
-      elements.childList.innerHTML = '';
-      children.forEach(child => {
-        const li = document.createElement('li');
-        const link = document.createElement('a');
-        link.href = `./view.html?page=${encodeURIComponent(child.id)}`;
-        link.dataset.pageId = child.id;
-        link.textContent = child.title || child.remainder || '無題';
-        li.appendChild(link);
-        elements.childList.appendChild(li);
-      });
-      elements.childSection.classList.remove('hidden');
-    }
-
     async function displayPage(pageId) {
       const normalizedId = normalizePageId(pageId);
       renderBreadcrumb(normalizedId);
@@ -824,7 +753,6 @@
           ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}`
           : '';
         elements.content.innerHTML = page.content || '';
-        renderChildPages(normalizedId, pages);
         renderSidebarPages(pages, normalizedId);
         showStatus('');
       } catch (error) {
@@ -832,7 +760,6 @@
         elements.title.textContent = 'ページを表示できません';
         elements.updated.textContent = '';
         elements.content.innerHTML = '';
-        elements.childSection.classList.add('hidden');
         showStatus(error.message || 'ページの取得に失敗しました。', true);
         elements.editButton.disabled = true;
       } finally {
