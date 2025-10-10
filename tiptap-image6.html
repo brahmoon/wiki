@@ -2766,7 +2766,9 @@
                 if (!anchor) {
                     return;
                 }
-                if (anchor.hasAttribute('data-page-link-card') || anchor.querySelector('.page-link-card__title')) {
+                const hasCardDataAttr = anchor.hasAttribute('data-page-link-card');
+                const hasCardStructure = Boolean(anchor.querySelector('.page-link-card__title'));
+                if (hasCardDataAttr && hasCardStructure) {
                     return;
                 }
                 if (anchor.childElementCount > 0) {
