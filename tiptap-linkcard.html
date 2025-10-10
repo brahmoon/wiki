@@ -2578,6 +2578,11 @@
                 elements.pageName.focus();
                 return;
             }
+            if (!titleInput) {
+                alert('ページタイトルを入力してください。');
+                elements.pageTitle.focus();
+                return;
+            }
 
             const parentId = state.currentParentId;
             const id = parentId ? `${parentId}/${slugInput}` : slugInput;
@@ -2595,7 +2600,7 @@
 
             const payload = {
                 id,
-                title: titleInput || slugInput,
+                title: titleInput,
                 content: normalizedContent
             };
 
@@ -2642,48 +2647,47 @@
         }
 
         function createNewPage(parentId = null) {
-            const defaultName = parentId ? `${getSlug(parentId)}-child` : 'new-page';
-            const pageName = normalizeSlug(prompt('ページ名（内部識別子）を入力してください', defaultName) || '');
-            if (!pageName) {
-                return;
-            }
             if (state.isNewPage && state.currentPageId) {
                 removeNode(state.currentPageId);
             }
-            const pageTitle = prompt('ページタイトル（表示名）を入力してください', pageName) || pageName;
-            const id = parentId ? `${parentId}/${pageName}` : pageName;
-            if (isSlugTaken(parentId, pageName, state.currentPageId)) {
-                alert('同じページ名のページが既に存在します。別の名前を指定してください。');
-                return;
-            }
 
-            state.currentParentId = parentId;
-            state.currentPageId = id;
+            const tempIdSuffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const tempId = parentId
+                ? `${parentId}/__new__${tempIdSuffix}`
+                : `__new__${tempIdSuffix}`;
+
+            state.currentParentId = parentId || null;
+            state.currentPageId = tempId;
             state.isNewPage = true;
             state.isDirty = true;
+
             elements.pageName.disabled = false;
-            elements.pageName.value = pageName;
-            elements.pageTitle.value = pageTitle;
+            elements.pageName.value = '';
+            elements.pageTitle.value = '';
+
             state.isApplyingContent = true;
             state.editor.commands.setContent('', false);
             state.isApplyingContent = false;
+
             hideLinkEditor();
             hidePageLinkPanel();
             renderToolbar();
+
             const node = {
-                id,
-                title: pageTitle || '無題',
+                id: tempId,
+                title: '新規ページ',
                 updatedAt: '',
-                parentId,
-                slug: pageName,
+                parentId: parentId || null,
+                slug: '',
                 children: []
             };
             insertNode(node);
-            updateBreadcrumb(id);
+            updateBreadcrumb(tempId);
             setUpdatedAt('');
             setStatus('新しいページを作成しました。保存して反映してください。');
             renderTree();
-            updateHistory(id);
+
+            requestAnimationFrame(() => elements.pageName.focus());
         }
 
         function attachEventListeners() {
