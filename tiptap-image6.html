@@ -1050,7 +1050,6 @@
     <script type="module">
         import { Editor, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
         import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
-        import { Link } from 'https://esm.sh/@tiptap/extension-link';
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
         import { Table } from 'https://esm.sh/@tiptap/extension-table';
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
@@ -1059,6 +1058,7 @@
         import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
+        import { PageLinkAwareLink } from './extensions/pageLink/PageLinkAwareLink.js';
         import { PageLink } from './extensions/pageLink/PageLink.js';
         import { TemplateManager, UITemplateExtension } from './extensions/ui-template.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
@@ -3163,7 +3163,7 @@
                     Placeholder.configure({
                         placeholder: 'ここにコンテンツを入力してください...'
                     }),
-                    Link.configure({
+                    PageLinkAwareLink.configure({
                         openOnClick: false,
                         autolink: true,
                         linkOnPaste: true
