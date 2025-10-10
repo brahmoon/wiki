@@ -2741,6 +2741,93 @@
             }
         }
 
+        function normalizePageLinkCards(html) {
+            if (!html || typeof html !== 'string') {
+                return html;
+            }
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const body = doc.body;
+            const getPageIdFromHref = href => {
+                if (!href) {
+                    return '';
+                }
+                try {
+                    const url = new URL(href, window.location.origin);
+                    return url.searchParams.get('page') || '';
+                } catch (error) {
+                    return '';
+                }
+            };
+
+            const paragraphs = Array.from(body.querySelectorAll('p'));
+            paragraphs.forEach(paragraph => {
+                const anchor = paragraph.childElementCount === 1 ? paragraph.querySelector(':scope > a.page-link-card') : null;
+                if (!anchor) {
+                    return;
+                }
+                if (anchor.hasAttribute('data-page-link-card') || anchor.querySelector('.page-link-card__title')) {
+                    return;
+                }
+                if (anchor.childElementCount > 0) {
+                    return;
+                }
+
+                const href = anchor.getAttribute('href') || '#';
+                const titleText = (anchor.textContent || '').trim();
+                const pageIdAttr = anchor.getAttribute('data-page-id') || anchor.getAttribute('pageid') || '';
+                const pageId = pageIdAttr || getPageIdFromHref(href);
+
+                let descriptionText = '';
+                const nextElement = paragraph.nextElementSibling;
+                if (nextElement && nextElement.tagName === 'P' && nextElement.childElementCount === 1) {
+                    const nextAnchor = nextElement.querySelector(':scope > a.page-link-card');
+                    if (nextAnchor && !nextAnchor.hasAttribute('data-page-link-card') && nextAnchor.childElementCount === 0) {
+                        const nextHref = nextAnchor.getAttribute('href') || '';
+                        if (!nextHref || nextHref === href) {
+                            descriptionText = (nextAnchor.textContent || '').trim();
+                            nextElement.remove();
+                        }
+                    }
+                }
+
+                const card = doc.createElement('a');
+                card.className = 'page-link-card';
+                card.setAttribute('data-page-link-card', '');
+                card.setAttribute('href', href || '#');
+                card.setAttribute('target', '_blank');
+                card.setAttribute('rel', 'noopener noreferrer');
+
+                if (pageId) {
+                    card.setAttribute('data-page-id', pageId);
+                }
+                if (titleText) {
+                    card.setAttribute('data-page-title', titleText);
+                    card.setAttribute('title', titleText);
+                }
+                if (descriptionText) {
+                    card.setAttribute('data-page-description', descriptionText);
+                }
+
+                const titleDiv = doc.createElement('div');
+                titleDiv.className = 'page-link-card__title';
+                titleDiv.textContent = titleText || pageId || '未指定のページ';
+                card.appendChild(titleDiv);
+
+                const metaText = descriptionText || pageId;
+                if (metaText) {
+                    const metaDiv = doc.createElement('div');
+                    metaDiv.className = 'page-link-card__meta';
+                    metaDiv.textContent = metaText;
+                    card.appendChild(metaDiv);
+                }
+
+                paragraph.replaceWith(card);
+            });
+
+            return body.innerHTML;
+        }
+
         async function navigateToPage(id, { updateHistory: shouldUpdateHistory = true } = {}) {
             if (!id) return;
             if (state.isNewPage && state.currentPageId === id) {
@@ -2767,8 +2854,9 @@
                 elements.pageName.value = slug;
                 elements.pageName.disabled = false;
                 elements.pageTitle.value = page.title || '無題';
+                const normalizedContent = normalizePageLinkCards(page.content || '');
                 state.isApplyingContent = true;
-                state.editor.commands.setContent(page.content || '', false);
+                state.editor.commands.setContent(normalizedContent || '', false);
                 state.isApplyingContent = false;
                 hideLinkEditor();
                 renderToolbar();
@@ -2822,10 +2910,11 @@
             const previousId = state.currentPageId;
             const existingNode = previousId ? state.pageMap.get(previousId) : null;
 
+            const normalizedContent = normalizePageLinkCards(state.editor.getHTML());
             const payload = {
                 id,
                 title: titleInput || slugInput,
-                content: state.editor.getHTML()
+                content: normalizedContent
             };
 
             try {
