@@ -2910,7 +2910,13 @@
             const previousId = state.currentPageId;
             const existingNode = previousId ? state.pageMap.get(previousId) : null;
 
-            const normalizedContent = normalizePageLinkCards(state.editor.getHTML());
+            const currentContent = state.editor.getHTML();
+            const normalizedContent = normalizePageLinkCards(currentContent);
+            if (normalizedContent !== currentContent) {
+                state.isApplyingContent = true;
+                state.editor.commands.setContent(normalizedContent || '', false);
+                state.isApplyingContent = false;
+            }
             const payload = {
                 id,
                 title: titleInput || slugInput,
