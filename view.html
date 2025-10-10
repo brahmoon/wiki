@@ -52,14 +52,14 @@
       background: #f7f6f3;
       border-right: 1px solid #e9e9e7;
       padding: 24px 0;
-      overflow-y: auto;
       transition: opacity 0.2s ease;
+      display: flex;
+      flex-direction: column;
     }
 
     .sidebar-header {
       padding: 0 20px 20px;
       border-bottom: 1px solid #e9e9e7;
-      margin-bottom: 16px;
     }
 
     .sidebar-title {
@@ -67,8 +67,14 @@
       font-weight: 600;
     }
 
-    .sidebar-header .login-status {
-      margin-top: 16px;
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px 24px 20px;
+      border-top: 1px solid #e9e9e7;
+      background: #f7f6f3;
+    }
+
+    .login-status {
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -94,6 +100,12 @@
       list-style: none;
       margin: 0;
       padding: 0;
+    }
+
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 0 24px;
     }
 
     .sidebar-item {
@@ -412,6 +424,15 @@
         </div>
       </div>
       <ul class="sidebar-list" id="sidebarPageList"></ul>
+      <div class="sidebar-footer">
+        <div class="login-status" role="status" aria-live="polite">
+          <div id="sidebarLoginStatusText" class="login-status-text">未ログイン</div>
+          <div class="login-actions">
+            <button id="sidebarLoginButton" class="btn btn-primary" type="button">ログイン</button>
+            <button id="sidebarLogoutButton" class="btn" type="button" hidden>ログアウト</button>
+          </div>
+        </div>
+      </div>
     </aside>
     <div class="view-main">
       <div class="view-container">
