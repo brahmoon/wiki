@@ -158,12 +158,21 @@
         const CONFIG = {
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com',
             LOGIN_STORAGE_KEY: 'wikiLoginState',
-            REDIRECT_URL: 'tiptap-login.html'
+            DEFAULT_REDIRECT_PATH: 'tiptap-login.html'
         };
 
         const state = {
             googleClient: null,
             isRequesting: false
+        };
+
+        const params = new URLSearchParams(window.location.search);
+        const redirectPathParam = (params.get('redirect') || '').trim();
+        const redirectPageParam = (params.get('page') || '').trim();
+
+        const redirectTarget = {
+            path: redirectPathParam || CONFIG.DEFAULT_REDIRECT_PATH,
+            page: redirectPageParam
         };
 
         const elements = {
@@ -209,6 +218,23 @@
                 </div>
             `;
             elements.profile.style.display = 'flex';
+        };
+
+        const buildRedirectUrl = () => {
+            const url = new URL(redirectTarget.path, window.location.href);
+            if (redirectTarget.page) {
+                url.searchParams.set('page', redirectTarget.page);
+            }
+            return url.toString();
+        };
+
+        const buildReturnUrl = () => {
+            if (redirectTarget.page) {
+                const url = new URL('view.html', window.location.href);
+                url.searchParams.set('page', redirectTarget.page);
+                return url.toString();
+            }
+            return buildRedirectUrl();
         };
 
         const updateUI = () => {
@@ -269,7 +295,7 @@
                 setStatus(`${user.name} としてログインしました。数秒後にエディタへ戻ります。`, 'status-success');
                 updateUI();
                 setTimeout(() => {
-                    window.location.href = CONFIG.REDIRECT_URL;
+                    window.location.href = buildRedirectUrl();
                 }, 1500);
             } catch (error) {
                 console.error(error);
@@ -313,7 +339,7 @@
         elements.loginButton.addEventListener('click', handleLoginClick);
         elements.logoutButton.addEventListener('click', handleLogoutClick);
         elements.returnButton.addEventListener('click', () => {
-            window.location.href = CONFIG.REDIRECT_URL;
+            window.location.href = buildReturnUrl();
         });
 
         window.addEventListener('storage', (event) => {
