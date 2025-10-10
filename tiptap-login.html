@@ -809,6 +809,8 @@
         const loginStatusText = document.getElementById('login-status-text');
         const loginButton = document.getElementById('login-button');
         const logoutButton = document.getElementById('logout-button');
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialPageIdFromQuery = (urlParams.get('page') || '').trim();
 
         const getStoredLoginState = () => {
             try {
@@ -822,6 +824,16 @@
 
         const clearStoredLoginState = () => {
             localStorage.removeItem(LOGIN_STORAGE_KEY);
+        };
+
+        const buildLoginUrl = (pageId) => {
+            const url = new URL('./login.html', window.location.href);
+            url.searchParams.set('redirect', 'tiptap-login.html');
+            const targetPage = (pageId || '').trim();
+            if (targetPage) {
+                url.searchParams.set('page', targetPage);
+            }
+            return url.toString();
         };
 
         const updateLoginUI = () => {
@@ -838,7 +850,8 @@
         };
 
         const handleLoginNavigation = () => {
-            window.location.href = 'login.html';
+            const targetPage = state.currentPageId || initialPageIdFromQuery || '';
+            window.location.href = buildLoginUrl(targetPage);
         };
 
         const handleLogout = () => {
@@ -868,6 +881,10 @@
         });
 
         updateLoginUI();
+
+        if (!getStoredLoginState()?.user?.name) {
+            window.location.replace(buildLoginUrl(initialPageIdFromQuery));
+        }
 
         const YouTubeEmbed = Node.create({
             name: 'youtube',

@@ -67,6 +67,28 @@
       font-weight: 600;
     }
 
+    .sidebar-header .login-status {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13px;
+      color: #55534e;
+    }
+
+    .login-status-text {
+      line-height: 1.4;
+    }
+
+    .login-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .login-actions .btn {
+      flex: 1;
+    }
+
     .sidebar-list,
     .sidebar-sublist {
       list-style: none;
@@ -193,6 +215,45 @@
     .edit-button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid #d3d2ce;
+      background: #fff;
+      color: #37352f;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .btn:hover {
+      background: #f7f6f3;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #2383e2;
+      border-color: #1d70c4;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #1a6bc2;
+    }
+
+    .btn[hidden] {
+      display: none !important;
     }
 
     .breadcrumb a {
@@ -342,6 +403,13 @@
     <aside class="sidebar" id="pageSidebar">
       <div class="sidebar-header">
         <div class="sidebar-title">ページ一覧</div>
+        <div class="login-status" role="status" aria-live="polite">
+          <div id="sidebarLoginStatusText" class="login-status-text">未ログイン</div>
+          <div class="login-actions">
+            <button id="sidebarLoginButton" class="btn btn-primary" type="button">ログイン</button>
+            <button id="sidebarLogoutButton" class="btn" type="button" hidden>ログアウト</button>
+          </div>
+        </div>
       </div>
       <ul class="sidebar-list" id="sidebarPageList"></ul>
     </aside>
@@ -372,6 +440,7 @@
 
   <script>
     const DEFAULT_TIMEOUT = 25000;
+    const LOGIN_STORAGE_KEY = 'wikiLoginState';
 
     const WIKI_APPS_SCRIPT_ENDPOINT = (window.APP_ENDPOINTS && window.APP_ENDPOINTS.wiki)
       ? window.APP_ENDPOINTS.wiki
@@ -491,10 +560,106 @@
       sidebarOverlay: document.getElementById('sidebarOverlay'),
     };
 
+    const loginElements = {
+      statusText: document.getElementById('sidebarLoginStatusText'),
+      loginButton: document.getElementById('sidebarLoginButton'),
+      logoutButton: document.getElementById('sidebarLogoutButton'),
+    };
+
     const normalizePageId = (pageId) => {
       const trimmed = (pageId || '').trim();
       return trimmed || 'top';
     };
+
+    let currentPageId = getPageIdFromQuery();
+
+    function getStoredLoginState() {
+      try {
+        const value = localStorage.getItem(LOGIN_STORAGE_KEY);
+        return value ? JSON.parse(value) : null;
+      } catch (error) {
+        console.error('Failed to parse login state', error);
+        return null;
+      }
+    }
+
+    async function revokeAccessToken(token) {
+      if (!token) {
+        return;
+      }
+      try {
+        await fetch('https://oauth2.googleapis.com/revoke', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `token=${encodeURIComponent(token)}`,
+        });
+      } catch (error) {
+        console.warn('Failed to revoke token', error);
+      }
+    }
+
+    function buildLoginUrl(pageId) {
+      const url = new URL('./login.html', window.location.href);
+      url.searchParams.set('redirect', 'tiptap-login.html');
+      if (pageId) {
+        url.searchParams.set('page', pageId);
+      }
+      return url.toString();
+    }
+
+    function updateLoginRedirectTarget() {
+      if (loginElements.loginButton) {
+        loginElements.loginButton.dataset.pageId = currentPageId;
+      }
+    }
+
+    function updateLoginUI() {
+      const loginState = getStoredLoginState();
+      if (loginElements.statusText) {
+        if (loginState?.user?.name) {
+          loginElements.statusText.textContent = `${loginState.user.name} としてログイン中`;
+        } else {
+          loginElements.statusText.textContent = '未ログイン';
+        }
+      }
+      if (loginElements.loginButton) {
+        const isLoggedIn = Boolean(loginState?.user?.name);
+        loginElements.loginButton.hidden = isLoggedIn;
+        loginElements.loginButton.disabled = false;
+      }
+      if (loginElements.logoutButton) {
+        loginElements.logoutButton.hidden = !Boolean(loginState?.user?.name);
+      }
+      updateLoginRedirectTarget();
+    }
+
+    function handleLoginClick() {
+      if (!loginElements.loginButton) {
+        return;
+      }
+      const targetPage = loginElements.loginButton.dataset.pageId || currentPageId || 'top';
+      window.location.href = buildLoginUrl(targetPage);
+    }
+
+    async function handleLogoutClick() {
+      const loginState = getStoredLoginState();
+      await revokeAccessToken(loginState?.accessToken);
+      localStorage.removeItem(LOGIN_STORAGE_KEY);
+      updateLoginUI();
+    }
+
+    loginElements.loginButton?.addEventListener('click', handleLoginClick);
+    loginElements.logoutButton?.addEventListener('click', handleLogoutClick);
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === LOGIN_STORAGE_KEY) {
+        updateLoginUI();
+      }
+    });
+
+    updateLoginUI();
 
     function getParentId(pageId) {
       if (!pageId || pageId === 'top') {
@@ -705,7 +870,8 @@
 
     function getPageIdFromQuery() {
       const params = new URLSearchParams(window.location.search);
-      return normalizePageId(params.get('page'));
+      const value = (params.get('page') || '').trim();
+      return normalizePageId(value);
     }
 
     function showStatus(message, isError = false) {
@@ -749,6 +915,8 @@
 
     async function displayPage(pageId) {
       const normalizedId = normalizePageId(pageId);
+      currentPageId = normalizedId;
+      updateLoginRedirectTarget();
       renderBreadcrumb(normalizedId);
       renderSidebarPages(dataService.getCachedPages() || [], normalizedId);
       elements.editButton.dataset.pageId = normalizedId;
@@ -843,7 +1011,7 @@
       if (!pageId) {
         return;
       }
-      const url = `./tiptap-image3.html?page=${encodeURIComponent(pageId)}`;
+      const url = `./tiptap-login.html?page=${encodeURIComponent(pageId)}`;
       window.location.href = url;
     });
 
