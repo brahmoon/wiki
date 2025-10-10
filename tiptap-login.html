@@ -18,9 +18,20 @@
         }
 
         .app-container {
-            display: flex;
-            height: 100vh;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
             width: 100vw;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .app-container.sidebar-closed {
+            grid-template-columns: 0 1fr;
+        }
+
+        .app-container.sidebar-closed .sidebar {
+            opacity: 0;
+            pointer-events: none;
         }
 
         .sidebar {
@@ -29,6 +40,7 @@
             border-right: 1px solid #e9e9e7;
             display: flex;
             flex-direction: column;
+            transition: opacity 0.2s ease;
         }
 
         .sidebar-header {
@@ -171,6 +183,7 @@
             display: flex;
             flex-direction: column;
             min-width: 0;
+            min-height: 100vh;
         }
 
         .page-header {
@@ -183,6 +196,12 @@
             position: sticky;
             top: 0;
             z-index: 30;
+        }
+
+        .page-header-top {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
 
         .page-header.is-scrolled {
@@ -677,6 +696,43 @@
             color: #c0352b;
         }
 
+        .sidebar-toggle {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1px solid #d3d2ce;
+            background: #fff;
+            cursor: pointer;
+            transition: background 0.2s, border 0.2s;
+        }
+
+        .sidebar-toggle:hover {
+            background: #f7f6f3;
+        }
+
+        .sidebar-toggle span {
+            width: 18px;
+            height: 2px;
+            background: #37352f;
+            border-radius: 99px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.3);
+            z-index: 80;
+        }
+
         .breadcrumb {
             font-size: 12px;
             color: #9b9a97;
@@ -695,19 +751,34 @@
 
         @media (max-width: 960px) {
             .app-container {
-                flex-direction: column;
+                display: block;
             }
 
             .sidebar {
-                width: 100%;
-                height: 260px;
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 260px;
+                box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18);
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 90;
+            }
+
+            .app-container.sidebar-open .sidebar {
+                transform: translateX(0);
+            }
+
+            .app-container.sidebar-closed .sidebar {
+                transform: translateX(-100%);
             }
         }
     </style>
 </head>
 <body>
-    <div class="app-container">
-        <aside class="sidebar">
+    <div class="app-container" id="appContainer">
+        <aside class="sidebar" id="pageSidebar">
             <div class="sidebar-header">
                 <div class="sidebar-title">ページ一覧</div>
             </div>
@@ -728,7 +799,14 @@
         </aside>
         <main class="main-area">
             <div class="page-header">
-                <div class="breadcrumb" id="breadcrumb"></div>
+                <div class="page-header-top">
+                    <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="ページ一覧" aria-expanded="false" aria-controls="pageSidebar">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <div class="breadcrumb" id="breadcrumb"></div>
+                </div>
                 <div class="page-header-row">
                     <div class="input-group">
                         <label class="input-label" for="page-name">Page ID</label>
@@ -789,6 +867,7 @@
             </div>
         </div>
     </div>
+    <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
 
     <script type="module">
         import { Editor, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
@@ -1047,6 +1126,10 @@
         };
 
         const elements = {
+            appContainer: document.getElementById('appContainer'),
+            sidebar: document.getElementById('pageSidebar'),
+            sidebarToggle: document.getElementById('sidebarToggle'),
+            sidebarOverlay: document.getElementById('sidebarOverlay'),
             pageTree: document.getElementById('page-tree'),
             breadcrumb: document.getElementById('breadcrumb'),
             pageName: document.getElementById('page-name'),
@@ -1132,6 +1215,56 @@
             updateToolbarMetrics();
             updateToolbarShadow();
         }
+
+        const desktopMediaQuery = typeof window.matchMedia === 'function'
+            ? window.matchMedia('(min-width: 961px)')
+            : { matches: true };
+
+        const sidebarState = {
+            open: desktopMediaQuery.matches
+        };
+
+        function setSidebar(open) {
+            sidebarState.open = open;
+            const isDesktop = desktopMediaQuery.matches;
+
+            if (elements.appContainer) {
+                elements.appContainer.classList.toggle('sidebar-open', open);
+                elements.appContainer.classList.toggle('sidebar-closed', !open);
+            }
+
+            if (elements.sidebar) {
+                const ariaHidden = !isDesktop && !open;
+                elements.sidebar.setAttribute('aria-hidden', ariaHidden ? 'true' : 'false');
+            }
+
+            if (elements.sidebarToggle) {
+                elements.sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+
+            if (elements.sidebarOverlay) {
+                const shouldShowOverlay = open && !isDesktop;
+                elements.sidebarOverlay.classList.toggle('hidden', !shouldShowOverlay);
+            }
+
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(updateToolbarMetrics);
+            } else {
+                updateToolbarMetrics();
+            }
+        }
+
+        const handleSidebarViewportChange = event => {
+            setSidebar(event.matches);
+        };
+
+        if (typeof desktopMediaQuery.addEventListener === 'function') {
+            desktopMediaQuery.addEventListener('change', handleSidebarViewportChange);
+        } else if (typeof desktopMediaQuery.addListener === 'function') {
+            desktopMediaQuery.addListener(handleSidebarViewportChange);
+        }
+
+        setSidebar(sidebarState.open);
 
         function parseYouTubeTime(value) {
             if (!value) {
@@ -2892,6 +3025,24 @@
                 updateToolbarShadow();
                 if (state.youtubePaste.visible) {
                     hideYouTubePastePopup();
+                }
+            });
+            elements.sidebarToggle?.addEventListener('click', () => {
+                setSidebar(!sidebarState.open);
+            });
+            elements.sidebarOverlay?.addEventListener('click', () => {
+                setSidebar(false);
+            });
+            elements.pageTree?.addEventListener('click', event => {
+                if (desktopMediaQuery.matches) {
+                    return;
+                }
+                const target = event.target;
+                if (!(target instanceof Element)) {
+                    return;
+                }
+                if (target.closest('.tree-item')) {
+                    setSidebar(false);
                 }
             });
             elements.editor?.addEventListener('click', preventEditorLinkNavigation);
