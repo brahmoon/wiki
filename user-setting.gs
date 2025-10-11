@@ -294,6 +294,12 @@ function buildResponse(result, origin) {
   return createJsonOutput(output, origin);
 }
 
+function getRequestOrigin(e) {
+  if (!e || !e.headers) {
+    return '';
+  }
+  return e.headers.origin || e.headers.Origin || '';
+}
 function createJsonOutput(data, requestOrigin) {
   const output = ContentService
     .createTextOutput(JSON.stringify(data))
@@ -310,36 +316,12 @@ function createJsonOutput(data, requestOrigin) {
   if (allowedOrigins.length) {
     if (allowedOrigins.indexOf('*') !== -1) {
       output.setHeader('Access-Control-Allow-Origin', '*');
-    } else if (requestOrigin) {
-      const normalizedRequestOrigin = normalizeOrigin(requestOrigin);
-      const matchedOrigin = allowedOrigins.find(function (allowedOrigin) {
-        return normalizeOrigin(allowedOrigin) === normalizedRequestOrigin;
-      });
-
-      if (matchedOrigin) {
-        output
-          .setHeader('Access-Control-Allow-Origin', requestOrigin)
-          .setHeader('Vary', 'Origin');
-      }
+    } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
+      output
+        .setHeader('Access-Control-Allow-Origin', requestOrigin)
+        .setHeader('Vary', 'Origin');
     }
   }
 
-  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   return output;
-}
-
-function getRequestOrigin(e) {
-  if (!e || !e.headers) {
-    return '';
-  }
-  return e.headers.origin || e.headers.Origin || '';
-}
-
-function normalizeOrigin(origin) {
-  if (!origin) {
-    return '';
-  }
-  return origin.replace(/\/$/, '').trim();
 }
