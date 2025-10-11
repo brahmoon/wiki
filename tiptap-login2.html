@@ -1079,6 +1079,9 @@
                 if (error.name === 'AbortError') {
                     throw new Error('ユーザー設定のリクエストがタイムアウトしました。');
                 }
+                if (error instanceof TypeError) {
+                    throw new Error('ユーザー設定サービスに接続できませんでした。ネットワークまたはCORS設定を確認してください。');
+                }
                 throw error;
             } finally {
                 window.clearTimeout(timeoutId);
