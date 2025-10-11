@@ -299,7 +299,34 @@ function createJsonOutput(data, requestOrigin) {
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 
-  setCorsHeaders(output, requestOrigin);
+  const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || [])
+    .map(function (origin) {
+      return (origin || '').trim();
+    })
+    .filter(function (origin) {
+      return origin;
+    });
+
+  if (allowedOrigins.length) {
+    if (allowedOrigins.indexOf('*') !== -1) {
+      output.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (requestOrigin) {
+      const normalizedRequestOrigin = normalizeOrigin(requestOrigin);
+      const matchedOrigin = allowedOrigins.find(function (allowedOrigin) {
+        return normalizeOrigin(allowedOrigin) === normalizedRequestOrigin;
+      });
+
+      if (matchedOrigin) {
+        output
+          .setHeader('Access-Control-Allow-Origin', requestOrigin)
+          .setHeader('Vary', 'Origin');
+      }
+    }
+  }
+
+  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   return output;
 }
 
@@ -308,36 +335,6 @@ function getRequestOrigin(e) {
     return '';
   }
   return e.headers.origin || e.headers.Origin || '';
-}
-
-function setCorsHeaders(output, requestOrigin) {
-  const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || [])
-    .map(function (origin) {
-      return normalizeOrigin(origin);
-    })
-    .filter(function (origin) {
-      return origin;
-    });
-
-  if (!allowedOrigins.length) {
-    return;
-  }
-
-  const normalizedRequestOrigin = normalizeOrigin(requestOrigin);
-
-  if (allowedOrigins.indexOf('*') !== -1) {
-    output.setHeader('Access-Control-Allow-Origin', '*');
-  } else if (
-    normalizedRequestOrigin &&
-    allowedOrigins.indexOf(normalizedRequestOrigin) !== -1
-  ) {
-    output
-      .setHeader('Access-Control-Allow-Origin', requestOrigin)
-      .setHeader('Vary', 'Origin');
-  }
-
-  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
 function normalizeOrigin(origin) {
