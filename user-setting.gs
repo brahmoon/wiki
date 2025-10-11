@@ -1,4 +1,4 @@
-const SETTINGS_CONFIG = {
+const CONFIG = {
   SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
   SHEET_NAME: 'Accounts',
   HEADER_ROW_INDEX: 1,
@@ -18,7 +18,7 @@ const SETTINGS_CONFIG = {
 };
 
 function doGet(e) {
-  return buildResponse(
+  return createJsonOutput(
     {
       success: true,
       message: 'User settings endpoint is running',
@@ -32,14 +32,14 @@ function doPost(e) {
   const origin = getRequestOrigin(e);
   try {
     const request = parseRequest(e);
-    const action = (request.action || '').toString() || 'getUserSettings';
+    const action = (request.action || 'getUserSettings').toString();
 
     const sheet = getAccountsSheet();
     if (!sheet) {
       return buildResponse(
         {
           success: false,
-          message: `シート「${SETTINGS_CONFIG.SHEET_NAME}」が見つかりません。`,
+          message: `シート「${CONFIG.SHEET_NAME}」が見つかりません。`,
         },
         origin,
       );
@@ -71,13 +71,12 @@ function doPost(e) {
 }
 
 function doOptions(e) {
-  const origin = getRequestOrigin(e);
   return createJsonOutput(
     {
       success: true,
       message: 'OK',
     },
-    origin,
+    getRequestOrigin(e),
   );
 }
 
@@ -136,7 +135,7 @@ function handleUpdateUserSettings(sheet, request) {
   const languageValue = sanitizeLanguage(request.language);
 
   const updatedValues = record.values.slice();
-  const columns = SETTINGS_CONFIG.COLUMNS;
+  const columns = CONFIG.COLUMNS;
 
   if (columns.username) {
     updatedValues[columns.username - 1] = normalizedUsername;
@@ -206,15 +205,15 @@ function parseRequestData(e) {
 }
 
 function getSpreadsheet() {
-  if (SETTINGS_CONFIG.SHEET_ID) {
-    return SpreadsheetApp.openById(SETTINGS_CONFIG.SHEET_ID);
+  if (CONFIG.SHEET_ID) {
+    return SpreadsheetApp.openById(CONFIG.SHEET_ID);
   }
   return SpreadsheetApp.getActiveSpreadsheet();
 }
 
 function getAccountsSheet() {
   const spreadsheet = getSpreadsheet();
-  return spreadsheet ? spreadsheet.getSheetByName(SETTINGS_CONFIG.SHEET_NAME) : null;
+  return spreadsheet ? spreadsheet.getSheetByName(CONFIG.SHEET_NAME) : null;
 }
 
 function normalizeId(value) {
@@ -240,18 +239,18 @@ function sanitizeLanguage(value) {
 
 function findAccount(sheet, identifiers) {
   const lastRow = sheet.getLastRow();
-  const firstDataRow = SETTINGS_CONFIG.HEADER_ROW_INDEX + 1;
+  const firstDataRow = CONFIG.HEADER_ROW_INDEX + 1;
   if (lastRow < firstDataRow) {
     return null;
   }
 
-  const totalRows = lastRow - SETTINGS_CONFIG.HEADER_ROW_INDEX;
+  const totalRows = lastRow - CONFIG.HEADER_ROW_INDEX;
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
   const normalizedLoginId = normalizeId(identifiers.loginId);
   const normalizedEmail = normalizeId(identifiers.email);
-  const columns = SETTINGS_CONFIG.COLUMNS;
+  const columns = CONFIG.COLUMNS;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
@@ -296,25 +295,11 @@ function buildResponse(result, origin) {
 }
 
 function createJsonOutput(data, requestOrigin) {
-  const output = ContentService.createTextOutput(JSON.stringify(data)).setMimeType(
-    ContentService.MimeType.JSON,
-  );
+  const output = ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 
-  const allowedOrigins = (SETTINGS_CONFIG.ALLOWED_ORIGINS || [])
-    .map((origin) => (origin || '').trim())
-    .filter((origin) => origin);
-
-  if (allowedOrigins.length) {
-    if (allowedOrigins.indexOf('*') !== -1) {
-      output.setHeader('Access-Control-Allow-Origin', '*');
-    } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
-      output.setHeader('Access-Control-Allow-Origin', requestOrigin).setHeader('Vary', 'Origin');
-    }
-  }
-
-  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  setCorsHeaders(output, requestOrigin);
   return output;
 }
 
@@ -323,4 +308,41 @@ function getRequestOrigin(e) {
     return '';
   }
   return e.headers.origin || e.headers.Origin || '';
+}
+
+function setCorsHeaders(output, requestOrigin) {
+  const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || [])
+    .map(function (origin) {
+      return normalizeOrigin(origin);
+    })
+    .filter(function (origin) {
+      return origin;
+    });
+
+  if (!allowedOrigins.length) {
+    return;
+  }
+
+  const normalizedRequestOrigin = normalizeOrigin(requestOrigin);
+
+  if (allowedOrigins.indexOf('*') !== -1) {
+    output.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (
+    normalizedRequestOrigin &&
+    allowedOrigins.indexOf(normalizedRequestOrigin) !== -1
+  ) {
+    output
+      .setHeader('Access-Control-Allow-Origin', requestOrigin)
+      .setHeader('Vary', 'Origin');
+  }
+
+  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function normalizeOrigin(origin) {
+  if (!origin) {
+    return '';
+  }
+  return origin.replace(/\/$/, '').trim();
 }
