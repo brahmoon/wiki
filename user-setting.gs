@@ -70,6 +70,17 @@ function doPost(e) {
   }
 }
 
+function doOptions(e) {
+  const origin = getRequestOrigin(e);
+  return createJsonOutput(
+    {
+      success: true,
+      message: 'OK',
+    },
+    origin,
+  );
+}
+
 function handleGetUserSettings(sheet, request) {
   if (!request.loginId && !request.email) {
     return {
