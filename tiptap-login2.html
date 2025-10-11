@@ -1002,7 +1002,7 @@
         import { WikiDataService } from './scripts/wikiDataService.js';
 
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
-        const USER_SETTINGS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzm7IBT2nvXul6Zh3aGCmpPc0iuypwudXeJG0Rkqi52qh8p8SAzV9slOEf1WWQnPhzNmw/exec';
+        const USER_SETTINGS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyxWdwPHEERmhGyePP6msF9f8BfBq54P7wONWWvNmZuXMUknEvXwQqWD2oi34pqC8Tb9w/exec';
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
 
         const loginStatusText = document.getElementById('login-status-text');
@@ -1078,6 +1078,9 @@
             } catch (error) {
                 if (error.name === 'AbortError') {
                     throw new Error('ユーザー設定のリクエストがタイムアウトしました。');
+                }
+                if (error instanceof TypeError) {
+                    throw new Error('ユーザー設定サービスに接続できませんでした。ネットワークまたはCORS設定を確認してください。');
                 }
                 throw error;
             } finally {
