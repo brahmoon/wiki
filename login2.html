@@ -170,7 +170,7 @@
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com',
             LOGIN_STORAGE_KEY: 'wikiLoginState',
             DEFAULT_REDIRECT_PATH: 'tiptap-login.html',
-            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbw7bZH5FYZU7d7gUIUAmjb3EhTq4tBTTrCPjUS8MeEWV--iGOpL6TNyU1h60EE1ZcI_/exec'
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxV3CZriWO2OJoNQu0BSiQ5ymShNU3k_XhOI4bL3Jz3lrCRxrSbrfpogwvx6niZzex9/exec'
         };
 
         const state = {
@@ -193,6 +193,49 @@
             logoutButton: document.getElementById('logout-btn'),
             status: document.getElementById('status'),
             profile: document.getElementById('profile')
+        };
+
+        const APP_SCRIPT_REQUEST_TIMEOUT = 20000;
+
+        const callAppsScript = async (payload) => {
+            if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.includes('YOUR_DEPLOYMENT_ID')) {
+                throw new Error('Apps ScriptのURLが設定されていません。管理者にお問い合わせください。');
+            }
+
+            const controller = new AbortController();
+            const timer = window.setTimeout(() => controller.abort(), APP_SCRIPT_REQUEST_TIMEOUT);
+
+            try {
+                const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error(`Apps Scriptとの通信に失敗しました (HTTP ${response.status})${errorText ? `: ${errorText}` : ''}`);
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result) {
+                    throw new Error('Apps Scriptからのレスポンスの解析に失敗しました。');
+                }
+
+                return result;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('Apps Scriptへのリクエストがタイムアウトしました。');
+                }
+                throw error;
+            } finally {
+                window.clearTimeout(timer);
+            }
         };
 
         const getStoredLoginState = () => {
@@ -284,40 +327,26 @@
         };
 
         const verifyLoginId = async (user) => {
-            if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.includes('YOUR_DEPLOYMENT_ID')) {
-                throw new Error('Apps ScriptのURLが設定されていません。管理者にお問い合わせください。');
+            const payload = {
+                action: 'verifyLogin',
+                loginId: user.email,
+                email: user.email,
+                googleEmail: user.email,
+                name: user.name,
+                googleName: user.name
+            };
+
+            const result = await callAppsScript(payload);
+
+            if (!result.success) {
+                throw new Error(result.message || 'このアカウントは利用権限がありません。');
             }
 
-            try {
-                const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        loginId: user.email,
-                        name: user.name
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('アカウント情報の確認に失敗しました。');
-                }
-
-                const result = await response.json();
-
-                if (!result.success) {
-                    throw new Error(result.message || 'このアカウントは利用権限がありません。');
-                }
-
-                return {
-                    loginId: result.loginId || user.email,
-                    username: result.username || user.name,
-                    email: result.email || user.email
-                };
-            } catch (error) {
-                throw error;
-            }
+            return {
+                loginId: result.loginId || user.email,
+                username: result.username || user.name,
+                email: result.email || user.email
+            };
         };
 
         const revokeAccessToken = async (token) => {
