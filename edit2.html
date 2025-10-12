@@ -233,26 +233,41 @@
         }
 
         .page-meta-toggle-icon {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
+            position: relative;
+            width: 28px;
+            height: 12px;
         }
 
-        .page-meta-toggle-icon span {
-            width: 0;
-            height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
+        .page-meta-toggle-icon::before,
+        .page-meta-toggle-icon::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 12px;
+            height: 2px;
+            background: #4a4a48;
+            border-radius: 999px;
+            transition: transform 0.2s ease;
         }
 
-        .page-meta-toggle-icon .triangle-up {
-            border-bottom: 10px solid #4a4a48;
+        .page-meta-toggle-icon::before {
+            left: 3px;
+            transform-origin: left center;
+            transform: translateY(-50%) rotate(35deg);
         }
 
-        .page-meta-toggle-icon .triangle-down {
-            border-top: 10px solid #4a4a48;
+        .page-meta-toggle-icon::after {
+            right: 3px;
+            transform-origin: right center;
+            transform: translateY(-50%) rotate(-35deg);
+        }
+
+        .page-meta-toggle.is-open .page-meta-toggle-icon::before {
+            transform: translateY(-50%) rotate(-35deg);
+        }
+
+        .page-meta-toggle.is-open .page-meta-toggle-icon::after {
+            transform: translateY(-50%) rotate(35deg);
         }
 
         .sr-only {
@@ -1009,11 +1024,8 @@
                 <div class="page-header-row">
                     <div class="page-meta">
                         <button id="page-meta-toggle" class="page-meta-toggle" type="button" aria-expanded="false">
-                            <span class="sr-only">Page IDとページタイトルを表示</span>
-                            <span class="page-meta-toggle-icon" aria-hidden="true">
-                                <span class="triangle-up"></span>
-                                <span class="triangle-down"></span>
-                            </span>
+                            <span class="sr-only">Page IDとページタイトルを開閉</span>
+                            <span class="page-meta-toggle-icon" aria-hidden="true"></span>
                         </button>
                         <div id="page-meta-fields" class="page-meta-fields" hidden>
                             <div class="input-group">
