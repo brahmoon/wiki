@@ -616,7 +616,7 @@
 
     function buildLoginUrl(pageId) {
       const url = new URL('./login.html', window.location.href);
-      url.searchParams.set('redirect', 'tiptap-login.html');
+      url.searchParams.set('redirect', 'edit.html');
       if (pageId) {
         url.searchParams.set('page', pageId);
       }
@@ -1025,7 +1025,7 @@
       if (!pageId) {
         return;
       }
-      const url = `./tiptap-login.html?page=${encodeURIComponent(pageId)}`;
+      const url = `./edit.html?page=${encodeURIComponent(pageId)}`;
       window.location.href = url;
     });
 
