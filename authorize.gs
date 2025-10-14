@@ -373,3 +373,14 @@ function normalizeOriginForCors(origin) {
     .replace(/\/$/, '')
     .toLowerCase();
 }
+
+function normalizeOriginForCors(origin) {
+  if (!origin) {
+    return '';
+  }
+
+  return String(origin)
+    .trim()
+    .replace(/\/$/, '')
+    .toLowerCase();
+}
