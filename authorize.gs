@@ -66,13 +66,7 @@ function doPost(e) {
 }
 
 function doOptions(e) {
-  return createJsonOutput(
-    {
-      success: true,
-      message: 'OK'
-    },
-    getRequestOrigin(e)
-  );
+  return createPreflightResponse(getRequestOrigin(e));
 }
 
 function verifyAdminAccess(sheet, request) {
@@ -272,58 +266,110 @@ function buildResponse(result, origin) {
 }
 
 function createJsonOutput(data, requestOrigin) {
-  const output = ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+  const output = ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 
-  const allowedOrigins = (AUTH_CONFIG.ALLOWED_ORIGINS || [])
-    .map((origin) => (origin || '').trim())
-    .filter((origin) => origin);
-
-  if (allowedOrigins.length) {
-    if (allowedOrigins.indexOf('*') !== -1) {
-      output.setHeader('Access-Control-Allow-Origin', '*');
-    } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
-      output.setHeader('Access-Control-Allow-Origin', requestOrigin).setHeader('Vary', 'Origin');
-    }
-  }
-
-  output
-    .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    .setHeader('Access-Control-Allow-Credentials', 'true');
+  applyCorsHeaders(output, requestOrigin);
 
   return output;
 }
 
 function getRequestOrigin(e) {
-  if (e && e.headers) {
+  if (!e) {
+    return '';
+  }
+
+  if (e.headers) {
     const headerOrigin = e.headers.origin || e.headers.Origin;
     if (headerOrigin) {
       return String(headerOrigin);
     }
   }
 
-  if (e && e.parameter && e.parameter.origin) {
-    return String(e.parameter.origin);
-  }
-
-  if (e && e.parameter && e.parameter.callback) {
-    return null;
-  }
-
-  if (e && e.postData && e.postData.contents) {
+  if (e.postData && e.postData.contents) {
     try {
       const parsed = JSON.parse(e.postData.contents);
       if (parsed && parsed.origin) {
         return String(parsed.origin);
       }
     } catch (error) {
-      // ignore
+      // ignore malformed body
     }
   }
 
-  if (e && e.context && e.context.domain) {
-    return String(e.context.domain);
+  return '';
+}
+
+function createPreflightResponse(requestOrigin) {
+  const output = ContentService
+    .createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
+
+  applyCorsHeaders(output, requestOrigin);
+
+  return output;
+}
+
+function applyCorsHeaders(output, requestOrigin) {
+  const allowedOrigins = (AUTH_CONFIG.ALLOWED_ORIGINS || [])
+    .map((origin) => (origin || '').trim())
+    .filter((origin) => origin);
+
+  if (allowedOrigins.length) {
+    const resolved = resolveAllowedOrigin(requestOrigin, allowedOrigins);
+
+    if (resolved === '*') {
+      output.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (resolved) {
+      output
+        .setHeader('Access-Control-Allow-Origin', resolved)
+        .setHeader('Vary', 'Origin');
+    }
   }
 
-  return null;
+  output
+    .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    .setHeader('Access-Control-Allow-Credentials', 'true')
+    .setHeader('Access-Control-Max-Age', '3600');
+
+  return output;
+}
+
+function resolveAllowedOrigin(requestOrigin, allowedOrigins) {
+  if (!allowedOrigins || !allowedOrigins.length) {
+    return '';
+  }
+
+  if (allowedOrigins.indexOf('*') !== -1) {
+    return '*';
+  }
+
+  const normalizedRequest = normalizeOriginForCors(requestOrigin);
+  if (normalizedRequest) {
+    for (let i = 0; i < allowedOrigins.length; i++) {
+      const allowed = allowedOrigins[i];
+      if (normalizeOriginForCors(allowed) === normalizedRequest) {
+        return requestOrigin ? String(requestOrigin) : allowed;
+      }
+    }
+  }
+
+  if (allowedOrigins.length === 1) {
+    return allowedOrigins[0];
+  }
+
+  return '';
+}
+
+function normalizeOriginForCors(origin) {
+  if (!origin) {
+    return '';
+  }
+
+  return String(origin)
+    .trim()
+    .replace(/\/$/, '')
+    .toLowerCase();
 }
