@@ -70,19 +70,21 @@ function doOptions(e) {
 }
 
 function verifyAdminAccess(sheet, request) {
-  const activeUserEmail = Session.getActiveUser().getEmail();
-  if (!activeUserEmail) {
+  const normalizedLoginId = normalizeId(request.loginId);
+  const normalizedEmail = normalizeId(request.email);
+  const normalizedGoogleEmail = normalizeId(request.googleEmail);
+
+  if (!normalizedLoginId && !normalizedEmail && !normalizedGoogleEmail) {
     return {
       success: false,
-      message: 'Googleアカウントでログインしてください。'
+      message: '管理者アカウント情報が不足しています。'
     };
   }
 
-  const normalizedActiveEmail = normalizeId(activeUserEmail);
   const account = findAccount(sheet, {
     loginId: request.loginId,
     email: request.email,
-    googleEmail: normalizedActiveEmail
+    googleEmail: request.googleEmail
   });
 
   if (!account) {
@@ -103,13 +105,22 @@ function verifyAdminAccess(sheet, request) {
     };
   }
 
+  const normalizedAccountEmail = normalizeId(account.email);
+  const normalizedRequestEmail = normalizedGoogleEmail || normalizedEmail;
+  if (normalizedRequestEmail && normalizedAccountEmail && normalizedRequestEmail !== normalizedAccountEmail) {
+    return {
+      success: false,
+      message: '管理者アカウントのメールアドレスが一致しません。'
+    };
+  }
+
   return {
     success: true,
     message: '管理者権限が確認されました。',
     loginId: account.loginId,
     username: account.username,
     email: account.email,
-    googleAccountEmail: activeUserEmail
+    googleAccountEmail: request.googleEmail || account.email || ''
   };
 }
 
@@ -152,6 +163,7 @@ function parseRequest(e) {
     action: data.action,
     loginId: data.loginId || data.expectedLoginId || '',
     email: data.email || '',
+    googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
     requiredLoginId: data.requiredLoginId || data.expectedLoginId || '',
     allowedLoginIds: Array.isArray(data.allowedLoginIds) ? data.allowedLoginIds : []
   };
