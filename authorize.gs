@@ -276,34 +276,26 @@ function createJsonOutput(data, requestOrigin) {
 }
 
 function getRequestOrigin(e) {
-  if (e && e.headers) {
+  if (!e) {
+    return '';
+  }
+
+  if (e.headers) {
     const headerOrigin = e.headers.origin || e.headers.Origin;
     if (headerOrigin) {
       return String(headerOrigin);
     }
   }
 
-  if (e && e.parameter && e.parameter.origin) {
-    return String(e.parameter.origin);
-  }
-
-  if (e && e.parameter && e.parameter.callback) {
-    return '';
-  }
-
-  if (e && e.postData && e.postData.contents) {
+  if (e.postData && e.postData.contents) {
     try {
       const parsed = JSON.parse(e.postData.contents);
       if (parsed && parsed.origin) {
         return String(parsed.origin);
       }
     } catch (error) {
-      // ignore
+      // ignore malformed body
     }
-  }
-
-  if (e && e.context && e.context.domain) {
-    return String(e.context.domain);
   }
 
   return '';
@@ -320,14 +312,20 @@ function createPreflightResponse(requestOrigin) {
 }
 
 function applyCorsHeaders(output, requestOrigin) {
-  const allowedOrigin = resolveAllowedOrigin(requestOrigin);
+  const allowedOrigins = (AUTH_CONFIG.ALLOWED_ORIGINS || [])
+    .map((origin) => (origin || '').trim())
+    .filter((origin) => origin);
 
-  if (allowedOrigin === '*') {
-    output.setHeader('Access-Control-Allow-Origin', '*');
-  } else if (allowedOrigin) {
-    output
-      .setHeader('Access-Control-Allow-Origin', allowedOrigin)
-      .setHeader('Vary', 'Origin');
+  if (allowedOrigins.length) {
+    const resolved = resolveAllowedOrigin(requestOrigin, allowedOrigins);
+
+    if (resolved === '*') {
+      output.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (resolved) {
+      output
+        .setHeader('Access-Control-Allow-Origin', resolved)
+        .setHeader('Vary', 'Origin');
+    }
   }
 
   output
@@ -335,31 +333,45 @@ function applyCorsHeaders(output, requestOrigin) {
     .setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     .setHeader('Access-Control-Allow-Credentials', 'true')
     .setHeader('Access-Control-Max-Age', '3600');
+
+  return output;
 }
 
-function resolveAllowedOrigin(requestOrigin) {
+function resolveAllowedOrigin(requestOrigin, allowedOrigins) {
+  if (!allowedOrigins || !allowedOrigins.length) {
+    return '';
+  }
+
+  if (allowedOrigins.indexOf('*') !== -1) {
+    return '*';
+  }
+
   const normalizedRequest = normalizeOriginForCors(requestOrigin);
-  if (!normalizedRequest) {
-    return null;
-  }
-
-  const allowedOrigins = AUTH_CONFIG.ALLOWED_ORIGINS || [];
-  for (let i = 0; i < allowedOrigins.length; i++) {
-    const allowed = allowedOrigins[i];
-    if (!allowed) {
-      continue;
-    }
-
-    if (allowed === '*') {
-      return '*';
-    }
-
-    if (normalizeOriginForCors(allowed) === normalizedRequest) {
-      return allowed;
+  if (normalizedRequest) {
+    for (let i = 0; i < allowedOrigins.length; i++) {
+      const allowed = allowedOrigins[i];
+      if (normalizeOriginForCors(allowed) === normalizedRequest) {
+        return requestOrigin ? String(requestOrigin) : allowed;
+      }
     }
   }
 
-  return null;
+  if (allowedOrigins.length === 1) {
+    return allowedOrigins[0];
+  }
+
+  return '';
+}
+
+function normalizeOriginForCors(origin) {
+  if (!origin) {
+    return '';
+  }
+
+  return String(origin)
+    .trim()
+    .replace(/\/$/, '')
+    .toLowerCase();
 }
 
 function normalizeOriginForCors(origin) {
