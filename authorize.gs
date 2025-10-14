@@ -94,11 +94,10 @@ function verifyAdminAccess(sheet, request) {
     };
   }
 
-  const requiredLoginIds = buildRequiredLoginIds(request);
   const normalizedAccountLoginId = normalizeId(account.loginId);
-  const isAuthorized = requiredLoginIds.some((loginId) => loginId === normalizedAccountLoginId);
+  const adminLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
 
-  if (!isAuthorized) {
+  if (!adminLoginId || normalizedAccountLoginId !== adminLoginId) {
     return {
       success: false,
       message: '管理者権限がありません。'
