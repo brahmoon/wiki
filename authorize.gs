@@ -94,11 +94,10 @@ function verifyAdminAccess(sheet, request) {
     };
   }
 
-  const requiredLoginIds = buildRequiredLoginIds(request);
   const normalizedAccountLoginId = normalizeId(account.loginId);
-  const isAuthorized = requiredLoginIds.some((loginId) => loginId === normalizedAccountLoginId);
+  const normalizedRequiredLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
 
-  if (!isAuthorized) {
+  if (!normalizedAccountLoginId || normalizedAccountLoginId !== normalizedRequiredLoginId) {
     return {
       success: false,
       message: '管理者権限がありません。'
@@ -124,60 +123,13 @@ function verifyAdminAccess(sheet, request) {
   };
 }
 
-function buildRequiredLoginIds(request) {
-  const candidates = [];
-
-  const allowedLoginIds = Array.isArray(request.allowedLoginIds)
-    ? request.allowedLoginIds
-    : [];
-  const hasAllowedLoginIds = allowedLoginIds.length > 0;
-
-  allowedLoginIds.forEach((value) => {
-    const normalized = normalizeId(value);
-    if (normalized) {
-      candidates.push(normalized);
-    }
-  });
-
-  const normalizedRequiredLoginId = normalizeId(request.requiredLoginId);
-  const hasExplicitRequiredLoginId = Boolean(normalizedRequiredLoginId);
-  if (normalizedRequiredLoginId) {
-    candidates.push(normalizedRequiredLoginId);
-  }
-
-  const normalizedLoginId = normalizeId(request.loginId);
-  if (normalizedLoginId) {
-    candidates.push(normalizedLoginId);
-  }
-
-  if (!hasAllowedLoginIds && !hasExplicitRequiredLoginId) {
-    const defaultLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
-    if (defaultLoginId) {
-      candidates.push(defaultLoginId);
-    }
-  }
-
-  const unique = {};
-  const uniqueList = [];
-  candidates.forEach((value) => {
-    if (value && !unique[value]) {
-      unique[value] = true;
-      uniqueList.push(value);
-    }
-  });
-
-  return uniqueList;
-}
-
 function parseRequest(e) {
   const data = parseRequestData(e);
   return {
     action: data.action,
     loginId: data.loginId || data.expectedLoginId || '',
     email: data.email || '',
-    googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
-    requiredLoginId: data.requiredLoginId || data.expectedLoginId || '',
-    allowedLoginIds: Array.isArray(data.allowedLoginIds) ? data.allowedLoginIds : []
+    googleEmail: data.googleEmail || data.googleAccountEmail || data.email || ''
   };
 }
 
