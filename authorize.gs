@@ -127,22 +127,34 @@ function verifyAdminAccess(sheet, request) {
 function buildRequiredLoginIds(request) {
   const candidates = [];
 
-  if (Array.isArray(request.allowedLoginIds)) {
-    request.allowedLoginIds.forEach((value) => {
-      const normalized = normalizeId(value);
-      if (normalized) {
-        candidates.push(normalized);
-      }
-    });
+  const allowedLoginIds = Array.isArray(request.allowedLoginIds)
+    ? request.allowedLoginIds
+    : [];
+  const hasAllowedLoginIds = allowedLoginIds.length > 0;
+
+  allowedLoginIds.forEach((value) => {
+    const normalized = normalizeId(value);
+    if (normalized) {
+      candidates.push(normalized);
+    }
+  });
+
+  const normalizedRequiredLoginId = normalizeId(request.requiredLoginId);
+  const hasExplicitRequiredLoginId = Boolean(normalizedRequiredLoginId);
+  if (normalizedRequiredLoginId) {
+    candidates.push(normalizedRequiredLoginId);
   }
 
-  const requiredLoginId = normalizeId(request.requiredLoginId || request.loginId);
-  if (requiredLoginId) {
-    candidates.push(requiredLoginId);
+  const normalizedLoginId = normalizeId(request.loginId);
+  if (normalizedLoginId) {
+    candidates.push(normalizedLoginId);
   }
 
-  if (!candidates.length) {
-    candidates.push(normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID));
+  if (!hasAllowedLoginIds && !hasExplicitRequiredLoginId) {
+    const defaultLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
+    if (defaultLoginId) {
+      candidates.push(defaultLoginId);
+    }
   }
 
   const unique = {};
