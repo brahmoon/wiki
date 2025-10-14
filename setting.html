@@ -405,6 +405,13 @@
             const timeoutId = window.setTimeout(() => controller.abort(), ADMIN_AUTH_TIMEOUT);
 
             try {
+                const payload = {
+                    action: 'verifyAdminAccess',
+                    loginId: loginState?.user?.loginId || '',
+                    email: loginState?.user?.email || '',
+                    origin: window.location.origin
+                };
+
                 const response = await fetch(ADMIN_AUTH_ENDPOINT, {
                     method: 'POST',
                     mode: 'cors',
@@ -412,28 +419,16 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify({
-                        action: 'verifyAdminAccess',
-                        loginId: loginState?.user?.loginId || '',
-                        email: loginState?.user?.email || '',
-                        origin: window.location.origin
-                    }),
+                    body: JSON.stringify(payload),
                     signal: controller.signal
                 });
 
-                const responseText = await response.text();
-                let result = null;
-                if (responseText) {
-                    try {
-                        result = JSON.parse(responseText);
-                    } catch (error) {
-                        throw new Error('管理者認証APIの応答解析に失敗しました。');
-                    }
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error((errorText && errorText.trim()) || `管理者認証に失敗しました (HTTP ${response.status})`);
                 }
 
-                if (!response.ok) {
-                    throw new Error((result && result.message) || `管理者認証に失敗しました (HTTP ${response.status})`);
-                }
+                const result = await response.json().catch(() => null);
 
                 if (!result) {
                     throw new Error('管理者認証の結果を取得できませんでした。');
