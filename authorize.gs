@@ -8,9 +8,9 @@ const AUTH_CONFIG = {
   ALLOWED_ORIGINS: [
     'https://brahmoon.github.io',
     'http://localhost:3000',
-    'http://localhost:4173',
+    'http://localhost:4173'
   ],
-  DEFAULT_REQUIRED_LOGIN_ID: 'admin',
+  DEFAULT_REQUIRED_LOGIN_ID: 'admin'
 };
 
 function doGet(e) {
@@ -18,7 +18,7 @@ function doGet(e) {
     {
       success: true,
       message: 'Authorization endpoint is running',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     },
     getRequestOrigin(e)
   );
@@ -34,7 +34,7 @@ function doPost(e) {
       return buildResponse(
         {
           success: false,
-          message: `Unknown action: ${action}`,
+          message: `Unknown action: ${action}`
         },
         origin
       );
@@ -45,7 +45,7 @@ function doPost(e) {
       return buildResponse(
         {
           success: false,
-          message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`,
+          message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`
         },
         origin
       );
@@ -58,7 +58,7 @@ function doPost(e) {
     return buildResponse(
       {
         success: false,
-        message: `処理中にエラーが発生しました: ${message}`,
+        message: `処理中にエラーが発生しました: ${message}`
       },
       origin
     );
@@ -69,7 +69,7 @@ function doOptions(e) {
   return createJsonOutput(
     {
       success: true,
-      message: 'OK',
+      message: 'OK'
     },
     getRequestOrigin(e)
   );
@@ -80,7 +80,7 @@ function verifyAdminAccess(sheet, request) {
   if (!activeUserEmail) {
     return {
       success: false,
-      message: 'Googleアカウントでログインしてください。',
+      message: 'Googleアカウントでログインしてください。'
     };
   }
 
@@ -88,13 +88,13 @@ function verifyAdminAccess(sheet, request) {
   const account = findAccount(sheet, {
     loginId: request.loginId,
     email: request.email,
-    googleEmail: normalizedActiveEmail,
+    googleEmail: normalizedActiveEmail
   });
 
   if (!account) {
     return {
       success: false,
-      message: '管理者アカウントが登録されていません。',
+      message: '管理者アカウントが登録されていません。'
     };
   }
 
@@ -105,7 +105,7 @@ function verifyAdminAccess(sheet, request) {
   if (!isAuthorized) {
     return {
       success: false,
-      message: '管理者権限がありません。',
+      message: '管理者権限がありません。'
     };
   }
 
@@ -115,7 +115,7 @@ function verifyAdminAccess(sheet, request) {
     loginId: account.loginId,
     username: account.username,
     email: account.email,
-    googleAccountEmail: activeUserEmail,
+    googleAccountEmail: activeUserEmail
   };
 }
 
@@ -159,7 +159,7 @@ function parseRequest(e) {
     loginId: data.loginId || data.expectedLoginId || '',
     email: data.email || '',
     requiredLoginId: data.requiredLoginId || data.expectedLoginId || '',
-    allowedLoginIds: Array.isArray(data.allowedLoginIds) ? data.allowedLoginIds : [],
+    allowedLoginIds: Array.isArray(data.allowedLoginIds) ? data.allowedLoginIds : []
   };
 }
 
@@ -234,23 +234,23 @@ function findAccount(sheet, identifiers) {
       return {
         loginId: row[loginIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
-        email: row[emailIndex] || '',
+        email: row[emailIndex] || ''
       };
     }
 
     if (normalizedLoginId && rowLoginId === normalizedLoginId) {
       return {
         loginId: row[loginIndex] || '',
-        username: usernameIndex >= 0 ? row[usernameIndex] || '',
-        email: row[emailIndex] || '',
+        username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
+        email: row[emailIndex] || ''
       };
     }
 
     if (normalizedEmail && rowEmail === normalizedEmail) {
       return {
         loginId: row[loginIndex] || '',
-        username: usernameIndex >= 0 ? row[usernameIndex] || '',
-        email: row[emailIndex] || '',
+        username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
+        email: row[emailIndex] || ''
       };
     }
   }
@@ -265,7 +265,7 @@ function buildResponse(result, origin) {
     loginId: result && result.loginId ? result.loginId : null,
     username: result && result.username ? result.username : null,
     email: result && result.email ? result.email : null,
-    googleAccountEmail: result && result.googleAccountEmail ? result.googleAccountEmail : null,
+    googleAccountEmail: result && result.googleAccountEmail ? result.googleAccountEmail : null
   };
 
   return createJsonOutput(output, origin);
