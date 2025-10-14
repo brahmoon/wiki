@@ -20,7 +20,7 @@ function doGet(e) {
       message: 'Authorization endpoint is running',
       timestamp: new Date().toISOString(),
     },
-    getRequestOrigin(e),
+    getRequestOrigin(e)
   );
 }
 
@@ -36,7 +36,7 @@ function doPost(e) {
           success: false,
           message: `Unknown action: ${action}`,
         },
-        origin,
+        origin
       );
     }
 
@@ -47,7 +47,7 @@ function doPost(e) {
           success: false,
           message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`,
         },
-        origin,
+        origin
       );
     }
 
@@ -60,7 +60,7 @@ function doPost(e) {
         success: false,
         message: `処理中にエラーが発生しました: ${message}`,
       },
-      origin,
+      origin
     );
   }
 }
@@ -71,7 +71,7 @@ function doOptions(e) {
       success: true,
       message: 'OK',
     },
-    getRequestOrigin(e),
+    getRequestOrigin(e)
   );
 }
 
