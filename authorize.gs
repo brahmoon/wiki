@@ -295,6 +295,13 @@ function createJsonOutput(data, requestOrigin) {
 }
 
 function getRequestOrigin(e) {
+  if (e && e.headers) {
+    const headerOrigin = e.headers.origin || e.headers.Origin;
+    if (headerOrigin) {
+      return String(headerOrigin);
+    }
+  }
+
   if (e && e.parameter && e.parameter.origin) {
     return String(e.parameter.origin);
   }
