@@ -307,7 +307,7 @@
     </div>
     <script>
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
-        const ADMIN_AUTH_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwMtwvsU6EiYcHY0_2E-cckunc5oR36bM9YHjA1crgVVSlq2Xe8mwxYl9Vza5R2YE0b/exec';
+        const ADMIN_AUTH_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzKP9km6naV1dorydOtN0YOuNAkBCLmrAE43adBUN008Awdm5UF9t-GULt3KCUmXvPnLg/exec';
         const ADMIN_AUTH_TIMEOUT = 10000;
         const MENU_LABELS = {
             general: 'Wiki設定',
@@ -405,6 +405,14 @@
             const timeoutId = window.setTimeout(() => controller.abort(), ADMIN_AUTH_TIMEOUT);
 
             try {
+                const payload = {
+                    action: 'verifyAdminAccess',
+                    loginId: loginState?.user?.loginId || '',
+                    email: loginState?.user?.email || '',
+                    googleEmail: loginState?.user?.email || '',
+                    origin: window.location.origin
+                };
+
                 const response = await fetch(ADMIN_AUTH_ENDPOINT, {
                     method: 'POST',
                     mode: 'cors',
@@ -412,28 +420,16 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify({
-                        action: 'verifyAdminAccess',
-                        loginId: loginState?.user?.loginId || '',
-                        email: loginState?.user?.email || '',
-                        origin: window.location.origin
-                    }),
+                    body: JSON.stringify(payload),
                     signal: controller.signal
                 });
 
-                const responseText = await response.text();
-                let result = null;
-                if (responseText) {
-                    try {
-                        result = JSON.parse(responseText);
-                    } catch (error) {
-                        throw new Error('管理者認証APIの応答解析に失敗しました。');
-                    }
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error((errorText && errorText.trim()) || `管理者認証に失敗しました (HTTP ${response.status})`);
                 }
 
-                if (!response.ok) {
-                    throw new Error((result && result.message) || `管理者認証に失敗しました (HTTP ${response.status})`);
-                }
+                const result = await response.json().catch(() => null);
 
                 if (!result) {
                     throw new Error('管理者認証の結果を取得できませんでした。');
