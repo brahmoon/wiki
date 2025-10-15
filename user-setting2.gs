@@ -69,13 +69,7 @@ function doPost(e) {
 }
 
 function doOptions(e) {
-  return createJsonOutput(
-    {
-      success: true,
-      message: 'OK',
-    },
-    getRequestOrigin(e),
-  );
+  return createPreflightResponse(getRequestOrigin(e));
 }
 
 function handleListMembers(sheet, request) {
@@ -289,8 +283,31 @@ function getRequestOrigin(e) {
 }
 
 function createJsonOutput(data, requestOrigin) {
-  const output = ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+  const output = ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 
+  applyCorsHeaders(output, requestOrigin);
+
+  return output;
+}
+
+function createPreflightResponse(requestOrigin) {
+  const output = ContentService
+    .createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
+
+  applyCorsHeaders(output, requestOrigin);
+
+  output
+    .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    .setHeader('Access-Control-Max-Age', '3600');
+
+  return output;
+}
+
+function applyCorsHeaders(output, requestOrigin) {
   const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || [])
     .map(function (origin) {
       return (origin || '').trim();
@@ -299,17 +316,25 @@ function createJsonOutput(data, requestOrigin) {
       return origin;
     });
 
-  if (allowedOrigins.length) {
-    if (allowedOrigins.indexOf('*') !== -1) {
-      output.setHeader('Access-Control-Allow-Origin', '*');
-    } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
-      output.setHeader('Access-Control-Allow-Origin', requestOrigin).setHeader('Vary', 'Origin');
-    }
+  if (!allowedOrigins.length) {
+    return output;
   }
 
-  output
-    .setHeader('Access-Control-Allow-Methods', 'POST,GET,OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (allowedOrigins.indexOf('*') !== -1) {
+    output.setHeader('Access-Control-Allow-Origin', '*');
+    return output;
+  }
+
+  if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
+    output
+      .setHeader('Access-Control-Allow-Origin', requestOrigin)
+      .setHeader('Vary', 'Origin');
+    return output;
+  }
+
+  if (!requestOrigin && allowedOrigins.length === 1) {
+    output.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
 
   return output;
 }
