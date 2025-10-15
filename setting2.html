@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wiki 管理設定</title>
+    <link rel="stylesheet" href="./styles/editor.css" />
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #f5f5f5;
+            color: #37352f;
+            min-height: 100vh;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            min-height: 100vh;
+        }
+
+        .admin-sidebar {
+            background: #f7f6f3;
+            border-right: 1px solid #e9e9e7;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid #e9e9e7;
+        }
+
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .menu-list {
+            list-style: none;
+            margin: 0;
+            padding: 12px 0;
+            flex: 1;
+        }
+
+        .menu-item {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            padding: 12px 24px;
+            text-align: left;
+            font-size: 15px;
+            color: #37352f;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-item::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: transparent;
+            border: 1px solid #d7d5d1;
+            flex-shrink: 0;
+        }
+
+        .menu-item:hover {
+            background: #ecebe7;
+        }
+
+        .menu-item.active {
+            background: #2383e2;
+            color: #fff;
+        }
+
+        .menu-item.active::before {
+            background: #fff;
+            border-color: transparent;
+        }
+
+        .admin-main {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 32px;
+            border-bottom: 1px solid #e9e9e7;
+            background: #fff;
+        }
+
+        .top-bar-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .admin-user {
+            font-size: 14px;
+            color: #6b6a67;
+        }
+
+        .btn {
+            height: 40px;
+            border-radius: 8px;
+            border: 1px solid #d0cfcc;
+            background: #f7f6f3;
+            color: #37352f;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 0 16px;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn:hover {
+            background: #ebe9e4;
+        }
+
+        .content-area {
+            padding: 32px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .content-header h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+
+        .content-header p {
+            margin: 0;
+            color: #6b6a67;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .placeholder-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.05);
+            padding: 24px;
+            border: 1px solid #efefed;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+
+        .placeholder-card h2 {
+            margin: 0 0 12px;
+            font-size: 20px;
+        }
+
+        .placeholder-card p {
+            margin: 0;
+            color: #55534e;
+            line-height: 1.7;
+        }
+
+        .plugin-settings {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .plugin-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.05);
+            border: 1px solid #efefed;
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .plugin-card h2 {
+            margin: 0 0 4px;
+            font-size: 22px;
+        }
+
+        .plugin-card p {
+            margin: 0;
+            color: #6b6a67;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+
+        .plugin-toolbar-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .plugin-toolbar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid #efefed;
+            background: #faf9f7;
+        }
+
+        .plugin-toolbar-item label {
+            font-size: 15px;
+            color: #37352f;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .plugin-toolbar-item input[type='checkbox'] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .plugin-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .plugin-status {
+            font-size: 14px;
+            color: #6b6a67;
+        }
+
+        .plugin-status.is-success {
+            color: #0f6b3d;
+        }
+
+        .plugin-status.is-error {
+            color: #b81515;
+        }
+
+        .plugin-loading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #6b6a67;
+        }
+
+        .plugin-loading .loading-spinner {
+            width: 18px;
+            height: 18px;
+            border-width: 2px;
+        }
+
+        .member-management {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .member-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.05);
+            border: 1px solid #efefed;
+            padding: 24px 28px;
+        }
+
+        .member-card h2 {
+            margin: 0 0 8px;
+            font-size: 22px;
+        }
+
+        .member-card p {
+            margin: 0;
+            color: #6b6a67;
+            line-height: 1.6;
+        }
+
+        .member-status {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .member-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .member-table-wrapper {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.05);
+            border: 1px solid #efefed;
+            overflow-x: auto;
+        }
+
+        .member-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 720px;
+        }
+
+        .member-table thead th {
+            background: #f7f6f3;
+            color: #6b6a67;
+            font-weight: 600;
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .member-table th,
+        .member-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid #ecebe7;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: nowrap;
+        }
+
+        .member-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .member-table tbody tr:hover {
+            background: #f7f6f3;
+        }
+
+        .member-language {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #ecebe7;
+            color: #55534e;
+        }
+
+        .member-authority-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .member-authority-select {
+            min-width: 140px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid #d0cfcc;
+            background: #fff;
+            font-size: 13px;
+            color: #37352f;
+            height: 36px;
+        }
+
+        .member-authority-update {
+            height: 36px;
+            padding: 0 14px;
+            font-size: 13px;
+        }
+
+        .member-authority-status {
+            font-size: 12px;
+            color: #6b6a67;
+        }
+
+        .member-authority-status.is-error {
+            color: #b73232;
+        }
+
+        .member-authority-status.is-success {
+            color: #2f8f4e;
+        }
+
+        .member-authority-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #ecebe7;
+            color: #37352f;
+        }
+
+        .member-authority-badge--admin {
+            background: #f2e0b8;
+            color: #7f5f00;
+        }
+
+        .member-loading,
+        .member-empty,
+        .member-error {
+            border-radius: 16px;
+            border: 1px solid #efefed;
+            padding: 28px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.05);
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            text-align: center;
+            font-size: 15px;
+            color: #6b6a67;
+        }
+
+        .member-error {
+            border-color: #f5b5b5;
+            background: #fcecec;
+            color: #b73232;
+            box-shadow: none;
+        }
+
+        .member-empty {
+            color: #55534e;
+        }
+
+        .layout-hidden {
+            display: none !important;
+        }
+
+        .btn-primary {
+            background: #2383e2;
+            border-color: #1f74c6;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #1f74c6;
+            border-color: #1860a3;
+        }
+
+        .authorization-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            background: #f5f5f5;
+        }
+
+        .authorization-error-card {
+            max-width: 520px;
+            width: 100%;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.08);
+            padding: 32px;
+            border: 1px solid #efefed;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .authorization-error-card h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .authorization-error-card p {
+            margin: 0;
+            color: #6b6a67;
+            line-height: 1.7;
+        }
+
+        .authorization-error-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: opacity 0.2s ease;
+        }
+
+        .loading-overlay[hidden] {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 32px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.08);
+            border: 1px solid #efefed;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 4px solid #e0dfdc;
+            border-top-color: #2383e2;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-message {
+            margin: 0;
+            font-size: 16px;
+            color: #37352f;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 960px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .admin-sidebar {
+                flex-direction: row;
+                overflow-x: auto;
+                border-right: 0;
+                border-bottom: 1px solid #e9e9e7;
+            }
+
+            .sidebar-header {
+                display: none;
+            }
+
+            .menu-list {
+                display: flex;
+                padding: 12px 16px;
+            }
+
+            .menu-item {
+                border-radius: 10px;
+                margin-right: 8px;
+            }
+
+            .admin-main {
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="admin-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">管理メニュー</div>
+            </div>
+            <ul class="menu-list">
+                <li><button type="button" class="menu-item" data-page="general">Wiki設定</button></li>
+                <li><button type="button" class="menu-item" data-page="member">ユーザー管理</button></li>
+                <li><button type="button" class="menu-item" data-page="authority">権限管理</button></li>
+                <li><button type="button" class="menu-item" data-page="activity">アクティビティ</button></li>
+                <li><button type="button" class="menu-item" data-page="plugin">プラグイン</button></li>
+                <li><button type="button" class="menu-item" data-page="backup">バックアップ</button></li>
+            </ul>
+        </aside>
+        <main class="admin-main">
+            <div class="top-bar">
+                <div class="top-bar-title">Wiki 管理設定</div>
+                <div class="top-bar-actions">
+                    <div id="admin-user" class="admin-user"></div>
+                    <button id="return-editor" class="btn" type="button">エディタに戻る</button>
+                </div>
+            </div>
+            <div class="content-area">
+                <div class="content-header">
+                    <h1 id="content-title"></h1>
+                    <p id="content-description"></p>
+                </div>
+                <div id="placeholder-card" class="placeholder-card" aria-hidden="false">
+                    <h2 id="placeholder-title"></h2>
+                    <p id="placeholder-description"></p>
+                </div>
+                <section id="plugin-settings" class="plugin-settings" hidden aria-hidden="true">
+                    <div class="plugin-card">
+                        <div>
+                            <h2>TipTapツールバー</h2>
+                            <p>エディタで使用できるTipTapツールバーの機能を管理します。</p>
+                        </div>
+                        <div id="plugin-loading" class="plugin-loading" hidden aria-hidden="true">
+                            <div class="loading-spinner" aria-hidden="true"></div>
+                            <span>設定を読み込んでいます…</span>
+                        </div>
+                        <div id="plugin-toolbar-list" class="plugin-toolbar-list" role="group" aria-label="TipTapツールバー機能"></div>
+                        <div class="plugin-actions">
+                            <button id="plugin-save" class="btn btn-primary" type="button" disabled>保存</button>
+                            <div id="plugin-status" class="plugin-status" role="status" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </section>
+                <section id="member-management" class="member-management" hidden aria-hidden="true">
+                    <div class="member-card">
+                        <div class="member-status">
+                            <div>
+                                <h2>登録ユーザー 一覧</h2>
+                                <p>Wikiに登録されているユーザー情報をリアルタイムに確認できます。</p>
+                            </div>
+                            <div class="member-actions">
+                                <button id="member-reload" class="btn" type="button">再読み込み</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="member-error" class="member-error" role="alert" hidden></div>
+                    <div id="member-loading" class="member-loading" role="status" aria-live="polite" hidden>
+                        <div class="loading-spinner" aria-hidden="true"></div>
+                        <p>ユーザー情報を取得しています…</p>
+                    </div>
+                    <div id="member-table-wrapper" class="member-table-wrapper" hidden aria-hidden="true">
+                        <table class="member-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Login ID</th>
+                                    <th scope="col">ユーザー名</th>
+                                    <th scope="col">メールアドレス</th>
+                                    <th scope="col">Kingdom</th>
+                                    <th scope="col">言語</th>
+                                    <th scope="col">Authority</th>
+                                    <th scope="col">更新日時</th>
+                                </tr>
+                            </thead>
+                            <tbody id="member-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="member-empty-state" class="member-empty" hidden>
+                        現在登録されているユーザーはいません。
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <div id="authorization-error" class="authorization-error" hidden aria-hidden="true">
+        <div class="authorization-error-card" role="alert" aria-live="assertive">
+            <h1>アクセスが拒否されました</h1>
+            <p id="authorization-error-message">管理者権限の確認に失敗しました。</p>
+            <div class="authorization-error-actions">
+                <button id="authorization-retry" class="btn" type="button">再試行</button>
+                <button id="authorization-login" class="btn btn-primary" type="button">ログイン画面に戻る</button>
+            </div>
+        </div>
+    </div>
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content" role="status" aria-live="polite">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <p class="loading-message">認証処理を確認しています…</p>
+        </div>
+    </div>
+    <script>
+        const LOGIN_STORAGE_KEY = 'wikiLoginState';
+        const ADMIN_AUTH_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzHrzo8DrfB6x-plElyHRY89o7dHeXS5vBqyIpcVMZI7Nj7xaJIY6WaTIf87ol5lrbRgA/exec';
+        const ADMIN_AUTH_TIMEOUT = 10000;
+        const MEMBER_LIST_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyctRzUunZUChpQSkvMsvoMmj5Ulk1_xlw9oFptvW9kRUfIxS8VKywF-FWmJL22hnFJAg/exec';
+        const MENU_LABELS = {
+            general: 'Wiki設定',
+            member: 'ユーザー管理',
+            authority: '権限管理',
+            activity: 'アクティビティ',
+            plugin: 'プラグイン',
+            backup: 'バックアップ'
+        };
+        const MENU_DESCRIPTIONS = {
+            general: 'Wiki全体に関する基本設定を管理します。',
+            member: 'Wikiに登録されているユーザー 一覧を確認します。',
+            authority: 'ロールの権限を管理します。',
+            activity: '最近の編集履歴や操作ログを確認します。',
+            plugin: 'プラグインの追加や設定を行います。',
+            backup: 'バックアップの作成や復元を管理します。'
+        };
+
+        const TOOLBAR_FEATURES = [
+            { key: 'bold', label: '太字' },
+            { key: 'italic', label: '斜体' },
+            { key: 'link', label: 'リンクを挿入/編集' },
+            { key: 'pageLink', label: 'ページリンクカードを挿入' },
+            { key: 'heading1', label: '見出し 1' },
+            { key: 'heading2', label: '見出し 2' },
+            { key: 'heading3', label: '見出し 3' },
+            { key: 'bulletList', label: '箇条書きリスト' },
+            { key: 'orderedList', label: '番号付きリスト' },
+            { key: 'blockquote', label: '引用' },
+            { key: 'codeBlock', label: 'コードブロック' },
+            { key: 'table', label: '表を挿入' },
+            { key: 'driveImage', label: 'Drive画像を挿入' }
+        ];
+
+        const AUTHORITY_OPTIONS = [
+            { value: -1, label: 'Blocked' },
+            { value: 1, label: 'Viewer' },
+            { value: 2, label: 'Editor' },
+            { value: 3, label: 'Moderator' }
+        ];
+
+        const AUTHORITY_LABELS = {
+            '-1': 'Blocked',
+            '0': 'Guest',
+            '1': 'Viewer',
+            '2': 'Editor',
+            '3': 'Moderator',
+            '99': 'Administrator'
+        };
+
+        const ADMIN_AUTHORITY_VALUE = 99;
+
+        const menuItems = Array.from(document.querySelectorAll('.menu-item[data-page]'));
+        const contentTitle = document.getElementById('content-title');
+        const contentDescription = document.getElementById('content-description');
+        const placeholderTitle = document.getElementById('placeholder-title');
+        const placeholderDescription = document.getElementById('placeholder-description');
+        const placeholderCard = document.getElementById('placeholder-card');
+        const pluginSettingsSection = document.getElementById('plugin-settings');
+        const pluginToolbarList = document.getElementById('plugin-toolbar-list');
+        const pluginSaveButton = document.getElementById('plugin-save');
+        const pluginStatus = document.getElementById('plugin-status');
+        const pluginLoading = document.getElementById('plugin-loading');
+        const memberManagement = document.getElementById('member-management');
+        const memberReloadButton = document.getElementById('member-reload');
+        const memberLoading = document.getElementById('member-loading');
+        const memberError = document.getElementById('member-error');
+        const memberTableWrapper = document.getElementById('member-table-wrapper');
+        const memberTableBody = document.getElementById('member-table-body');
+        const memberEmptyState = document.getElementById('member-empty-state');
+        const adminUser = document.getElementById('admin-user');
+        const returnEditorButton = document.getElementById('return-editor');
+        const layoutRoot = document.querySelector('.layout');
+        const authorizationError = document.getElementById('authorization-error');
+        const authorizationErrorMessage = document.getElementById('authorization-error-message');
+        const authorizationRetryButton = document.getElementById('authorization-retry');
+        const authorizationLoginButton = document.getElementById('authorization-login');
+        const loadingOverlay = document.getElementById('loading-overlay');
+
+        const params = new URLSearchParams(window.location.search);
+        const requestedPage = (params.get('page') || '').trim().toLowerCase();
+        let currentPage = Object.prototype.hasOwnProperty.call(MENU_LABELS, requestedPage)
+            ? requestedPage
+            : 'general';
+        let memberDataLoaded = false;
+        let memberFetchInProgress = false;
+        let currentLoginState = null;
+        let adminVerificationResult = null;
+        let pluginSettingsLoaded = false;
+        let pluginSettingsDirty = false;
+        let pluginLoadingInProgress = false;
+        let pluginSavingInProgress = false;
+
+        const pluginCheckboxMap = new Map();
+
+        const getStoredLoginState = () => {
+            try {
+                const value = localStorage.getItem(LOGIN_STORAGE_KEY);
+                return value ? JSON.parse(value) : null;
+            } catch (error) {
+                console.error('Failed to parse login state', error);
+                return null;
+            }
+        };
+
+        const buildLoginUrl = () => {
+            const url = new URL('./login.html', window.location.href);
+            url.searchParams.set('redirect', 'setting2.html');
+            url.searchParams.set('page', currentPage);
+            return url.toString();
+        };
+
+        const showLoadingOverlay = () => {
+            if (loadingOverlay) {
+                loadingOverlay.hidden = false;
+            }
+        };
+
+        const hideLoadingOverlay = () => {
+            if (loadingOverlay) {
+                loadingOverlay.hidden = true;
+            }
+        };
+
+        const showAuthorizationError = (message) => {
+            hideLoadingOverlay();
+            if (layoutRoot) {
+                layoutRoot.classList.add('layout-hidden');
+            }
+            if (authorizationErrorMessage) {
+                authorizationErrorMessage.textContent = message || '管理者権限の確認に失敗しました。';
+            }
+            if (authorizationError) {
+                authorizationError.hidden = false;
+                authorizationError.setAttribute('aria-hidden', 'false');
+            }
+        };
+
+        const hideAuthorizationError = () => {
+            if (authorizationError) {
+                authorizationError.hidden = true;
+                authorizationError.setAttribute('aria-hidden', 'true');
+            }
+            if (layoutRoot) {
+                layoutRoot.classList.remove('layout-hidden');
+            }
+            hideLoadingOverlay();
+        };
+
+        const setPlaceholderVisibility = (visible) => {
+            if (!placeholderCard) {
+                return;
+            }
+            placeholderCard.hidden = !visible;
+            placeholderCard.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        };
+
+        const showMemberSection = () => {
+            if (memberManagement) {
+                memberManagement.hidden = false;
+                memberManagement.setAttribute('aria-hidden', 'false');
+            }
+        };
+
+        const hideMemberSection = () => {
+            if (memberManagement) {
+                memberManagement.hidden = true;
+                memberManagement.setAttribute('aria-hidden', 'true');
+            }
+        };
+
+        const showPluginSettingsSection = () => {
+            if (pluginSettingsSection) {
+                pluginSettingsSection.hidden = false;
+                pluginSettingsSection.setAttribute('aria-hidden', 'false');
+            }
+        };
+
+        const hidePluginSettingsSection = () => {
+            if (pluginSettingsSection) {
+                pluginSettingsSection.hidden = true;
+                pluginSettingsSection.setAttribute('aria-hidden', 'true');
+            }
+        };
+
+        const clearPluginStatus = () => {
+            if (!pluginStatus) {
+                return;
+            }
+            pluginStatus.textContent = '';
+            pluginStatus.classList.remove('is-success', 'is-error');
+        };
+
+        const setPluginStatusMessage = (message, status) => {
+            if (!pluginStatus) {
+                return;
+            }
+            pluginStatus.textContent = message || '';
+            pluginStatus.classList.remove('is-success', 'is-error');
+            if (status === 'success') {
+                pluginStatus.classList.add('is-success');
+            } else if (status === 'error') {
+                pluginStatus.classList.add('is-error');
+            }
+        };
+
+        const updatePluginSaveButtonState = () => {
+            if (!pluginSaveButton) {
+                return;
+            }
+            const shouldDisable =
+                !pluginSettingsLoaded ||
+                pluginLoadingInProgress ||
+                pluginSavingInProgress ||
+                !pluginSettingsDirty;
+            pluginSaveButton.disabled = shouldDisable;
+        };
+
+        const setPluginLoadingState = (isLoading) => {
+            pluginLoadingInProgress = Boolean(isLoading);
+            if (pluginLoading) {
+                pluginLoading.hidden = !isLoading;
+                pluginLoading.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+            }
+            pluginCheckboxMap.forEach((checkbox) => {
+                checkbox.disabled = pluginLoadingInProgress || pluginSavingInProgress;
+            });
+            updatePluginSaveButtonState();
+        };
+
+        const setPluginSavingState = (isSaving) => {
+            pluginSavingInProgress = Boolean(isSaving);
+            pluginCheckboxMap.forEach((checkbox) => {
+                checkbox.disabled = pluginLoadingInProgress || pluginSavingInProgress;
+            });
+            updatePluginSaveButtonState();
+        };
+
+        const setPluginDirtyState = (isDirty) => {
+            pluginSettingsDirty = Boolean(isDirty);
+            updatePluginSaveButtonState();
+        };
+
+        const renderPluginToolbarOptions = () => {
+            if (!pluginToolbarList) {
+                return;
+            }
+
+            pluginToolbarList.textContent = '';
+            pluginCheckboxMap.clear();
+
+            TOOLBAR_FEATURES.forEach((feature) => {
+                const item = document.createElement('div');
+                item.className = 'plugin-toolbar-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `plugin-${feature.key}`;
+                checkbox.dataset.pluginKey = feature.key;
+
+                const label = document.createElement('label');
+                label.setAttribute('for', checkbox.id);
+                label.textContent = feature.label;
+
+                checkbox.addEventListener('change', () => {
+                    clearPluginStatus();
+                    setPluginDirtyState(true);
+                });
+
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                pluginToolbarList.appendChild(item);
+                pluginCheckboxMap.set(feature.key, checkbox);
+            });
+
+            pluginCheckboxMap.forEach((checkbox) => {
+                checkbox.disabled = pluginLoadingInProgress || pluginSavingInProgress;
+            });
+        };
+
+        const applyToolbarStatesToUI = (states) => {
+            const safeStates = states && typeof states === 'object' ? states : {};
+            TOOLBAR_FEATURES.forEach((feature) => {
+                const checkbox = pluginCheckboxMap.get(feature.key);
+                if (!checkbox) {
+                    return;
+                }
+                const value = safeStates[feature.key];
+                const enabled = value === 0 || value === '0' || value === false ? false : true;
+                checkbox.checked = enabled;
+            });
+        };
+
+        const getCurrentToolbarStates = () => {
+            return TOOLBAR_FEATURES.map((feature) => {
+                const checkbox = pluginCheckboxMap.get(feature.key);
+                return checkbox && checkbox.checked ? 1 : 0;
+            });
+        };
+
+        const setMemberReloading = (isLoading) => {
+            if (!memberReloadButton) {
+                return;
+            }
+            memberReloadButton.disabled = Boolean(isLoading);
+            memberReloadButton.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+        };
+
+        const clearMemberError = () => {
+            if (!memberError) {
+                return;
+            }
+            memberError.hidden = true;
+            memberError.setAttribute('aria-hidden', 'true');
+            memberError.textContent = '';
+        };
+
+        const showMemberError = (message) => {
+            if (memberError) {
+                memberError.hidden = false;
+                memberError.setAttribute('aria-hidden', 'false');
+                memberError.textContent = message || 'ユーザー情報を取得できませんでした。';
+            }
+            if (memberTableWrapper) {
+                memberTableWrapper.hidden = true;
+                memberTableWrapper.setAttribute('aria-hidden', 'true');
+            }
+            if (memberEmptyState) {
+                memberEmptyState.hidden = true;
+            }
+        };
+
+        const setMemberLoading = (isLoading) => {
+            if (memberLoading) {
+                memberLoading.hidden = !isLoading;
+                memberLoading.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+            }
+            setMemberReloading(isLoading);
+        };
+
+        const formatLanguageLabel = (value) => {
+            const normalized = (value || '').toString().trim().toLowerCase();
+            if (!normalized) {
+                return '-';
+            }
+            if (normalized === 'en') {
+                return 'English';
+            }
+            if (normalized === 'ja') {
+                return '日本語';
+            }
+            return value;
+        };
+
+        const formatDateTime = (value) => {
+            if (!value) {
+                return '-';
+            }
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return value;
+            }
+            try {
+                return new Intl.DateTimeFormat('ja-JP', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            } catch (error) {
+                console.error('日付の整形に失敗しました。', error);
+                return date.toLocaleString('ja-JP');
+            }
+        };
+
+        const normalizeCellValue = (value) => {
+            if (value === null || value === undefined) {
+                return '-';
+            }
+            const stringValue = value.toString().trim();
+            return stringValue ? stringValue : '-';
+        };
+
+        const normalizeId = (value) => {
+            return (value || '').toString().trim().toLowerCase();
+        };
+
+        const parseAuthorityValue = (value) => {
+            if (value === null || value === undefined || value === '') {
+                return null;
+            }
+            const number = Number(value);
+            return Number.isFinite(number) ? number : null;
+        };
+
+        const formatAuthorityLabel = (value) => {
+            const authorityValue = parseAuthorityValue(value);
+            if (authorityValue === null) {
+                return '-';
+            }
+
+            const label = AUTHORITY_LABELS[String(authorityValue)];
+            return label ? label : `Level ${authorityValue}`;
+        };
+
+        const isAdministratorAccount = (member) => {
+            const authorityValue = parseAuthorityValue(member?.authority);
+            if (authorityValue !== null && authorityValue === ADMIN_AUTHORITY_VALUE) {
+                return true;
+            }
+            const loginId = normalizeId(member?.loginId);
+            return loginId === 'admin';
+        };
+
+        const createAuthorityCell = (member, updatedCell) => {
+            const cell = document.createElement('td');
+            const authorityValue = parseAuthorityValue(member?.authority);
+
+            if (isAdministratorAccount(member)) {
+                const badge = document.createElement('span');
+                badge.className = 'member-authority-badge';
+                if (isAdministratorAccount(member)) {
+                    badge.classList.add('member-authority-badge--admin');
+                }
+                badge.textContent = formatAuthorityLabel(authorityValue);
+                cell.appendChild(badge);
+                return cell;
+            }
+
+            const control = document.createElement('div');
+            control.className = 'member-authority-control';
+
+            const select = document.createElement('select');
+            select.className = 'member-authority-select';
+            const displayName = normalizeCellValue(member?.username) !== '-'
+                ? member?.username
+                : member?.loginId;
+            select.setAttribute('aria-label', `${displayName || 'ユーザー'}の権限レベル`);
+
+            AUTHORITY_OPTIONS.forEach((option) => {
+                const optionElement = document.createElement('option');
+                optionElement.value = String(option.value);
+                optionElement.textContent = option.label;
+                select.appendChild(optionElement);
+            });
+
+            const recognized = AUTHORITY_OPTIONS.some((option) => option.value === authorityValue);
+            if (recognized) {
+                select.value = String(authorityValue);
+            } else {
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = formatAuthorityLabel(authorityValue);
+                placeholder.disabled = true;
+                placeholder.selected = true;
+                select.insertBefore(placeholder, select.firstChild);
+            }
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-primary member-authority-update';
+            button.textContent = '変更';
+
+            const status = document.createElement('span');
+            status.className = 'member-authority-status';
+            status.setAttribute('role', 'status');
+
+            button.addEventListener('click', () => {
+                handleAuthorityUpdate(member, select, button, status, updatedCell);
+            });
+
+            control.appendChild(select);
+            control.appendChild(button);
+            control.appendChild(status);
+
+            cell.appendChild(control);
+            return cell;
+        };
+
+        const handleAuthorityUpdate = async (member, select, button, status, updatedCell) => {
+            const targetLoginId = (member?.loginId || '').toString().trim();
+            const selectedAuthority = parseAuthorityValue(select.value);
+
+            status.textContent = '';
+            status.classList.remove('is-error', 'is-success');
+
+            if (!targetLoginId) {
+                status.textContent = '対象ユーザーが不明です。';
+                status.classList.add('is-error');
+                return;
+            }
+
+            if (selectedAuthority === null) {
+                status.textContent = '権限を選択してください。';
+                status.classList.add('is-error');
+                return;
+            }
+
+            select.disabled = true;
+            button.disabled = true;
+            button.textContent = '更新中…';
+
+            try {
+                const result = await requestAuthorityUpdate({
+                    targetLoginId,
+                    authority: selectedAuthority
+                });
+
+                status.textContent = '権限を更新しました。';
+                status.classList.add('is-success');
+
+                const updatedAuthority = parseAuthorityValue(result?.updatedAuthority);
+                if (updatedAuthority !== null && AUTHORITY_OPTIONS.some((option) => option.value === updatedAuthority)) {
+                    select.value = String(updatedAuthority);
+                }
+
+                const updatedTimestamp = result?.updatedAt || new Date().toISOString();
+                if (updatedCell) {
+                    updatedCell.textContent = formatDateTime(updatedTimestamp);
+                }
+
+                const latestAuthority = updatedAuthority !== null ? updatedAuthority : selectedAuthority;
+                member.authority = latestAuthority;
+            } catch (error) {
+                console.error('権限の更新に失敗しました。', error);
+                status.textContent = error && error.message ? error.message : '権限の更新に失敗しました。';
+                status.classList.add('is-error');
+            } finally {
+                select.disabled = false;
+                button.disabled = false;
+                button.textContent = '変更';
+            }
+        };
+
+        const requestAuthorityUpdate = async ({ targetLoginId, authority }) => {
+            if (!adminVerificationResult || !adminVerificationResult.success) {
+                throw new Error('管理者認証が確認できません。ページを再読み込みしてください。');
+            }
+
+            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+                throw new Error('管理者認証APIのエンドポイントが設定されていません。');
+            }
+
+            const payload = {
+                action: 'updateAuthority',
+                targetLoginId,
+                authority,
+                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
+
+            const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+                method: 'POST',
+                mode: 'cors',
+                credentials: 'omit',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                throw new Error((errorText && errorText.trim()) || `権限更新に失敗しました (HTTP ${response.status})`);
+            }
+
+            const result = await response.json().catch(() => null);
+            if (!result || !result.success) {
+                throw new Error((result && result.message) || '権限の更新に失敗しました。');
+            }
+
+            return result;
+        };
+
+        const loadToolbarPluginSettings = async () => {
+            if (pluginLoadingInProgress) {
+                return;
+            }
+
+            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+                setPluginStatusMessage('プラグイン設定APIのエンドポイントが設定されていません。', 'error');
+                return;
+            }
+
+            setPluginLoadingState(true);
+            clearPluginStatus();
+
+            try {
+                const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify({
+                        action: 'getToolbarPlugins'
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error((errorText && errorText.trim()) || `プラグイン設定の取得に失敗しました (HTTP ${response.status})`);
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || !result.success) {
+                    throw new Error((result && result.message) || 'プラグイン設定の取得に失敗しました。');
+                }
+
+                applyToolbarStatesToUI(result.toolbarConfig?.states);
+                pluginSettingsLoaded = true;
+                setPluginDirtyState(false);
+                setPluginStatusMessage('最新の設定を読み込みました。', 'success');
+            } catch (error) {
+                console.error('プラグイン設定の取得に失敗しました。', error);
+                pluginSettingsLoaded = false;
+                setPluginStatusMessage(error && error.message ? error.message : 'プラグイン設定の取得に失敗しました。', 'error');
+            } finally {
+                setPluginLoadingState(false);
+            }
+        };
+
+        const saveToolbarPluginSettings = async () => {
+            if (!pluginSettingsLoaded) {
+                setPluginStatusMessage('プラグイン設定の読み込み完了を待ってから保存してください。', 'error');
+                return;
+            }
+
+            if (pluginLoadingInProgress || pluginSavingInProgress) {
+                return;
+            }
+
+            if (!adminVerificationResult || !adminVerificationResult.success) {
+                setPluginStatusMessage('管理者認証が確認できません。ページを再読み込みしてください。', 'error');
+                return;
+            }
+
+            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+                setPluginStatusMessage('プラグイン設定APIのエンドポイントが設定されていません。', 'error');
+                return;
+            }
+
+            const states = getCurrentToolbarStates();
+            const payload = {
+                action: 'updateToolbarPlugins',
+                toolbarKeys: TOOLBAR_FEATURES.map((feature) => feature.key),
+                toolbarStates: states,
+                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
+
+            clearPluginStatus();
+            setPluginSavingState(true);
+            if (pluginSaveButton) {
+                pluginSaveButton.textContent = '保存中…';
+            }
+
+            try {
+                const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error((errorText && errorText.trim()) || `プラグイン設定の保存に失敗しました (HTTP ${response.status})`);
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || !result.success) {
+                    throw new Error((result && result.message) || 'プラグイン設定の保存に失敗しました。');
+                }
+
+                applyToolbarStatesToUI(result.toolbarConfig?.states);
+                pluginSettingsLoaded = true;
+                setPluginDirtyState(false);
+                setPluginStatusMessage('TipTapツールバーの設定を保存しました。', 'success');
+            } catch (error) {
+                console.error('プラグイン設定の保存に失敗しました。', error);
+                setPluginStatusMessage(error && error.message ? error.message : 'プラグイン設定の保存に失敗しました。', 'error');
+            } finally {
+                if (pluginSaveButton) {
+                    pluginSaveButton.textContent = '保存';
+                }
+                setPluginSavingState(false);
+            }
+        };
+
+        renderPluginToolbarOptions();
+        applyToolbarStatesToUI({});
+        updatePluginSaveButtonState();
+
+        const renderMemberTable = (members) => {
+            if (!memberTableBody || !memberTableWrapper) {
+                return;
+            }
+
+            memberTableBody.textContent = '';
+
+            if (!Array.isArray(members) || members.length === 0) {
+                memberTableWrapper.hidden = true;
+                memberTableWrapper.setAttribute('aria-hidden', 'true');
+                if (memberEmptyState) {
+                    memberEmptyState.hidden = false;
+                }
+                return;
+            }
+
+            if (memberEmptyState) {
+                memberEmptyState.hidden = true;
+            }
+
+            memberTableWrapper.hidden = false;
+            memberTableWrapper.setAttribute('aria-hidden', 'false');
+
+            const fragment = document.createDocumentFragment();
+
+            members.forEach((member) => {
+                const row = document.createElement('tr');
+
+                const loginCell = document.createElement('td');
+                loginCell.textContent = normalizeCellValue(member?.loginId);
+                row.appendChild(loginCell);
+
+                const usernameCell = document.createElement('td');
+                usernameCell.textContent = normalizeCellValue(member?.username);
+                row.appendChild(usernameCell);
+
+                const emailCell = document.createElement('td');
+                emailCell.textContent = normalizeCellValue(member?.email);
+                row.appendChild(emailCell);
+
+                const kingdomCell = document.createElement('td');
+                kingdomCell.textContent = normalizeCellValue(member?.kingdom);
+                row.appendChild(kingdomCell);
+
+                const languageCell = document.createElement('td');
+                const languageChip = document.createElement('span');
+                languageChip.className = 'member-language';
+                languageChip.textContent = formatLanguageLabel(member?.language);
+                languageCell.appendChild(languageChip);
+                row.appendChild(languageCell);
+
+                const updatedCell = document.createElement('td');
+                updatedCell.textContent = formatDateTime(member?.updatedAt);
+
+                const authorityCell = createAuthorityCell(member, updatedCell);
+                row.appendChild(authorityCell);
+
+                row.appendChild(updatedCell);
+
+                fragment.appendChild(row);
+            });
+
+            memberTableBody.appendChild(fragment);
+        };
+
+        const fetchMemberRecords = async (forceRefresh = false) => {
+            if (memberFetchInProgress) {
+                return;
+            }
+            if (memberDataLoaded && !forceRefresh) {
+                return;
+            }
+
+            if (forceRefresh) {
+                memberDataLoaded = false;
+            }
+
+            if (!MEMBER_LIST_ENDPOINT || MEMBER_LIST_ENDPOINT.includes('YOUR_DEPLOYMENT_ID')) {
+                showMemberError('ユーザー情報のAPIエンドポイントが正しく設定されていません。');
+                return;
+            }
+
+            memberFetchInProgress = true;
+            clearMemberError();
+            if (memberTableWrapper) {
+                memberTableWrapper.hidden = true;
+                memberTableWrapper.setAttribute('aria-hidden', 'true');
+            }
+            if (memberEmptyState) {
+                memberEmptyState.hidden = true;
+            }
+            setMemberLoading(true);
+
+            try {
+                const response = await fetch(MEMBER_LIST_ENDPOINT, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify({
+                        action: 'listMembers'
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error((errorText && errorText.trim()) || `ユーザー情報の取得に失敗しました (HTTP ${response.status})`);
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || !result.success) {
+                    throw new Error((result && result.message) || 'ユーザー情報を取得できませんでした。');
+                }
+
+                const members = Array.isArray(result.members) ? result.members : [];
+                renderMemberTable(members);
+                memberDataLoaded = true;
+            } catch (error) {
+                console.error('ユーザー情報の取得に失敗しました。', error);
+                showMemberError(error && error.message ? error.message : 'ユーザー情報の取得に失敗しました。');
+            } finally {
+                setMemberLoading(false);
+                memberFetchInProgress = false;
+            }
+        };
+
+        const updateMenuUI = () => {
+            menuItems.forEach((item) => {
+                const page = item.dataset.page;
+                item.classList.toggle('active', page === currentPage);
+            });
+
+            const label = MENU_LABELS[currentPage];
+            const description = MENU_DESCRIPTIONS[currentPage] || '';
+            const isMemberPage = currentPage === 'member';
+            const isPluginPage = currentPage === 'plugin';
+
+            contentTitle.textContent = label;
+            contentDescription.textContent = description;
+
+            if (isMemberPage) {
+                placeholderTitle.textContent = '';
+                placeholderDescription.textContent = '';
+                setPlaceholderVisibility(false);
+                showMemberSection();
+                hidePluginSettingsSection();
+                fetchMemberRecords(false);
+            } else if (isPluginPage) {
+                hideMemberSection();
+                setPlaceholderVisibility(false);
+                showPluginSettingsSection();
+                if (!pluginSettingsLoaded && !pluginLoadingInProgress) {
+                    loadToolbarPluginSettings();
+                } else {
+                    updatePluginSaveButtonState();
+                }
+            } else {
+                hideMemberSection();
+                hidePluginSettingsSection();
+                setPlaceholderVisibility(true);
+                placeholderTitle.textContent = `${label} は現在準備中です`;
+                placeholderDescription.textContent = 'このページでは将来的に管理者向けの設定操作が提供される予定です。';
+            }
+        };
+
+        const callAdminAuthorizationApi = async (loginState) => {
+            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+                throw new Error('管理者認証APIのエンドポイントが設定されていません。');
+            }
+
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), ADMIN_AUTH_TIMEOUT);
+
+            try {
+                const payload = {
+                    action: 'verifyAdminAccess',
+                    loginId: loginState?.user?.loginId || '',
+                    email: loginState?.user?.email || '',
+                    googleEmail: loginState?.user?.email || '',
+                    origin: window.location.origin
+                };
+
+                const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error((errorText && errorText.trim()) || `管理者認証に失敗しました (HTTP ${response.status})`);
+                }
+
+                const result = await response.json().catch(() => null);
+
+                if (!result) {
+                    throw new Error('管理者認証の結果を取得できませんでした。');
+                }
+
+                return result;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('管理者認証のリクエストがタイムアウトしました。');
+                }
+                if (error instanceof TypeError) {
+                    throw new Error('管理者認証サービスに接続できませんでした。ネットワークまたはCORS設定を確認してください。');
+                }
+                throw error;
+            } finally {
+                window.clearTimeout(timeoutId);
+            }
+        };
+
+        const initializeAdminConsole = async () => {
+            if (layoutRoot) {
+                layoutRoot.classList.add('layout-hidden');
+            }
+            showLoadingOverlay();
+
+            const loginState = getStoredLoginState();
+            const user = loginState?.user;
+            if (!user) {
+                hideLoadingOverlay();
+                window.location.replace(buildLoginUrl());
+                return;
+            }
+
+            try {
+                const verification = await callAdminAuthorizationApi(loginState);
+                if (!verification.success) {
+                    showAuthorizationError(verification.message || '管理者権限が確認できませんでした。');
+                    return;
+                }
+
+                currentLoginState = loginState;
+                adminVerificationResult = verification;
+
+                hideAuthorizationError();
+
+                const authorizedUser = {
+                    loginId: verification.loginId || user.loginId || '',
+                    username: verification.username || user.username || user.name || '',
+                    email: verification.email || user.email || ''
+                };
+
+                const displayName = (authorizedUser.username || authorizedUser.email || '').trim();
+                adminUser.textContent = displayName ? `${displayName} (管理者)` : '管理者アカウント';
+
+                updateMenuUI();
+
+                menuItems.forEach((item) => {
+                    item.addEventListener('click', () => {
+                        const page = item.dataset.page;
+                        if (!page || page === currentPage) {
+                            return;
+                        }
+
+                        currentPage = page;
+
+                        try {
+                            const url = new URL(window.location.href);
+                            url.searchParams.set('page', page);
+                            window.history.replaceState({}, '', url);
+                            updateMenuUI();
+                        } catch (error) {
+                            console.warn('ブラウザ履歴の更新に失敗したため、ページを再読み込みします。', error);
+                            window.location.href = `./setting2.html?page=${encodeURIComponent(page)}`;
+                        }
+                    });
+                });
+
+                memberReloadButton?.addEventListener('click', () => {
+                    memberDataLoaded = false;
+                    fetchMemberRecords(true);
+                });
+
+                pluginSaveButton?.addEventListener('click', saveToolbarPluginSettings);
+
+                returnEditorButton.addEventListener('click', () => {
+                    window.location.href = './edit2.html';
+                });
+            } catch (error) {
+                console.error('管理者認証中にエラーが発生しました。', error);
+                showAuthorizationError(error.message || '管理者認証中にエラーが発生しました。');
+            }
+        };
+
+        authorizationRetryButton?.addEventListener('click', () => {
+            window.location.reload();
+        });
+
+        authorizationLoginButton?.addEventListener('click', () => {
+            window.location.href = buildLoginUrl();
+        });
+
+        initializeAdminConsole();
+    </script>
+</body>
+</html>
