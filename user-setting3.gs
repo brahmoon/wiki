@@ -49,6 +49,10 @@ function doPost(e) {
     switch (action) {
       case 'listMembers':
         return buildResponse(handleListMembers(sheet, request), origin);
+      case 'getUserSettings':
+        return buildResponse(handleGetUserSettings(sheet, request), origin);
+      case 'updateUserSettings':
+        return buildResponse(handleUpdateUserSettings(sheet, request), origin);
       default:
         return buildResponse(
           {
@@ -142,6 +146,93 @@ function handleListMembers(sheet, request) {
   };
 }
 
+function handleGetUserSettings(sheet, request) {
+  if (!request.loginId && !request.email) {
+    return {
+      success: false,
+      message: 'ログインIDまたはメールアドレスを指定してください。',
+    };
+  }
+
+  const record = findAccount(sheet, request);
+  if (!record) {
+    return {
+      success: false,
+      message: '該当するユーザーが見つかりません。',
+    };
+  }
+
+  return {
+    success: true,
+    message: 'ユーザー設定を取得しました。',
+    loginId: record.loginId,
+    username: record.username,
+    email: record.email,
+    kingdom: record.kingdom,
+    language: record.language,
+  };
+}
+
+function handleUpdateUserSettings(sheet, request) {
+  if (!request.loginId && !request.email) {
+    return {
+      success: false,
+      message: 'ログインIDまたはメールアドレスを指定してください。',
+    };
+  }
+
+  const normalizedUsername = (request.username || '').toString().trim();
+  if (!normalizedUsername) {
+    return {
+      success: false,
+      message: 'ユーザーネームを入力してください。',
+    };
+  }
+
+  const record = findAccount(sheet, request);
+  if (!record) {
+    return {
+      success: false,
+      message: '該当するユーザーが見つかりません。',
+    };
+  }
+
+  const kingdomValue = sanitizeKingdom(request.kingdom);
+  const languageValue = sanitizeLanguage(request.language);
+
+  const updatedValues = record.values.slice();
+  const columns = CONFIG.COLUMNS;
+
+  if (columns.username) {
+    updatedValues[columns.username - 1] = normalizedUsername;
+  }
+  if (columns.email) {
+    updatedValues[columns.email - 1] = request.email ? request.email.toString().trim() : record.email;
+  }
+  if (columns.kingdom) {
+    updatedValues[columns.kingdom - 1] = kingdomValue;
+  }
+  if (columns.language) {
+    updatedValues[columns.language - 1] = languageValue;
+  }
+  if (columns.updatedAt) {
+    updatedValues[columns.updatedAt - 1] = new Date();
+  }
+
+  const rowRange = sheet.getRange(record.rowNumber, 1, 1, sheet.getLastColumn());
+  rowRange.setValues([updatedValues]);
+
+  return {
+    success: true,
+    message: 'ユーザー設定を更新しました。',
+    loginId: updatedValues[columns.loginId - 1] || record.loginId,
+    username: updatedValues[columns.username - 1] || normalizedUsername,
+    email: columns.email ? updatedValues[columns.email - 1] || record.email : record.email,
+    kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
+    language: columns.language ? updatedValues[columns.language - 1] || '' : '',
+  };
+}
+
 function parseRequest(e) {
   const data = parseRequestData(e);
   return {
@@ -149,6 +240,11 @@ function parseRequest(e) {
     search: data.search || data.query || '',
     limit: parsePositiveInteger(data.limit),
     offset: parsePositiveInteger(data.offset),
+    loginId: data.loginId || data.email || '',
+    email: data.email || '',
+    username: data.username || data.name || '',
+    kingdom: data.kingdom,
+    language: data.language,
   };
 }
 
@@ -240,6 +336,54 @@ function sanitizeAuthority(value) {
   return number;
 }
 
+function normalizeId(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase();
+}
+
+function findAccount(sheet, identifiers) {
+  const lastRow = sheet.getLastRow();
+  const firstDataRow = CONFIG.HEADER_ROW_INDEX + 1;
+  if (lastRow < firstDataRow) {
+    return null;
+  }
+
+  const totalRows = lastRow - CONFIG.HEADER_ROW_INDEX;
+  const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
+  const values = range.getValues();
+
+  const normalizedLoginId = normalizeId(identifiers.loginId);
+  const normalizedEmail = normalizeId(identifiers.email);
+  const columns = CONFIG.COLUMNS;
+
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+    const rowLoginId = normalizeId(columns.loginId ? row[columns.loginId - 1] : '');
+    const rowEmail = columns.email ? normalizeId(row[columns.email - 1]) : '';
+
+    const loginMatch = normalizedLoginId && rowLoginId && rowLoginId === normalizedLoginId;
+    const emailMatch = normalizedEmail && rowEmail && rowEmail === normalizedEmail;
+
+    if (loginMatch || emailMatch) {
+      return {
+        rowNumber: firstDataRow + i,
+        values: row,
+        loginId: columns.loginId ? row[columns.loginId - 1] : identifiers.loginId || identifiers.email || '',
+        username: columns.username ? row[columns.username - 1] || '' : '',
+        email:
+          columns.email && row[columns.email - 1]
+            ? row[columns.email - 1]
+            : identifiers.email || '',
+        kingdom: columns.kingdom ? row[columns.kingdom - 1] || '' : '',
+        language: columns.language ? sanitizeLanguage(row[columns.language - 1]) : 'ja',
+      };
+    }
+  }
+
+  return null;
+}
+
 function formatDateValue(value) {
   if (!value) {
     return '';
@@ -275,17 +419,36 @@ function buildResponse(result, origin) {
   const payload = {
     success: Boolean(result.success),
     message: result.message || '',
-    members: Array.isArray(result.members) ? result.members : [],
-    total:
+    timestamp: new Date().toISOString(),
+  };
+
+  if (Object.prototype.hasOwnProperty.call(result, 'members')) {
+    payload.members = Array.isArray(result.members) ? result.members : [];
+    payload.total =
       typeof result.total === 'number'
         ? result.total
         : Array.isArray(result.members)
         ? result.members.length
-        : 0,
-    limit: typeof result.limit === 'number' ? result.limit : 0,
-    offset: typeof result.offset === 'number' ? result.offset : 0,
-    timestamp: new Date().toISOString(),
-  };
+        : 0;
+    payload.limit = typeof result.limit === 'number' ? result.limit : 0;
+    payload.offset = typeof result.offset === 'number' ? result.offset : 0;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(result, 'loginId')) {
+    payload.loginId = result.loginId || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(result, 'username')) {
+    payload.username = result.username || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(result, 'email')) {
+    payload.email = result.email || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(result, 'kingdom')) {
+    payload.kingdom = result.kingdom || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(result, 'language')) {
+    payload.language = result.language || null;
+  }
 
   return createJsonOutput(payload, origin);
 }
