@@ -33,12 +33,12 @@
             gap: 20px;
         }
 
-        .-title {
+        .login-title {
             font-size: 24px;
             font-weight: 700;
         }
 
-        .-description {
+        .login-description {
             font-size: 14px;
             color: #6b6a67;
             line-height: 1.6;
@@ -137,7 +137,7 @@
             margin-top: 4px;
         }
 
-        .profile--id {
+        .profile-login-id {
             font-size: 13px;
             color: #6b6a67;
         }
@@ -151,10 +151,10 @@
     </style>
 </head>
 <body>
-    <div class="-card">
+    <div class="login-card">
         <div>
-            <div class="-title">Googleアカウントでログイン</div>
-            <p class="-description">
+            <div class="login-title">Googleアカウントでログイン</div>
+            <p class="login-description">
                 編集ツールの利用にはGoogleアカウントでのログインが必要です。ログイン後はブラウザに保持され、
                 ログアウトするまで再認証は不要です。
             </p>
@@ -162,7 +162,7 @@
         <div id="profile" class="profile-card" style="display: none;"></div>
         <div id="status" class="status-message" role="status" aria-live="polite"></div>
         <div class="button-group">
-            <button id="-btn" class="btn-primary" type="button" disabled>Googleでログイン</button>
+            <button id="login-btn" class="btn-primary" type="button" disabled>Googleでログイン</button>
             <button id="return-btn" class="btn-secondary" type="button">エディタに戻る</button>
             <button id="logout-btn" class="btn-danger" type="button" style="display: none;">ログアウト</button>
         </div>
