@@ -524,6 +524,14 @@
             position: relative;
         }
 
+        .tiptap [data-block-id][draggable="true"] {
+            cursor: grab;
+        }
+
+        .tiptap [data-block-id][draggable="true"]:active {
+            cursor: grabbing;
+        }
+
         .tiptap [data-block-id].layout-drop-left::before,
         .tiptap [data-block-id].layout-drop-right::before,
         .tiptap [data-block-id].layout-drop-stack::after {
@@ -1812,7 +1820,10 @@
                                 default: null,
                                 parseHTML: element => element.getAttribute('data-block-id'),
                                 renderHTML: attributes => attributes.blockId
-                                    ? { 'data-block-id': attributes.blockId }
+                                    ? {
+                                        'data-block-id': attributes.blockId,
+                                        draggable: 'true'
+                                    }
                                     : {}
                             },
                             layoutGroup: {
@@ -2049,6 +2060,16 @@
                                         return false;
                                     }
                                     dragState.sourceId = block.getAttribute('data-block-id');
+                                    block.setAttribute('draggable', 'true');
+                                    if (event.dataTransfer) {
+                                        event.dataTransfer.effectAllowed = 'move';
+                                        const previewText = block.textContent ? block.textContent.trim().slice(0, 120) : '';
+                                        try {
+                                            event.dataTransfer.setData('text/plain', previewText);
+                                        } catch (error) {
+                                            /* ignore unsupported dataTransfer operations */
+                                        }
+                                    }
                                     dragState.intent = null;
                                     dragState.targetId = null;
                                     clearHighlights();
@@ -2101,7 +2122,14 @@
                                     }
                                     return false;
                                 },
-                                dragleave() {
+                                dragleave(view, event) {
+                                    const relatedTarget = event.relatedTarget;
+                                    if (relatedTarget instanceof HTMLElement) {
+                                        const nextBlock = relatedTarget.closest('[data-block-id]');
+                                        if (nextBlock === dragState.lastTarget) {
+                                            return false;
+                                        }
+                                    }
                                     clearHighlights();
                                     dragState.intent = null;
                                     dragState.targetId = null;
