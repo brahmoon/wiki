@@ -8,8 +8,8 @@ const CONFIG = {
     email: 3,
     kingdom: 4,
     language: 5,
-    updatedAt: 6,
-    authority: 7,
+    authority: 6,
+    updatedAt: 7,
   },
   ALLOWED_ORIGINS: [
     'https://brahmoon.github.io',
