@@ -445,7 +445,7 @@
             </div>
             <ul class="menu-list">
                 <li><button type="button" class="menu-item" data-page="general">Wiki設定</button></li>
-                <li><button type="button" class="menu-item" data-page="member">メンバー管理</button></li>
+                <li><button type="button" class="menu-item" data-page="member">ユーザー管理</button></li>
                 <li><button type="button" class="menu-item" data-page="authority">権限管理</button></li>
                 <li><button type="button" class="menu-item" data-page="activity">アクティビティ</button></li>
                 <li><button type="button" class="menu-item" data-page="plugin">プラグイン</button></li>
@@ -473,7 +473,7 @@
                     <div class="member-card">
                         <div class="member-status">
                             <div>
-                                <h2>登録メンバー一覧</h2>
+                                <h2>登録ユーザー 一覧</h2>
                                 <p>Wikiに登録されているユーザー情報をリアルタイムに確認できます。</p>
                             </div>
                             <div class="member-actions">
@@ -484,7 +484,7 @@
                     <div id="member-error" class="member-error" role="alert" hidden></div>
                     <div id="member-loading" class="member-loading" role="status" aria-live="polite" hidden>
                         <div class="loading-spinner" aria-hidden="true"></div>
-                        <p>メンバー情報を取得しています…</p>
+                        <p>ユーザー情報を取得しています…</p>
                     </div>
                     <div id="member-table-wrapper" class="member-table-wrapper" hidden aria-hidden="true">
                         <table class="member-table">
@@ -502,7 +502,7 @@
                         </table>
                     </div>
                     <div id="member-empty-state" class="member-empty" hidden>
-                        現在登録されているメンバーはいません。
+                        現在登録されているユーザーはいません。
                     </div>
                 </section>
             </div>
@@ -531,7 +531,7 @@
         const MEMBER_LIST_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwCzr1ryM2RkZfxPYnIMURRa1uBHRszKheM_f5Rl9nefj6VLzjPVAu5xSqB7_GFn1ro0Q/exec';
         const MENU_LABELS = {
             general: 'Wiki設定',
-            member: 'メンバー管理',
+            member: 'ユーザー管理',
             authority: '権限管理',
             activity: 'アクティビティ',
             plugin: 'プラグイン',
@@ -539,7 +539,7 @@
         };
         const MENU_DESCRIPTIONS = {
             general: 'Wiki全体に関する基本設定を管理します。',
-            member: 'Wikiに登録されているメンバー一覧を確認します。',
+            member: 'Wikiに登録されているユーザー 一覧を確認します。',
             authority: 'ロールの権限を管理します。',
             activity: '最近の編集履歴や操作ログを確認します。',
             plugin: 'プラグインの追加や設定を行います。',
@@ -673,7 +673,7 @@
             if (memberError) {
                 memberError.hidden = false;
                 memberError.setAttribute('aria-hidden', 'false');
-                memberError.textContent = message || 'メンバー情報を取得できませんでした。';
+                memberError.textContent = message || 'ユーザー情報を取得できませんでした。';
             }
             if (memberTableWrapper) {
                 memberTableWrapper.hidden = true;
@@ -804,7 +804,7 @@
             }
 
             if (!MEMBER_LIST_ENDPOINT || MEMBER_LIST_ENDPOINT.includes('YOUR_DEPLOYMENT_ID')) {
-                showMemberError('メンバー情報のAPIエンドポイントが正しく設定されていません。');
+                showMemberError('ユーザー情報のAPIエンドポイントが正しく設定されていません。');
                 return;
             }
 
@@ -834,20 +834,20 @@
 
                 if (!response.ok) {
                     const errorText = await response.text().catch(() => '');
-                    throw new Error((errorText && errorText.trim()) || `メンバー情報の取得に失敗しました (HTTP ${response.status})`);
+                    throw new Error((errorText && errorText.trim()) || `ユーザー情報の取得に失敗しました (HTTP ${response.status})`);
                 }
 
                 const result = await response.json().catch(() => null);
                 if (!result || !result.success) {
-                    throw new Error((result && result.message) || 'メンバー情報を取得できませんでした。');
+                    throw new Error((result && result.message) || 'ユーザー情報を取得できませんでした。');
                 }
 
                 const members = Array.isArray(result.members) ? result.members : [];
                 renderMemberTable(members);
                 memberDataLoaded = true;
             } catch (error) {
-                console.error('メンバー情報の取得に失敗しました。', error);
-                showMemberError(error && error.message ? error.message : 'メンバー情報の取得に失敗しました。');
+                console.error('ユーザー情報の取得に失敗しました。', error);
+                showMemberError(error && error.message ? error.message : 'ユーザー情報の取得に失敗しました。');
             } finally {
                 setMemberLoading(false);
                 memberFetchInProgress = false;
