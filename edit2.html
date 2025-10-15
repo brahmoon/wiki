@@ -488,40 +488,46 @@
             --layout-gap: 24px;
         }
 
-        .tiptap [data-layout-group] {
-            display: inline-block;
-            vertical-align: top;
-            box-sizing: border-box;
+        .tiptap .columns {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: var(--layout-gap);
             margin-bottom: var(--layout-gap);
-            margin-right: var(--layout-gap);
-            padding: 0;
-            transition: outline 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .tiptap [data-layout-group][data-layout-columns="2"] {
-            width: calc((100% - var(--layout-gap)) / 2);
+        .tiptap .columns.columns-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .tiptap [data-layout-group][data-layout-columns="3"] {
-            width: calc((100% - (var(--layout-gap) * 2)) / 3);
+        .tiptap .columns.columns-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
-        .tiptap [data-layout-group][data-layout-columns="4"] {
-            width: calc((100% - (var(--layout-gap) * 3)) / 4);
+        .tiptap .columns.columns-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
         }
 
-        .tiptap [data-layout-group][data-layout-columns="2"][data-layout-index="1"],
-        .tiptap [data-layout-group][data-layout-columns="3"][data-layout-index="2"],
-        .tiptap [data-layout-group][data-layout-columns="4"][data-layout-index="3"] {
-            margin-right: 0;
+        .tiptap .columns .column {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: calc(var(--layout-gap) / 2);
         }
 
-        .tiptap [data-layout-group] > * {
+        .tiptap .columns .column > * {
             width: 100%;
         }
 
         .tiptap [data-block-id] {
             position: relative;
+        }
+
+        .tiptap [data-block-id][draggable="true"] {
+            cursor: grab;
+        }
+
+        .tiptap [data-block-id][draggable="true"]:active {
+            cursor: grabbing;
         }
 
         .tiptap [data-block-id].layout-drop-left::before,
@@ -1781,13 +1787,53 @@
             }
         });
 
+        const Column = Node.create({
+            name: 'column',
+            group: 'block',
+            content: 'block+',
+            isolating: true,
+            draggable: false,
+            parseHTML() {
+                return [
+                    {
+                        tag: 'div.column'
+                    }
+                ];
+            },
+            renderHTML({ HTMLAttributes }) {
+                return ['div', mergeAttributes(HTMLAttributes, { class: 'column' }), 0];
+            }
+        });
+
+        const Columns = Node.create({
+            name: 'columns',
+            group: 'block',
+            content: 'column+',
+            isolating: true,
+            draggable: false,
+            parseHTML() {
+                return [
+                    {
+                        tag: 'div.columns'
+                    }
+                ];
+            },
+            renderHTML({ node, HTMLAttributes }) {
+                const count = Math.max(1, Math.min(node.childCount, 4));
+                const classes = ['columns', `columns-${count}`];
+                if (HTMLAttributes.class) {
+                    classes.push(HTMLAttributes.class);
+                }
+                return ['div', mergeAttributes(HTMLAttributes, { class: classes.join(' ') }), 0];
+            }
+        });
+
         const LayoutSystem = Extension.create({
             name: 'layoutSystem',
             addOptions() {
                 return {
                     maxColumns: 4,
-                    generateBlockId: () => `b_${Math.random().toString(36).slice(2, 8)}_${Date.now().toString(36)}`,
-                    generateGroupId: () => `g_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36)}`
+                    generateBlockId: () => `b_${Math.random().toString(36).slice(2, 8)}_${Date.now().toString(36)}`
                 };
             },
             addGlobalAttributes() {
@@ -1812,34 +1858,10 @@
                                 default: null,
                                 parseHTML: element => element.getAttribute('data-block-id'),
                                 renderHTML: attributes => attributes.blockId
-                                    ? { 'data-block-id': attributes.blockId }
-                                    : {}
-                            },
-                            layoutGroup: {
-                                default: null,
-                                parseHTML: element => element.getAttribute('data-layout-group'),
-                                renderHTML: attributes => attributes.layoutGroup
-                                    ? { 'data-layout-group': attributes.layoutGroup }
-                                    : {}
-                            },
-                            layoutColumns: {
-                                default: null,
-                                parseHTML: element => {
-                                    const value = element.getAttribute('data-layout-columns');
-                                    return value ? Number(value) : null;
-                                },
-                                renderHTML: attributes => attributes.layoutGroup
-                                    ? { 'data-layout-columns': attributes.layoutColumns || 1 }
-                                    : {}
-                            },
-                            layoutIndex: {
-                                default: null,
-                                parseHTML: element => {
-                                    const value = element.getAttribute('data-layout-index');
-                                    return value ? Number(value) : null;
-                                },
-                                renderHTML: attributes => attributes.layoutGroup
-                                    ? { 'data-layout-index': attributes.layoutIndex ?? 0 }
+                                    ? {
+                                        'data-block-id': attributes.blockId,
+                                        draggable: 'true'
+                                    }
                                     : {}
                             }
                         }
@@ -1862,10 +1884,19 @@
                     }
                 }
 
-                function collectLayoutInfo(doc) {
-                    const blockNodes = new Map();
-                    const groups = new Map();
+                function collectBlockContext(doc, schema) {
+                    const blocks = new Map();
+                    const stack = [];
                     doc.descendants((node, pos) => {
+                        while (stack.length && stack[stack.length - 1].end <= pos) {
+                            stack.pop();
+                        }
+                        const end = pos + node.nodeSize;
+                        if (node.type === schema.nodes.columns) {
+                            stack.push({ type: 'columns', pos, end, node });
+                        } else if (node.type === schema.nodes.column) {
+                            stack.push({ type: 'column', pos, end, node });
+                        }
                         if (!node.isBlock) {
                             return;
                         }
@@ -1873,57 +1904,64 @@
                         if (!blockId) {
                             return;
                         }
-                        const entry = { node, pos };
-                        blockNodes.set(blockId, entry);
-                        const groupId = node.attrs.layoutGroup;
-                        if (groupId) {
-                            if (!groups.has(groupId)) {
-                                groups.set(groupId, []);
+                        const context = { columns: null, column: null };
+                        for (let index = stack.length - 1; index >= 0; index -= 1) {
+                            const frame = stack[index];
+                            if (frame.type === 'column' && !context.column) {
+                                context.column = { pos: frame.pos, node: frame.node };
                             }
-                            groups.get(groupId).push(entry);
+                            if (frame.type === 'columns' && !context.columns) {
+                                context.columns = { pos: frame.pos, node: frame.node };
+                            }
+                            if (context.column && context.columns) {
+                                break;
+                            }
                         }
+                        blocks.set(blockId, { pos, node, ...context });
                     });
-                    return { blockNodes, groups };
+                    return blocks;
                 }
 
-                function applyGroupAttributes(tr, members, groupId, maxColumns) {
-                    const count = members.length;
-                    if (count < 2 || count > maxColumns) {
-                        members.forEach(member => {
-                            const node = tr.doc.nodeAt(member.pos);
-                            if (!node) {
-                                return;
-                            }
-                            const attrs = {
-                                ...node.attrs,
-                                layoutGroup: null,
-                                layoutColumns: null,
-                                layoutIndex: null
-                            };
-                            tr.setNodeMarkup(member.pos, node.type, attrs, node.marks);
-                        });
+                function getChildInsertPos(parentPos, parentNode, insertIndex) {
+                    let position = parentPos + 1;
+                    for (let i = 0; i < insertIndex; i += 1) {
+                        const child = parentNode.child(i);
+                        position += child.nodeSize;
+                    }
+                    return position;
+                }
+
+                function collectColumnsForCleanup(doc, columnsType) {
+                    const targets = [];
+                    doc.descendants((node, pos) => {
+                        if (node.type === columnsType) {
+                            targets.push({ pos, node });
+                        }
+                    });
+                    return targets;
+                }
+
+                function cleanupColumns(tr, columnsType) {
+                    const targets = collectColumnsForCleanup(tr.doc, columnsType);
+                    if (!targets.length) {
                         return;
                     }
-                    members.forEach((member, index) => {
-                        const node = tr.doc.nodeAt(member.pos);
-                        if (!node) {
-                            return;
+                    for (let i = targets.length - 1; i >= 0; i -= 1) {
+                        const target = targets[i];
+                        const mappedPos = tr.mapping.map(target.pos);
+                        const node = tr.doc.nodeAt(mappedPos);
+                        if (!node || node.type !== columnsType) {
+                            continue;
                         }
-                        const attrs = {
-                            ...node.attrs,
-                            layoutGroup: groupId,
-                            layoutColumns: count,
-                            layoutIndex: index
-                        };
-                        tr.setNodeMarkup(member.pos, node.type, attrs, node.marks);
-                    });
-                }
-
-                function cleanupGroups(tr, maxColumns) {
-                    const info = collectLayoutInfo(tr.doc);
-                    info.groups.forEach((members, groupId) => {
-                        applyGroupAttributes(tr, members, groupId, maxColumns);
-                    });
+                        if (node.childCount >= 2) {
+                            continue;
+                        }
+                        let replacement = Fragment.empty;
+                        for (let index = 0; index < node.childCount; index += 1) {
+                            replacement = replacement.append(node.child(index).content);
+                        }
+                        tr.replaceWith(mappedPos, mappedPos + node.nodeSize, replacement);
+                    }
                 }
 
                 function handleLayoutDrop(view) {
@@ -1931,80 +1969,101 @@
                         return false;
                     }
                     const { state } = view;
+                    const { schema } = state;
+                    const columnsType = schema.nodes.columns;
+                    const columnType = schema.nodes.column;
+                    if (!columnsType || !columnType) {
+                        return false;
+                    }
                     const maxColumns = extension.options.maxColumns;
-                    let tr = state.tr;
-                    const info = collectLayoutInfo(state.doc);
-                    const sourceEntry = info.blockNodes.get(dragState.sourceId);
-                    const targetEntry = info.blockNodes.get(dragState.targetId);
+                    const contextBefore = collectBlockContext(state.doc, schema);
+                    const sourceEntry = contextBefore.get(dragState.sourceId);
+                    const targetEntry = contextBefore.get(dragState.targetId);
                     if (!sourceEntry || !targetEntry || sourceEntry.pos === targetEntry.pos) {
                         return false;
                     }
-                    const sourceNode = sourceEntry.node;
-                    const oldGroupId = sourceNode.attrs.layoutGroup;
-                    tr.delete(sourceEntry.pos, sourceEntry.pos + sourceNode.nodeSize);
-                    const mappedTargetPos = tr.mapping.map(targetEntry.pos, dragState.intent === 'left' ? -1 : 1);
-                    const targetAfterDeletion = tr.doc.nodeAt(mappedTargetPos);
-                    let insertPos = mappedTargetPos;
-                    if (dragState.intent === 'right' && targetAfterDeletion) {
-                        insertPos = mappedTargetPos + targetAfterDeletion.nodeSize;
+                    if (targetEntry.columns && targetEntry.columns.node.childCount >= maxColumns) {
+                        const sameContainer = sourceEntry.columns && sourceEntry.columns.pos === targetEntry.columns.pos;
+                        if (!sameContainer) {
+                            return false;
+                        }
                     }
-                    const cleanAttrs = {
-                        ...sourceNode.attrs,
-                        layoutGroup: null,
-                        layoutColumns: null,
-                        layoutIndex: null
-                    };
-                    const nodeToInsert = sourceNode.type.create(cleanAttrs, sourceNode.content, sourceNode.marks);
-                    tr.insert(insertPos, Fragment.from(nodeToInsert));
-                    const postInsertInfo = collectLayoutInfo(tr.doc);
-                    const targetAfter = postInsertInfo.blockNodes.get(dragState.targetId);
-                    const sourceAfter = postInsertInfo.blockNodes.get(dragState.sourceId);
-                    if (!targetAfter || !sourceAfter) {
+                    const sourceColumnsPosBefore = sourceEntry.columns ? sourceEntry.columns.pos : null;
+                    const sourceColumnIndexBefore = sourceEntry.columns && sourceEntry.column
+                        ? (() => {
+                            let posCursor = sourceEntry.columns.pos + 1;
+                            for (let index = 0; index < sourceEntry.columns.node.childCount; index += 1) {
+                                if (posCursor === sourceEntry.column.pos) {
+                                    return index;
+                                }
+                                posCursor += sourceEntry.columns.node.child(index).nodeSize;
+                            }
+                            return null;
+                        })()
+                        : null;
+                    let tr = state.tr;
+                    const sourceRangeStart = sourceEntry.column ? sourceEntry.column.pos : sourceEntry.pos;
+                    const sourceRangeEnd = sourceEntry.column
+                        ? sourceEntry.column.pos + sourceEntry.column.node.nodeSize
+                        : sourceEntry.pos + sourceEntry.node.nodeSize;
+                    const sourceContent = sourceEntry.column
+                        ? sourceEntry.column.node.content
+                        : Fragment.from(sourceEntry.node);
+                    tr.delete(sourceRangeStart, sourceRangeEnd);
+                    const contextAfterRemoval = collectBlockContext(tr.doc, schema);
+                    const targetAfter = contextAfterRemoval.get(dragState.targetId);
+                    if (!targetAfter) {
                         return false;
                     }
-                    let groupId = targetAfter.node.attrs.layoutGroup;
-                    let baseMembers;
-                    if (groupId) {
-                        baseMembers = postInsertInfo.groups.get(groupId) || [];
-                        baseMembers = baseMembers.filter(member => member.node.attrs.blockId !== dragState.sourceId);
-                    } else {
-                        groupId = extension.options.generateGroupId();
-                        baseMembers = [targetAfter];
-                    }
-                    const targetIndex = baseMembers.findIndex(member => member.node.attrs.blockId === dragState.targetId);
-                    if (targetIndex === -1) {
-                        baseMembers.push(targetAfter);
-                    }
-                    const insertIndex = dragState.intent === 'left'
-                        ? Math.max(targetIndex, 0)
-                        : Math.max(targetIndex, 0) + 1;
-                    baseMembers.splice(insertIndex, 0, sourceAfter);
-                    const desiredMembers = baseMembers.filter((member, index, array) => {
-                        const blockId = member.node.attrs.blockId;
-                        return blockId && array.findIndex(item => item.node.attrs.blockId === blockId) === index;
-                    });
-                    if (desiredMembers.length > maxColumns) {
-                        cleanupGroups(tr, maxColumns);
-                        view.dispatch(tr);
-                        return true;
-                    }
-                    desiredMembers.forEach(member => {
-                        const node = tr.doc.nodeAt(member.pos);
-                        if (!node) {
-                            return;
+                    const sameColumns = sourceColumnsPosBefore != null
+                        && targetAfter.columns
+                        && sourceColumnsPosBefore === targetAfter.columns.pos;
+                    if (targetAfter.columns) {
+                        const columnsPos = targetAfter.columns.pos;
+                        const columnsNode = tr.doc.nodeAt(columnsPos);
+                        if (!columnsNode || columnsNode.type !== columnsType) {
+                            return false;
                         }
-                        const attrs = {
-                            ...node.attrs,
-                            layoutGroup: groupId
-                        };
-                        tr.setNodeMarkup(member.pos, node.type, attrs, node.marks);
-                    });
-                    cleanupGroups(tr, maxColumns);
-                    if (oldGroupId && oldGroupId !== groupId) {
-                        const afterCleanupInfo = collectLayoutInfo(tr.doc);
-                        const oldMembers = afterCleanupInfo.groups.get(oldGroupId) || [];
-                        applyGroupAttributes(tr, oldMembers, oldGroupId, maxColumns);
+                        const columnPos = targetAfter.column ? targetAfter.column.pos : null;
+                        let targetIndex = 0;
+                        if (columnPos != null) {
+                            let posCursor = columnsPos + 1;
+                            for (let index = 0; index < columnsNode.childCount; index += 1) {
+                                if (posCursor === columnPos) {
+                                    targetIndex = index;
+                                    break;
+                                }
+                                posCursor += columnsNode.child(index).nodeSize;
+                            }
+                        }
+                        let insertIndex = dragState.intent === 'left' ? targetIndex : targetIndex + 1;
+                        if (sameColumns && sourceColumnIndexBefore != null && sourceColumnIndexBefore < insertIndex) {
+                            insertIndex -= 1;
+                        }
+                        insertIndex = Math.max(0, Math.min(insertIndex, columnsNode.childCount));
+                        const insertPos = getChildInsertPos(columnsPos, columnsNode, insertIndex);
+                        const newColumn = columnType.create({}, sourceContent);
+                        tr.insert(insertPos, Fragment.from(newColumn));
+                    } else {
+                        const targetPos = targetAfter.pos;
+                        const targetNode = tr.doc.nodeAt(targetPos);
+                        if (!targetNode || !targetNode.attrs?.blockId) {
+                            return false;
+                        }
+                        const targetFragment = Fragment.from(targetNode);
+                        tr.delete(targetPos, targetPos + targetNode.nodeSize);
+                        const columnsChildren = [];
+                        if (dragState.intent === 'left') {
+                            columnsChildren.push(columnType.create({}, sourceContent));
+                            columnsChildren.push(columnType.create({}, targetFragment));
+                        } else {
+                            columnsChildren.push(columnType.create({}, targetFragment));
+                            columnsChildren.push(columnType.create({}, sourceContent));
+                        }
+                        const columnsNode = columnsType.create({}, columnsChildren);
+                        tr.insert(targetPos, Fragment.from(columnsNode));
                     }
+                    cleanupColumns(tr, columnsType);
                     view.dispatch(tr);
                     return true;
                 }
@@ -2049,6 +2108,16 @@
                                         return false;
                                     }
                                     dragState.sourceId = block.getAttribute('data-block-id');
+                                    block.setAttribute('draggable', 'true');
+                                    if (event.dataTransfer) {
+                                        event.dataTransfer.effectAllowed = 'move';
+                                        const previewText = block.textContent ? block.textContent.trim().slice(0, 120) : '';
+                                        try {
+                                            event.dataTransfer.setData('text/plain', previewText);
+                                        } catch (error) {
+                                            /* ignore unsupported dataTransfer operations */
+                                        }
+                                    }
                                     dragState.intent = null;
                                     dragState.targetId = null;
                                     clearHighlights();
@@ -2101,7 +2170,14 @@
                                     }
                                     return false;
                                 },
-                                dragleave() {
+                                dragleave(view, event) {
+                                    const relatedTarget = event.relatedTarget;
+                                    if (relatedTarget instanceof HTMLElement) {
+                                        const nextBlock = relatedTarget.closest('[data-block-id]');
+                                        if (nextBlock === dragState.lastTarget) {
+                                            return false;
+                                        }
+                                    }
                                     clearHighlights();
                                     dragState.intent = null;
                                     dragState.targetId = null;
@@ -4311,6 +4387,8 @@
                     TableRow,
                     TableHeader,
                     TableCell,
+                    Columns,
+                    Column,
                     LayoutSystem,
                     ResizableImage.configure({
                         inline: false,
