@@ -5,8 +5,8 @@ const AUTH_CONFIG = {
   LOGIN_ID_COLUMN: 1,
   USERNAME_COLUMN: 2,
   EMAIL_COLUMN: 3,
-  UPDATED_AT_COLUMN: 6,
-  AUTHORITY_COLUMN: 7,
+  AUTHORITY_COLUMN: 6,
+  UPDATED_AT_COLUMN: 7,
   ALLOWED_UPDATE_AUTHORITY_VALUES: [-1, 1, 2, 3],
   ALLOWED_ORIGINS: [
     'https://brahmoon.github.io',
@@ -14,6 +14,26 @@ const AUTH_CONFIG = {
     'http://localhost:4173'
   ],
   DEFAULT_REQUIRED_LOGIN_ID: 'admin'
+};
+
+const PLUGIN_CONFIG = {
+  SHEET_NAME: 'Plugins',
+  TOOLBAR_RANGE: 'A1',
+  TOOLBAR_KEYS: [
+    'bold',
+    'italic',
+    'link',
+    'pageLink',
+    'heading1',
+    'heading2',
+    'heading3',
+    'bulletList',
+    'orderedList',
+    'blockquote',
+    'codeBlock',
+    'table',
+    'driveImage'
+  ]
 };
 
 function doGet(e) {
@@ -50,6 +70,10 @@ function doPost(e) {
       result = verifyAdminAccess(sheet, request);
     } else if (action === 'updateAuthority') {
       result = updateAuthority(sheet, request);
+    } else if (action === 'getToolbarPlugins') {
+      result = getToolbarPlugins();
+    } else if (action === 'updateToolbarPlugins') {
+      result = updateToolbarPlugins(sheet, request);
     } else {
       result = {
         success: false,
@@ -201,6 +225,38 @@ function parseAuthorityValue(value) {
   return null;
 }
 
+function getToolbarPlugins() {
+  const states = loadToolbarStates();
+  return {
+    success: true,
+    message: 'Toolbar plugin states retrieved.',
+    toolbarConfig: buildToolbarConfigResponse(states)
+  };
+}
+
+function updateToolbarPlugins(sheet, request) {
+  const verification = verifyAdminAccess(sheet, request);
+  if (!verification.success) {
+    return verification;
+  }
+
+  const states = extractToolbarStates(request);
+  if (!states) {
+    return {
+      success: false,
+      message: '有効にするツールの情報が正しく送信されていません。'
+    };
+  }
+
+  const savedStates = saveToolbarStates(states);
+
+  return {
+    success: true,
+    message: 'TipTapツールバーの設定を保存しました。',
+    toolbarConfig: buildToolbarConfigResponse(savedStates)
+  };
+}
+
 function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
   const authorityColumn = AUTH_CONFIG.AUTHORITY_COLUMN;
   if (!authorityColumn) {
@@ -313,7 +369,10 @@ function parseRequest(e) {
     requiredLoginId: data.requiredLoginId || data.expectedLoginId || '',
     allowedLoginIds: Array.isArray(data.allowedLoginIds) ? data.allowedLoginIds : [],
     targetLoginId: data.targetLoginId || data.memberLoginId || '',
-    authority: data.authority !== undefined ? data.authority : data.role
+    authority: data.authority !== undefined ? data.authority : data.role,
+    toolbarStates: data.toolbarStates,
+    toolbarKeys: data.toolbarKeys,
+    toolbarConfig: data.toolbarConfig
   };
 }
 
@@ -352,6 +411,20 @@ function getSpreadsheet() {
 function getAccountsSheet() {
   const spreadsheet = getSpreadsheet();
   return spreadsheet ? spreadsheet.getSheetByName(AUTH_CONFIG.SHEET_NAME) : null;
+}
+
+function getPluginsSheet(createIfMissing) {
+  const spreadsheet = getSpreadsheet();
+  if (!spreadsheet) {
+    return null;
+  }
+
+  let sheet = spreadsheet.getSheetByName(PLUGIN_CONFIG.SHEET_NAME);
+  if (!sheet && createIfMissing) {
+    sheet = spreadsheet.insertSheet(PLUGIN_CONFIG.SHEET_NAME);
+  }
+
+  return sheet;
 }
 
 function normalizeId(value) {
@@ -425,7 +498,8 @@ function buildResponse(result, origin) {
     'googleAccountEmail',
     'targetLoginId',
     'updatedAuthority',
-    'updatedAt'
+    'updatedAt',
+    'toolbarConfig'
   ];
 
   optionalFields.forEach(function(field) {
@@ -500,4 +574,129 @@ function getRequestOrigin(e) {
   }
 
   return e.headers.origin || e.headers.Origin || '';
+}
+
+function loadToolbarStates() {
+  const sheet = getPluginsSheet(false);
+  const defaultStates = createDefaultToolbarStates();
+  if (!sheet) {
+    return defaultStates;
+  }
+
+  try {
+    const range = sheet.getRange(PLUGIN_CONFIG.TOOLBAR_RANGE);
+    const raw = range ? String(range.getValue() || '') : '';
+    if (!raw) {
+      return defaultStates;
+    }
+
+    const tokens = raw.split(',');
+    const normalized = [];
+    for (let i = 0; i < PLUGIN_CONFIG.TOOLBAR_KEYS.length; i++) {
+      normalized.push(tokens[i] && tokens[i].trim() === '0' ? 0 : 1);
+    }
+    return normalized;
+  } catch (error) {
+    return defaultStates;
+  }
+}
+
+function saveToolbarStates(states) {
+  const sheet = getPluginsSheet(true);
+  if (!sheet) {
+    throw new Error('プラグイン設定シートを開けませんでした。');
+  }
+
+  const normalized = [];
+  for (let i = 0; i < PLUGIN_CONFIG.TOOLBAR_KEYS.length; i++) {
+    const value = states[i] === 0 ? 0 : 1;
+    normalized.push(value);
+  }
+
+  const range = sheet.getRange(PLUGIN_CONFIG.TOOLBAR_RANGE);
+  range.setValue(normalized.join(','));
+
+  return normalized;
+}
+
+function extractToolbarStates(request) {
+  if (!request) {
+    return null;
+  }
+
+  const keys = Array.isArray(request.toolbarKeys) && request.toolbarKeys.length
+    ? request.toolbarKeys
+    : PLUGIN_CONFIG.TOOLBAR_KEYS;
+
+  const rawStates = request.toolbarStates;
+  let states = null;
+
+  if (Array.isArray(rawStates)) {
+    states = rawStates.map(function(value) {
+      return parseToolbarStateValue(value);
+    });
+  } else if (typeof rawStates === 'string') {
+    states = rawStates.split(',').map(function(value) {
+      return parseToolbarStateValue(value);
+    });
+  } else if (request.toolbarConfig && typeof request.toolbarConfig === 'object') {
+    const config = request.toolbarConfig;
+    states = keys.map(function(key) {
+      return parseToolbarStateValue(config[key]);
+    });
+  }
+
+  if (!states) {
+    return null;
+  }
+
+  const normalized = [];
+  const defaultStates = createDefaultToolbarStates();
+
+  for (let i = 0; i < PLUGIN_CONFIG.TOOLBAR_KEYS.length; i++) {
+    const keyIndex = keys.indexOf(PLUGIN_CONFIG.TOOLBAR_KEYS[i]);
+    const fallback = defaultStates[i];
+    if (keyIndex === -1) {
+      normalized.push(fallback);
+    } else {
+      const value = states[keyIndex];
+      normalized.push(value === 0 ? 0 : 1);
+    }
+  }
+
+  return normalized;
+}
+
+function parseToolbarStateValue(value) {
+  if (value === 0 || value === '0' || value === false) {
+    return 0;
+  }
+  if (value === 1 || value === '1' || value === true) {
+    return 1;
+  }
+  return undefined;
+}
+
+function createDefaultToolbarStates() {
+  return PLUGIN_CONFIG.TOOLBAR_KEYS.map(function() {
+    return 1;
+  });
+}
+
+function buildToolbarConfigResponse(states) {
+  const config = {};
+  const safeStates = Array.isArray(states) && states.length
+    ? states
+    : createDefaultToolbarStates();
+
+  for (let i = 0; i < PLUGIN_CONFIG.TOOLBAR_KEYS.length; i++) {
+    const key = PLUGIN_CONFIG.TOOLBAR_KEYS[i];
+    const value = safeStates[i] === 0 ? false : true;
+    config[key] = value;
+  }
+
+  return {
+    keys: PLUGIN_CONFIG.TOOLBAR_KEYS.slice(),
+    states: config
+  };
 }
