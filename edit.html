@@ -1262,8 +1262,8 @@
         };
 
         const buildLoginUrl = (pageId) => {
-            const url = new URL('./login2.html', window.location.href);
-            url.searchParams.set('redirect', 'tiptap-login2.html');
+            const url = new URL('./login.html', window.location.href);
+            url.searchParams.set('redirect', 'edit.html');
             const targetPage = (pageId || '').trim();
             if (targetPage) {
                 url.searchParams.set('page', targetPage);
