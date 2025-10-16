@@ -1330,6 +1330,27 @@
             return parseAuthority(loginState?.user?.authority);
         }
 
+        function getCurrentUserLoginId() {
+            const loginState = getStoredLoginState();
+            const rawLoginId = loginState?.user?.loginId;
+            return typeof rawLoginId === 'string' ? rawLoginId.trim() : '';
+        }
+
+        function getCurrentUserEmail() {
+            const loginState = getStoredLoginState();
+            const rawEmail = loginState?.user?.email;
+            return typeof rawEmail === 'string' ? rawEmail.trim() : '';
+        }
+
+        function getCurrentUserGoogleEmail() {
+            const loginState = getStoredLoginState();
+            const rawGoogleEmail = loginState?.user?.googleAccountEmail;
+            if (typeof rawGoogleEmail === 'string' && rawGoogleEmail.trim()) {
+                return rawGoogleEmail.trim();
+            }
+            return getCurrentUserEmail();
+        }
+
         function setUserSettingsMessage(message, type = '') {
             if (!userSettingsMessage) {
                 return;
@@ -3930,7 +3951,10 @@
                         buttonClass: 'btn',
                         debug: false,
                         permissionsEndpoint: DRIVE_IMAGE_PERMISSION_ENDPOINT,
-                        userAuthority: getCurrentUserAuthority()
+                        userAuthority: getCurrentUserAuthority(),
+                        userLoginId: getCurrentUserLoginId(),
+                        userEmail: getCurrentUserEmail(),
+                        userGoogleEmail: getCurrentUserGoogleEmail()
                     }),
                     YouTubeEmbed
                 ],
