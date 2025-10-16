@@ -172,7 +172,7 @@
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com',
             LOGIN_STORAGE_KEY: 'wikiLoginState',
             DEFAULT_REDIRECT_PATH: 'edit.html',
-            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbw4DPAmRq9f-zikBUH4MLWxfhVPmMI1dJpmMWeiDWkKxQwPKLPZa1wp4pZk3eav2zJ4/exec'
+            LOGIN_APPS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbw4DPAmRq9f-zikBUH4MLWxfhVPmMI1dJpmMWeiDWkKxQwPKLPZa1wp4pZk3eav2zJ4/exec'
         };
 
         const state = {
@@ -200,7 +200,7 @@
         const APP_SCRIPT_REQUEST_TIMEOUT = 20000;
 
         const callAppsScript = async (payload) => {
-            if (!CONFIG.APPS_SCRIPT_URL || CONFIG.APPS_SCRIPT_URL.includes('YOUR_DEPLOYMENT_ID')) {
+            if (!CONFIG.LOGIN_APPS_ENDPOINT || CONFIG.LOGIN_APPS_ENDPOINT.includes('YOUR_DEPLOYMENT_ID')) {
                 throw new Error('Apps ScriptのURLが設定されていません。管理者にお問い合わせください。');
             }
 
@@ -208,7 +208,7 @@
             const timer = window.setTimeout(() => controller.abort(), APP_SCRIPT_REQUEST_TIMEOUT);
 
             try {
-                const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+                const response = await fetch(CONFIG.LOGIN_APPS_ENDPOINT, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
