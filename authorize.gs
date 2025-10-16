@@ -427,26 +427,6 @@ function resolveDriveImageRoleFromRequest(request) {
   return null;
 }
 
-function resolveDriveImageAdminStatus(request) {
-  try {
-    const accountsSheet = getAccountsSheet();
-    if (!accountsSheet) {
-      return { isAdmin: false };
-    }
-    const verification = verifyAdminAccess(accountsSheet, request);
-    if (verification && verification.success) {
-      return {
-        isAdmin: true,
-        loginId: verification.loginId || '',
-        email: verification.email || verification.googleAccountEmail || ''
-      };
-    }
-  } catch (error) {
-    Logger.log('resolveDriveImageAdminStatus error: %s', error);
-  }
-  return { isAdmin: false };
-}
-
 function extractImageAuthoritiesPayload(authorities) {
   if (!authorities || typeof authorities !== 'object') {
     return {};
@@ -650,40 +630,12 @@ function updateDriveImageAuthorities(sheet, request) {
 }
 
 function getDriveImagePermissions(request) {
-  const adminStatus = resolveDriveImageAdminStatus(request);
-  if (adminStatus.isAdmin) {
-    const authorities = readDriveImageAuthorities();
-    const imageAuthorities = authorities.Image || {};
-    const permissions = {};
-
-    Object.keys(imageAuthorities).forEach((folderKey) => {
-      const normalizedKey = normalizeDriveImageFolderKey(folderKey);
-      if (!normalizedKey) {
-        return;
-      }
-      permissions[normalizedKey] = { upload: true, delete: true };
-    });
-
-    permissions[DRIVE_IMAGE_ROOT_KEY] = { upload: true, delete: true };
-
-    return {
-      success: true,
-      message: '管理者はすべてのフォルダでアップロード・削除が可能です。',
-      permissions,
-      isAdmin: true,
-      loginId: adminStatus.loginId || '',
-      email: adminStatus.email || ''
-    };
-  }
-
   const role = resolveDriveImageRoleFromRequest(request);
   if (!role) {
     return {
       success: true,
       message: '権限を判定できませんでした。',
-      permissions: {},
-      isAdmin: false,
-      resolvedRole: ''
+      permissions: {}
     };
   }
 
@@ -715,9 +667,7 @@ function getDriveImagePermissions(request) {
   return {
     success: true,
     message: 'Drive画像の権限を返却しました。',
-    permissions,
-    isAdmin: false,
-    resolvedRole: role
+    permissions
   };
 }
 

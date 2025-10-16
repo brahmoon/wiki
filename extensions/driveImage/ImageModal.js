@@ -1002,14 +1002,11 @@ export class ImageModal {
   getFolderPermission(folderKey) {
     const normalizedKey = this.handler.getFolderKey(folderKey || this.handler.ROOT_FOLDER_KEY);
     const permission = this.permissions?.[normalizedKey];
-    if (this.handler.hasAdminPrivileges(this.options)) {
-      return { upload: true, delete: true };
-    }
     if (permission) {
       return permission;
     }
     const role = this.handler.resolveRole(this.options);
-    if (role === 'Moderator' || role === 'Administrator') {
+    if (role === 'Moderator') {
       return { upload: true, delete: true };
     }
     return { upload: false, delete: false };

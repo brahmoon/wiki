@@ -6,16 +6,6 @@
 export class DriveImageHandler {
   static ROOT_FOLDER_KEY = '__root__';
   static DEFAULT_PERMISSION_CACHE_TTL = 5 * 60 * 1000;
-  static normalizeIdentifier(value) {
-    if (value === null || value === undefined) {
-      return '';
-    }
-    return value.toString().trim().toLowerCase();
-  }
-
-  static hasAdminPrivileges(options) {
-    return Boolean(options && options.driveImageAdmin);
-  }
 
   /**
    * 画像ファイルをGoogle Driveにアップロード（CORS対応版）
@@ -627,9 +617,6 @@ export class DriveImageHandler {
     if (!options) {
       return null;
     }
-    if (this.hasAdminPrivileges(options)) {
-      return 'Administrator';
-    }
     if (options.userRole) {
       const role = options.userRole.toString().trim();
       if (role) {
@@ -650,10 +637,6 @@ export class DriveImageHandler {
   }
 
   static getPermissionCacheKey(options) {
-    const normalizedLoginId = this.normalizeIdentifier(options?.userLoginId);
-    if (normalizedLoginId) {
-      return normalizedLoginId;
-    }
     const role = this.resolveRole(options);
     return role ? role.toLowerCase() : null;
   }
@@ -664,9 +647,6 @@ export class DriveImageHandler {
       return {};
     }
     const cached = this.permissionCache.get(cacheKey);
-    if (cached && options) {
-      options.driveImageAdmin = Boolean(cached.isAdmin);
-    }
     return cached ? cached.data : {};
   }
 
@@ -689,28 +669,12 @@ export class DriveImageHandler {
   }
 
   static async fetchPermissions(options, role) {
-    const endpoint = options?.permissionsEndpoint;
-    if (!endpoint) {
-      if (options) {
-        options.driveImageAdmin = false;
-      }
+    if (!options?.permissionsEndpoint || !role) {
       return {};
-    }
-
-    const normalizedLoginId = this.normalizeIdentifier(options?.userLoginId);
-    if (!role && !normalizedLoginId) {
-      if (options) {
-        options.driveImageAdmin = false;
-      }
-      return {};
-    }
-
-    if (options) {
-      options.driveImageAdmin = false;
     }
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch(options.permissionsEndpoint, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
@@ -719,11 +683,8 @@ export class DriveImageHandler {
         },
         body: JSON.stringify({
           action: 'getDriveImagePermissions',
-          role: role || '',
-          authority: options.userAuthority ?? null,
-          loginId: options?.userLoginId || '',
-          email: options?.userEmail || '',
-          googleEmail: options?.userGoogleEmail || options?.userEmail || ''
+          role,
+          authority: options.userAuthority ?? null
         })
       });
 
@@ -734,18 +695,12 @@ export class DriveImageHandler {
 
       const result = await response.json().catch(() => null);
       if (result && result.success) {
-        if (options) {
-          options.driveImageAdmin = Boolean(result.isAdmin);
-        }
         return this.normalizePermissions(result.permissions);
       }
     } catch (error) {
       console.error('Failed to fetch drive image permissions:', error);
     }
 
-    if (options) {
-      options.driveImageAdmin = false;
-    }
     return {};
   }
 
@@ -758,28 +713,17 @@ export class DriveImageHandler {
     const cached = this.permissionCache.get(cacheKey);
     const ttl = options?.permissionCacheTimeout || this.DEFAULT_PERMISSION_CACHE_TTL;
     if (cached && Date.now() - cached.timestamp < ttl) {
-      if (options) {
-        options.driveImageAdmin = Boolean(cached.isAdmin);
-      }
       return cached.data;
     }
 
     const role = this.resolveRole(options);
-    const normalizedLoginId = this.normalizeIdentifier(options?.userLoginId);
-    if (!role && !normalizedLoginId) {
-      this.permissionCache.set(cacheKey, { data: {}, timestamp: Date.now(), isAdmin: false });
-      if (options) {
-        options.driveImageAdmin = false;
-      }
+    if (!role) {
+      this.permissionCache.set(cacheKey, { data: {}, timestamp: Date.now() });
       return {};
     }
 
     const permissions = await this.fetchPermissions(options, role);
-    this.permissionCache.set(cacheKey, {
-      data: permissions,
-      timestamp: Date.now(),
-      isAdmin: Boolean(options?.driveImageAdmin)
-    });
+    this.permissionCache.set(cacheKey, { data: permissions, timestamp: Date.now() });
     return permissions;
   }
 
