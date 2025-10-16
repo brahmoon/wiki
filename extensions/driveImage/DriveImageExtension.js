@@ -14,6 +14,11 @@ export const DriveImageExtension = Extension.create({
       maxConcurrentUploads: 2, // CORS対応のため2に変更
       galleryTimeout: 15000,
       galleryCacheTimeout: 0, // キャッシュを無効化（毎回リフレッシュ）
+      permissionsEndpoint: '',
+      permissionCacheTimeout: DriveImageHandler.DEFAULT_PERMISSION_CACHE_TTL,
+      userAuthority: null,
+      userRole: '',
+      defaultFolderName: '',
       recaptchaSiteKey: null,
       addToToolbar: true,
       toolbarButtonHTML: '🖼️',

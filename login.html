@@ -355,13 +355,17 @@
             const languageValue = typeof result.language === 'string' && result.language.trim()
                 ? result.language.trim().toLowerCase()
                 : '';
+            const authorityValue = typeof result.authority !== 'undefined' && result.authority !== null
+                ? result.authority
+                : '';
 
             return {
                 loginId: result.loginId || user.email,
                 username: result.username || user.name,
                 email: result.email || user.email,
                 kingdom: kingdomValue,
-                language: languageValue
+                language: languageValue,
+                authority: authorityValue
             };
         };
 
@@ -401,7 +405,8 @@
                     loginId: verified.loginId,
                     email: verified.email,
                     kingdom: verified.kingdom,
-                    language: verified.language
+                    language: verified.language,
+                    authority: verified.authority
                 };
                 saveLoginState(tokenResponse, verifiedUser);
                 const displayName = verifiedUser.username || verifiedUser.name;

@@ -36,6 +36,22 @@ const PLUGIN_CONFIG = {
   ]
 };
 
+const AUTHORITIES_CONFIG = {
+  SHEET_NAME: 'Authorities',
+  HEADER_ROW_INDEX: 1,
+  COLUMNS: {
+    type: 1,
+    folderKey: 2,
+    role: 3,
+    canUpload: 4,
+    canDelete: 5,
+    updatedAt: 6
+  }
+};
+
+const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator'];
+const DRIVE_IMAGE_ROOT_KEY = '__root__';
+
 function doGet(e) {
   return createJsonOutput(
     {
@@ -74,6 +90,12 @@ function doPost(e) {
       result = getToolbarPlugins();
     } else if (action === 'updateToolbarPlugins') {
       result = updateToolbarPlugins(sheet, request);
+    } else if (action === 'getDriveImageAuthorities') {
+      result = getDriveImageAuthorities(sheet, request);
+    } else if (action === 'updateDriveImageAuthorities') {
+      result = updateDriveImageAuthorities(sheet, request);
+    } else if (action === 'getDriveImagePermissions') {
+      result = getDriveImagePermissions(request);
     } else {
       result = {
         success: false,
@@ -257,6 +279,398 @@ function updateToolbarPlugins(sheet, request) {
   };
 }
 
+function getAuthoritiesSheet(createIfMissing) {
+  const spreadsheet = getSpreadsheet();
+  if (!spreadsheet) {
+    return null;
+  }
+
+  let sheet = spreadsheet.getSheetByName(AUTHORITIES_CONFIG.SHEET_NAME);
+  if (!sheet && createIfMissing) {
+    sheet = spreadsheet.insertSheet(AUTHORITIES_CONFIG.SHEET_NAME);
+  }
+
+  if (sheet) {
+    ensureAuthoritiesHeader(sheet);
+  }
+
+  return sheet;
+}
+
+function ensureAuthoritiesHeader(sheet) {
+  if (!sheet) {
+    return;
+  }
+
+  const headerRow = AUTHORITIES_CONFIG.HEADER_ROW_INDEX || 1;
+  const columns = AUTHORITIES_CONFIG.COLUMNS || {};
+  const requiredColumns = Object.keys(columns).reduce((max, key) => {
+    const index = Number(columns[key]);
+    return Number.isFinite(index) && index > max ? index : max;
+  }, 0);
+
+  if (requiredColumns <= 0) {
+    return;
+  }
+
+  const currentLastColumn = sheet.getLastColumn();
+  if (currentLastColumn < requiredColumns) {
+    const missing = requiredColumns - currentLastColumn;
+    sheet.insertColumnsAfter(currentLastColumn || 1, missing);
+  }
+
+  const headers = new Array(requiredColumns).fill('');
+  headers[(columns.type || 1) - 1] = 'Type';
+  headers[(columns.folderKey || 2) - 1] = 'Folder Key';
+  headers[(columns.role || 3) - 1] = 'Role';
+  headers[(columns.canUpload || 4) - 1] = 'Can Upload';
+  headers[(columns.canDelete || 5) - 1] = 'Can Delete';
+  headers[(columns.updatedAt || 6) - 1] = 'Updated At';
+
+  sheet.getRange(headerRow, 1, 1, requiredColumns).setValues([headers]);
+}
+
+function normalizeBooleanCell(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  if (value instanceof Date) {
+    return true;
+  }
+
+  const normalized = value.toString().trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on';
+}
+
+function normalizeDriveImageFolderKey(value) {
+  const text = value === null || value === undefined ? '' : value;
+  const trimmed = text.toString().trim();
+  if (!trimmed || trimmed === DRIVE_IMAGE_ROOT_KEY) {
+    return DRIVE_IMAGE_ROOT_KEY;
+  }
+  return trimmed;
+}
+
+function resolveDriveImageRole(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    if (value >= 3) {
+      return 'Moderator';
+    }
+    if (value >= 2) {
+      return 'Editor';
+    }
+    return null;
+  }
+
+  const stringValue = value.toString().trim();
+  if (!stringValue) {
+    return null;
+  }
+
+  const lower = stringValue.toLowerCase();
+  if (lower === 'moderator') {
+    return 'Moderator';
+  }
+  if (lower === 'editor') {
+    return 'Editor';
+  }
+
+  const numeric = Number(stringValue);
+  if (Number.isFinite(numeric)) {
+    return resolveDriveImageRole(numeric);
+  }
+
+  return null;
+}
+
+function resolveDriveImageRoleFromRequest(request) {
+  if (!request || typeof request !== 'object') {
+    return null;
+  }
+
+  const directRole = resolveDriveImageRole(request.role);
+  if (directRole) {
+    return directRole;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(request, 'authorityLevel')) {
+    const roleFromLevel = resolveDriveImageRole(request.authorityLevel);
+    if (roleFromLevel) {
+      return roleFromLevel;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(request, 'authority')) {
+    const roleFromAuthority = resolveDriveImageRole(request.authority);
+    if (roleFromAuthority) {
+      return roleFromAuthority;
+    }
+  }
+
+  return null;
+}
+
+function extractImageAuthoritiesPayload(authorities) {
+  if (!authorities || typeof authorities !== 'object') {
+    return {};
+  }
+
+  const candidates = [authorities.Image, authorities.image];
+  for (let i = 0; i < candidates.length; i++) {
+    const value = candidates[i];
+    if (value && typeof value === 'object') {
+      return value;
+    }
+  }
+
+  return {};
+}
+
+function readDriveImageAuthorities() {
+  const sheet = getAuthoritiesSheet(false);
+  const result = { Image: {} };
+
+  if (!sheet) {
+    return result;
+  }
+
+  const headerRow = AUTHORITIES_CONFIG.HEADER_ROW_INDEX || 1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= headerRow) {
+    return result;
+  }
+
+  const columns = AUTHORITIES_CONFIG.COLUMNS || {};
+  const requiredColumns = Object.keys(columns).reduce((max, key) => {
+    const index = Number(columns[key]);
+    return Number.isFinite(index) && index > max ? index : max;
+  }, 0);
+  const lastColumn = Math.max(sheet.getLastColumn(), requiredColumns);
+  const rowCount = lastRow - headerRow;
+
+  if (rowCount <= 0 || lastColumn <= 0) {
+    return result;
+  }
+
+  const range = sheet.getRange(headerRow + 1, 1, rowCount, lastColumn);
+  const values = range.getValues();
+
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+    const typeCell = row[(columns.type || 1) - 1];
+    const type = typeCell ? typeCell.toString().trim().toLowerCase() : '';
+    if (type !== 'image') {
+      continue;
+    }
+
+    const folderKey = normalizeDriveImageFolderKey(row[(columns.folderKey || 2) - 1]);
+    const role = resolveDriveImageRole(row[(columns.role || 3) - 1]);
+    if (!role) {
+      continue;
+    }
+
+    if (!result.Image[folderKey]) {
+      result.Image[folderKey] = {};
+    }
+
+    result.Image[folderKey][role] = {
+      upload: normalizeBooleanCell(row[(columns.canUpload || 4) - 1]),
+      delete: normalizeBooleanCell(row[(columns.canDelete || 5) - 1])
+    };
+  }
+
+  return result;
+}
+
+function writeDriveImageAuthorities(authorities) {
+  const sheet = getAuthoritiesSheet(true);
+  if (!sheet) {
+    throw new Error('権限シートを取得できませんでした。');
+  }
+
+  const columns = AUTHORITIES_CONFIG.COLUMNS || {};
+  const headerRow = AUTHORITIES_CONFIG.HEADER_ROW_INDEX || 1;
+  const requiredColumns = Object.keys(columns).reduce((max, key) => {
+    const index = Number(columns[key]);
+    return Number.isFinite(index) && index > max ? index : max;
+  }, 0);
+
+  const lastColumn = Math.max(sheet.getLastColumn(), requiredColumns);
+  const startRow = headerRow + 1;
+  const existingRowCount = Math.max(0, sheet.getLastRow() - headerRow);
+
+  const imageAuthorities = extractImageAuthoritiesPayload(authorities);
+  const timestamp = new Date();
+  const rows = [];
+
+  Object.keys(imageAuthorities).forEach((key) => {
+    const folderEntry = imageAuthorities[key];
+    if (!folderEntry || typeof folderEntry !== 'object') {
+      return;
+    }
+
+    const folderKey = normalizeDriveImageFolderKey(key);
+
+    Object.keys(folderEntry).forEach((roleKey) => {
+      const role = resolveDriveImageRole(roleKey);
+      if (!role) {
+        return;
+      }
+
+      const permissions = folderEntry[roleKey] || {};
+      const row = new Array(lastColumn).fill('');
+      row[(columns.type || 1) - 1] = 'Image';
+      row[(columns.folderKey || 2) - 1] = folderKey;
+      row[(columns.role || 3) - 1] = role;
+      row[(columns.canUpload || 4) - 1] = Boolean(permissions.upload);
+      row[(columns.canDelete || 5) - 1] = Boolean(permissions.delete);
+      row[(columns.updatedAt || 6) - 1] = timestamp;
+      rows.push(row);
+    });
+  });
+
+  rows.sort((a, b) => {
+    const folderA = (a[(columns.folderKey || 2) - 1] || '').toString();
+    const folderB = (b[(columns.folderKey || 2) - 1] || '').toString();
+    const folderComparison = folderA.localeCompare(folderB, 'ja');
+    if (folderComparison !== 0) {
+      return folderComparison;
+    }
+    const roleA = (a[(columns.role || 3) - 1] || '').toString();
+    const roleB = (b[(columns.role || 3) - 1] || '').toString();
+    return DRIVE_IMAGE_ROLES.indexOf(roleA) - DRIVE_IMAGE_ROLES.indexOf(roleB);
+  });
+
+  const existingValues = existingRowCount > 0
+    ? sheet.getRange(startRow, 1, existingRowCount, lastColumn).getValues()
+    : [];
+  const preservedRows = [];
+
+  for (let i = 0; i < existingValues.length; i++) {
+    const row = existingValues[i];
+    const typeCell = row[(columns.type || 1) - 1];
+    const type = typeCell ? typeCell.toString().trim().toLowerCase() : '';
+    if (type !== 'image') {
+      preservedRows.push(row);
+    }
+  }
+
+  const outputRows = preservedRows.concat(rows);
+
+  if (existingRowCount > 0) {
+    sheet.getRange(startRow, 1, existingRowCount, lastColumn).clearContent();
+  }
+
+  if (outputRows.length === 0) {
+    return;
+  }
+
+  const availableRows = sheet.getMaxRows() - headerRow;
+  if (outputRows.length > availableRows) {
+    const additionalRows = outputRows.length - availableRows;
+    sheet.insertRowsAfter(sheet.getMaxRows(), additionalRows);
+  }
+
+  sheet.getRange(startRow, 1, outputRows.length, lastColumn).setValues(outputRows);
+}
+
+function getDriveImageAuthorities(sheet, request) {
+  const verification = verifyAdminAccess(sheet, request);
+  if (!verification.success) {
+    return verification;
+  }
+
+  const authorities = readDriveImageAuthorities();
+
+  return {
+    success: true,
+    message: 'Drive画像の権限を取得しました。',
+    authorities
+  };
+}
+
+function updateDriveImageAuthorities(sheet, request) {
+  const verification = verifyAdminAccess(sheet, request);
+  if (!verification.success) {
+    return verification;
+  }
+
+  if (!request.authorities || typeof request.authorities !== 'object') {
+    return {
+      success: false,
+      message: '権限データが指定されていません。'
+    };
+  }
+
+  writeDriveImageAuthorities(request.authorities);
+  const updated = readDriveImageAuthorities();
+
+  return {
+    success: true,
+    message: 'Drive画像の権限を保存しました。',
+    authorities: updated
+  };
+}
+
+function getDriveImagePermissions(request) {
+  const role = resolveDriveImageRoleFromRequest(request);
+  if (!role) {
+    return {
+      success: true,
+      message: '権限を判定できませんでした。',
+      permissions: {}
+    };
+  }
+
+  const authorities = readDriveImageAuthorities();
+  const imageAuthorities = authorities.Image || {};
+  const permissions = {};
+
+  Object.keys(imageAuthorities).forEach((folderKey) => {
+    const folderEntry = imageAuthorities[folderKey];
+    if (!folderEntry || typeof folderEntry !== 'object') {
+      return;
+    }
+
+    const roleEntry = folderEntry[role];
+    if (!roleEntry || typeof roleEntry !== 'object') {
+      return;
+    }
+
+    permissions[folderKey] = {
+      upload: Boolean(roleEntry.upload),
+      delete: Boolean(roleEntry.delete)
+    };
+  });
+
+  if (!Object.prototype.hasOwnProperty.call(permissions, DRIVE_IMAGE_ROOT_KEY)) {
+    permissions[DRIVE_IMAGE_ROOT_KEY] = { upload: false, delete: false };
+  }
+
+  return {
+    success: true,
+    message: 'Drive画像の権限を返却しました。',
+    permissions
+  };
+}
+
 function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
   const authorityColumn = AUTH_CONFIG.AUTHORITY_COLUMN;
   if (!authorityColumn) {
@@ -372,7 +786,11 @@ function parseRequest(e) {
     authority: data.authority !== undefined ? data.authority : data.role,
     toolbarStates: data.toolbarStates,
     toolbarKeys: data.toolbarKeys,
-    toolbarConfig: data.toolbarConfig
+    toolbarConfig: data.toolbarConfig,
+    role: data.role || data.targetRole || '',
+    authorities: data.authorities,
+    resourceType: data.resourceType || data.type || '',
+    authorityLevel: data.authorityLevel || data.authority
   };
 }
 
@@ -499,7 +917,9 @@ function buildResponse(result, origin) {
     'targetLoginId',
     'updatedAuthority',
     'updatedAt',
-    'toolbarConfig'
+    'toolbarConfig',
+    'authorities',
+    'permissions'
   ];
 
   optionalFields.forEach(function(field) {

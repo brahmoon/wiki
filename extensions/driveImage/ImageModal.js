@@ -16,7 +16,15 @@ export class ImageModal {
     this.currentTab = 'gallery';
     this.isVisible = false;
     this.instanceId = `modal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
+    this.galleryFolders = [];
+    this.permissions = {};
+    this.permissionsLoaded = false;
+    this.shouldReloadGallery = true;
+    this.currentFolderKey = null;
+    this.currentUploadFolderKey = null;
+    this.uploadElements = null;
+
     // アクセシビリティ用
     this.previousActiveElement = null;
     this.focusableElements = [];
@@ -227,25 +235,211 @@ export class ImageModal {
       }
       
       .drive-image-modal .gallery-error {
-        text-align: center; 
-        padding: 40px 20px; 
+        text-align: center;
+        padding: 40px 20px;
         color: #dc3545;
         background: #f8d7da;
         border-radius: 8px;
         margin: 20px 0;
       }
-      
+
+      .drive-image-modal .folder-grid-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .drive-image-modal .folder-grid-header h3 {
+        margin: 0 0 4px 0;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .drive-image-modal .folder-grid-header p {
+        margin: 0;
+        color: #6c757d;
+        font-size: 14px;
+      }
+
+      .drive-image-modal .drive-folder-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+      }
+
+      .drive-image-modal .drive-folder-card {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        background: #fff;
+        cursor: pointer;
+        text-align: left;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+
+      .drive-image-modal .drive-folder-card:hover,
+      .drive-image-modal .drive-folder-card:focus {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+        border-color: #0d6efd;
+      }
+
+      .drive-image-modal .drive-folder-card:focus {
+        outline: 3px solid rgba(13,110,253,0.35);
+        outline-offset: 2px;
+      }
+
+      .drive-image-modal .folder-card-icon {
+        font-size: 32px;
+      }
+
+      .drive-image-modal .folder-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .drive-image-modal .folder-card-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #343a40;
+      }
+
+      .drive-image-modal .folder-card-meta {
+        font-size: 13px;
+        color: #6c757d;
+      }
+
+      .drive-image-modal .folder-card-permissions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+
+      .drive-image-modal .permission-tag {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+      }
+
+      .drive-image-modal .permission-tag.allowed {
+        background: rgba(25,135,84,0.12);
+        color: #198754;
+        border-color: rgba(25,135,84,0.3);
+      }
+
+      .drive-image-modal .permission-tag.denied {
+        background: rgba(220,53,69,0.12);
+        color: #dc3545;
+        border-color: rgba(220,53,69,0.3);
+      }
+
+      .drive-image-modal .folder-content-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .drive-image-modal .folder-content-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .drive-image-modal .folder-back-btn {
+        border: 1px solid #dee2e6;
+        background: #fff;
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 13px;
+        color: #495057;
+        transition: all 0.2s ease;
+      }
+
+      .drive-image-modal .folder-back-btn:hover,
+      .drive-image-modal .folder-back-btn:focus {
+        background: #e7f1ff;
+        border-color: #0d6efd;
+        color: #0d6efd;
+        outline: none;
+      }
+
+      .drive-image-modal .folder-content-title h3 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        color: #212529;
+      }
+
+      .drive-image-modal .folder-content-meta {
+        font-size: 13px;
+        color: #6c757d;
+      }
+
       /* アップロードスタイル */
       .drive-image-modal .upload-container {
-        text-align: center; 
-        max-width: 500px; 
+        text-align: center;
+        max-width: 500px;
         margin: 0 auto;
       }
-      
+
+      .drive-image-modal .upload-destination {
+        text-align: left;
+        margin-bottom: 20px;
+      }
+
+      .drive-image-modal .upload-destination-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #495057;
+      }
+
+      .drive-image-modal .upload-folder-select {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid #ced4da;
+        font-size: 14px;
+        background: #fff;
+        color: #212529;
+      }
+
+      .drive-image-modal .upload-folder-select:focus {
+        border-color: #0d6efd;
+        outline: 3px solid rgba(13,110,253,0.3);
+        outline-offset: 1px;
+      }
+
+      .drive-image-modal .upload-folder-meta {
+        margin-top: 6px;
+        font-size: 13px;
+        color: #6c757d;
+        min-height: 18px;
+      }
+
+      .drive-image-modal .upload-permission-warning {
+        margin-top: 10px;
+        font-size: 13px;
+        color: #dc3545;
+        background: rgba(220,53,69,0.12);
+        border: 1px solid rgba(220,53,69,0.3);
+        padding: 8px 12px;
+        border-radius: 6px;
+      }
+
       .drive-image-modal .upload-btn {
-        padding: 12px 24px; 
-        background: #007bff; 
-        color: white; 
+        padding: 12px 24px;
+        background: #007bff;
+        color: white;
         border: none;
         border-radius: 6px; 
         cursor: pointer; 
@@ -279,10 +473,32 @@ export class ImageModal {
         justify-content: center;
         align-items: center;
       }
-      
+
+      .drive-image-modal .upload-zone.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .drive-image-modal .upload-zone-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+
+      .drive-image-modal .upload-zone-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .drive-image-modal .upload-zone-subtitle {
+        margin: 8px 0 0 0;
+        font-size: 14px;
+        opacity: 0.8;
+      }
+
       .drive-image-modal .upload-zone.dragover {
-        border-color: #007bff; 
-        background-color: #f0f8ff; 
+        border-color: #007bff;
+        background-color: #f0f8ff;
         color: #007bff;
         transform: scale(1.02);
       }
@@ -747,13 +963,192 @@ export class ImageModal {
   setupEventListeners(content) {
     // 閉じるボタン
     content.querySelector('.close-btn').addEventListener('click', () => this.hide());
-    
+
     // タブボタン
     content.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
     });
   }
-  
+
+  async ensurePermissionsLoaded() {
+    if (this.permissionsLoaded) {
+      return this.permissions;
+    }
+    try {
+      this.permissions = await this.handler.getPermissions(this.options);
+    } catch (error) {
+      console.error('Failed to load drive image permissions:', error);
+      this.permissions = {};
+    }
+    this.permissionsLoaded = true;
+    return this.permissions;
+  }
+
+  async refreshGalleryData(force = false) {
+    if (!force && !this.shouldReloadGallery && this.galleryFolders.length) {
+      return this.galleryFolders;
+    }
+    const gallery = await this.handler.loadGallery(this.options);
+    this.galleryFolders = Array.isArray(gallery?.folders) ? gallery.folders : [];
+    this.shouldReloadGallery = false;
+    return this.galleryFolders;
+  }
+
+  getFolderByKey(key) {
+    const normalizedKey = this.handler.getFolderKey(key || this.handler.ROOT_FOLDER_KEY);
+    return this.galleryFolders.find((folder) => this.handler.getFolderKey(folder.key) === normalizedKey) || null;
+  }
+
+  getFolderPermission(folderKey) {
+    const normalizedKey = this.handler.getFolderKey(folderKey || this.handler.ROOT_FOLDER_KEY);
+    const permission = this.permissions?.[normalizedKey];
+    if (permission) {
+      return permission;
+    }
+    const role = this.handler.resolveRole(this.options);
+    if (role === 'Moderator') {
+      return { upload: true, delete: true };
+    }
+    return { upload: false, delete: false };
+  }
+
+  isUploadAllowed(folderKey) {
+    return Boolean(this.getFolderPermission(folderKey).upload);
+  }
+
+  isDeleteAllowed(folderKey) {
+    return Boolean(this.getFolderPermission(folderKey).delete);
+  }
+
+  getUploadableFolders() {
+    return this.galleryFolders.filter((folder) => this.isUploadAllowed(folder.key));
+  }
+
+  updateUploadDestinationDisplay() {
+    if (!this.modal) {
+      return;
+    }
+    const meta = this.modal.querySelector(`#upload-folder-meta-${this.instanceId}`);
+    const dropZone = this.uploadElements?.dropZone || null;
+    const title = dropZone?.querySelector('.upload-zone-title') || null;
+    const subtitle = dropZone?.querySelector('.upload-zone-subtitle') || null;
+
+    const folder = this.getFolderByKey(this.currentUploadFolderKey);
+    const folderName = folder ? (folder.displayName || folder.name || '未分類') : '未選択';
+    const permission = folder ? this.getFolderPermission(folder.key) : { upload: false, delete: false };
+
+    if (meta) {
+      meta.textContent = folder
+        ? `選択中: ${folderName}（アップロード${permission.upload ? '可' : '不可'}・削除${permission.delete ? '可' : '不可'}）`
+        : 'アップロード先フォルダを選択してください。';
+    }
+
+    if (dropZone) {
+      if (folder && permission.upload) {
+        dropZone.setAttribute('aria-label', `${folderName}に画像をドラッグ&ドロップまたはクリックしてアップロード`);
+        dropZone.tabIndex = 0;
+      } else if (folder) {
+        dropZone.setAttribute('aria-label', `${folderName}にはアップロードできません。別のフォルダを選択してください`);
+        dropZone.tabIndex = -1;
+      } else {
+        dropZone.setAttribute('aria-label', 'アップロード先フォルダを選択してください');
+        dropZone.tabIndex = -1;
+      }
+      dropZone.classList.toggle('disabled', !(folder && permission.upload));
+    }
+
+    if (title) {
+      title.textContent = folder && permission.upload
+        ? `${folderName} にアップロード`
+        : 'アップロード先を選択してください';
+    }
+
+    if (subtitle) {
+      subtitle.textContent = folder && permission.upload
+        ? 'または上のボタンでファイルを選択'
+        : 'フォルダを選択するとアップロードできます';
+    }
+  }
+
+  toggleUploadControls(enabled) {
+    if (!this.uploadElements) {
+      return;
+    }
+    const { fileInput, selectBtn, dropZone } = this.uploadElements;
+    if (fileInput) {
+      fileInput.disabled = !enabled;
+    }
+    if (selectBtn) {
+      selectBtn.disabled = !enabled;
+    }
+    if (dropZone) {
+      dropZone.setAttribute('aria-disabled', (!enabled).toString());
+      dropZone.classList.toggle('disabled', !enabled);
+      dropZone.tabIndex = enabled ? 0 : -1;
+    }
+  }
+
+  async populateUploadFolders(container) {
+    if (!this.uploadElements) {
+      return;
+    }
+
+    await this.ensurePermissionsLoaded();
+    await this.refreshGalleryData();
+
+    const folderSelect = this.uploadElements.folderSelect;
+    const warning = this.uploadElements.permissionWarning;
+
+    if (!folderSelect) {
+      return;
+    }
+
+    folderSelect.innerHTML = '';
+
+    const uploadableFolders = this.getUploadableFolders();
+
+    if (!uploadableFolders.length) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'アップロード可能なフォルダがありません';
+      folderSelect.appendChild(option);
+      folderSelect.disabled = true;
+      if (warning) {
+        warning.hidden = false;
+      }
+      this.currentUploadFolderKey = null;
+      this.toggleUploadControls(false);
+      this.updateUploadDestinationDisplay();
+      return;
+    }
+
+    folderSelect.disabled = false;
+    uploadableFolders.forEach((folder) => {
+      const option = document.createElement('option');
+      option.value = folder.key;
+      option.textContent = folder.displayName || folder.name || '未分類';
+      folderSelect.appendChild(option);
+    });
+
+    const preferredKey = this.handler.getFolderKey(this.options.defaultFolderName || this.handler.ROOT_FOLDER_KEY);
+    const preferredFolder = uploadableFolders.find((folder) => this.handler.getFolderKey(folder.key) === preferredKey);
+
+    if (preferredFolder) {
+      this.currentUploadFolderKey = preferredFolder.key;
+    }
+
+    if (!this.currentUploadFolderKey || !uploadableFolders.some((folder) => folder.key === this.currentUploadFolderKey)) {
+      this.currentUploadFolderKey = uploadableFolders[0].key;
+    }
+
+    folderSelect.value = this.currentUploadFolderKey;
+    if (warning) {
+      warning.hidden = true;
+    }
+    this.toggleUploadControls(true);
+    this.updateUploadDestinationDisplay();
+  }
+
   /**
    * タブを切り替え
    * @param {string} tabId - タブID ('gallery' | 'upload')
@@ -774,9 +1169,11 @@ export class ImageModal {
     // タブパネルの aria-labelledby を更新
     const activeTabId = `${tabId}-tab-${this.instanceId}`;
     content.setAttribute('aria-labelledby', activeTabId);
-    
+
     if (tabId === 'gallery') {
-      this.showGalleryTab(content);
+      Promise.resolve(this.showGalleryTab(content)).catch((error) => {
+        console.error('Failed to render gallery tab:', error);
+      });
     } else {
       this.showUploadTab(content);
     }
@@ -793,39 +1190,38 @@ export class ImageModal {
         <div style="font-size: 14px; margin-top: 8px; opacity: 0.7;">しばらくお待ちください</div>
       </div>
     `;
-    
+
     try {
-      const images = await this.handler.loadGallery(this.options);
-      
-      if (images.length === 0) {
+      await this.ensurePermissionsLoaded();
+      await this.refreshGalleryData();
+
+      if (!this.galleryFolders.length) {
         container.innerHTML = `
           <div class="gallery-empty">
             <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
-            <div>画像がありません</div>
+            <div>表示できるフォルダがありません</div>
             <div style="font-size: 14px; margin-top: 8px; opacity: 0.7;">
-              「アップロード」タブから画像を追加してください
+              「アップロード」タブから画像を追加するか、管理者にフォルダの作成を依頼してください
             </div>
           </div>
         `;
+        this.updateFocusableElements();
         return;
       }
-      
-      const gallery = document.createElement('div');
-      gallery.className = 'gallery-grid';
-      gallery.setAttribute('role', 'grid');
-      gallery.setAttribute('aria-label', `${images.length}個の画像`);
-      
-      images.forEach((image, index) => {
-        const item = this.createGalleryItem(image, index);
-        gallery.appendChild(item);
-      });
-      
-      container.innerHTML = '';
-      container.appendChild(gallery);
-      
-      // フォーカス可能要素を更新
+
+      if (this.currentFolderKey) {
+        const currentFolder = this.getFolderByKey(this.currentFolderKey);
+        if (currentFolder) {
+          this.renderFolderContent(container, currentFolder);
+        } else {
+          this.currentFolderKey = null;
+          this.renderFolderGrid(container);
+        }
+      } else {
+        this.renderFolderGrid(container);
+      }
+
       this.updateFocusableElements();
-      
     } catch (error) {
       container.innerHTML = `
         <div class="gallery-error" role="alert">
@@ -839,6 +1235,114 @@ export class ImageModal {
       `;
       this.updateFocusableElements();
     }
+  }
+
+  renderFolderGrid(container) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'folder-grid-wrapper';
+
+    const heading = document.createElement('div');
+    heading.className = 'folder-grid-header';
+    heading.innerHTML = `
+      <h3>フォルダを選択</h3>
+      <p>カテゴリを選択して画像を閲覧します。</p>
+    `;
+    wrapper.appendChild(heading);
+
+    const grid = document.createElement('div');
+    grid.className = 'drive-folder-grid';
+    grid.setAttribute('role', 'list');
+
+    this.galleryFolders.forEach((folder) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'drive-folder-card';
+      card.setAttribute('role', 'listitem');
+      card.dataset.folderKey = folder.key;
+
+      const permission = this.getFolderPermission(folder.key);
+      const uploadTag = permission.upload ? 'アップロード可' : 'アップロード不可';
+      const deleteTag = permission.delete ? '削除可' : '削除不可';
+
+      card.innerHTML = `
+        <div class="folder-card-icon" aria-hidden="true">📁</div>
+        <div class="folder-card-body">
+          <div class="folder-card-title">${folder.displayName || folder.name || '未分類'}</div>
+          <div class="folder-card-meta">${folder.imageCount}件の画像</div>
+          <div class="folder-card-permissions">
+            <span class="permission-tag ${permission.upload ? 'allowed' : 'denied'}">${uploadTag}</span>
+            <span class="permission-tag ${permission.delete ? 'allowed' : 'denied'}">${deleteTag}</span>
+          </div>
+        </div>
+      `;
+
+      card.addEventListener('click', () => {
+        this.currentFolderKey = folder.key;
+        this.showGalleryTab(container);
+      });
+
+      grid.appendChild(card);
+    });
+
+    wrapper.appendChild(grid);
+
+    container.innerHTML = '';
+    container.appendChild(wrapper);
+  }
+
+  renderFolderContent(container, folder) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'folder-content-wrapper';
+
+    const header = document.createElement('div');
+    header.className = 'folder-content-header';
+    const permission = this.getFolderPermission(folder.key);
+    header.innerHTML = `
+      <button type="button" class="folder-back-btn">← フォルダ一覧</button>
+      <div class="folder-content-title">
+        <h3>${folder.displayName || folder.name || '未分類'}</h3>
+        <div class="folder-content-meta">${folder.imageCount}件の画像 · アップロード${permission.upload ? '可' : '不可'} · 削除${permission.delete ? '可' : '不可'}</div>
+      </div>
+    `;
+
+    const backBtn = header.querySelector('.folder-back-btn');
+    backBtn.addEventListener('click', () => {
+      this.currentFolderKey = null;
+      this.showGalleryTab(container);
+    });
+
+    wrapper.appendChild(header);
+
+    if (!folder.images.length) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'gallery-empty';
+      emptyState.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">🗂️</div>
+        <div>このフォルダにはまだ画像がありません</div>
+        <div style="font-size: 14px; margin-top: 8px; opacity: 0.7;">
+          「アップロード」タブから画像を追加してください
+        </div>
+      `;
+      wrapper.appendChild(emptyState);
+      container.innerHTML = '';
+      container.appendChild(wrapper);
+      return;
+    }
+
+    const gallery = document.createElement('div');
+    gallery.className = 'gallery-grid';
+    gallery.setAttribute('role', 'grid');
+    gallery.setAttribute('aria-label', `${folder.images.length}個の画像 (${folder.displayName || folder.name || '未分類'})`);
+
+    folder.images.forEach((image, index) => {
+      const item = this.createGalleryItem(image, index);
+      gallery.appendChild(item);
+    });
+
+    wrapper.appendChild(gallery);
+
+    container.innerHTML = '';
+    container.appendChild(wrapper);
   }
   
   /**
@@ -854,18 +1358,21 @@ export class ImageModal {
     item.setAttribute('tabindex', '0');
     item.setAttribute('aria-label', `画像: ${image.name || `無題${index + 1}`}を挿入`);
     item.title = image.name || `無題の画像 ${index + 1}`;
-    
-    // 削除ボタン
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-btn';
-    deleteBtn.innerHTML = '×';
-    deleteBtn.setAttribute('aria-label', `画像「${image.name || '無題'}」を削除`);
-    deleteBtn.title = '画像を削除';
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.showDeleteConfirmation(image);
-    });
-    
+
+    const canDelete = this.isDeleteAllowed(image.folderKey);
+    let deleteBtn = null;
+    if (canDelete) {
+      deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.innerHTML = '×';
+      deleteBtn.setAttribute('aria-label', `画像「${image.name || '無題'}」を削除`);
+      deleteBtn.title = '画像を削除';
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showDeleteConfirmation(image);
+      });
+    }
+
     // 画像要素
     const img = document.createElement('img');
     img.src = image.thumbnail || image.url;
@@ -882,9 +1389,11 @@ export class ImageModal {
       `;
       item.setAttribute('aria-label', `画像読み込みエラー: ${image.name || '無題の画像'}`);
       // 削除ボタンは残す
-      item.appendChild(deleteBtn);
+      if (deleteBtn) {
+        item.appendChild(deleteBtn);
+      }
     };
-    
+
     // クリックで挿入
     item.addEventListener('click', (e) => {
       // 削除ボタンのクリックでない場合のみ挿入
@@ -898,14 +1407,16 @@ export class ImageModal {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         this.insertImage(image);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && canDelete) {
         e.preventDefault();
         this.showDeleteConfirmation(image);
       }
     });
-    
+
     item.appendChild(img);
-    item.appendChild(deleteBtn);
+    if (deleteBtn) {
+      item.appendChild(deleteBtn);
+    }
     return item;
   }
   
@@ -914,6 +1425,10 @@ export class ImageModal {
    * @param {Object} image - 削除する画像情報
    */
   showDeleteConfirmation(image) {
+    if (!this.isDeleteAllowed(image.folderKey)) {
+      return;
+    }
+
     const dialog = document.createElement('div');
     dialog.className = 'delete-confirmation-dialog';
     dialog.setAttribute('role', 'dialog');
@@ -976,11 +1491,12 @@ export class ImageModal {
   async deleteImage(image) {
     try {
       await this.handler.deleteImage(image.id, this.options);
-      
+
       // ギャラリーを再読み込み
+      this.shouldReloadGallery = true;
       const content = this.modal.querySelector('.tab-content');
       this.showGalleryTab(content);
-      
+
     } catch (error) {
       console.error('Delete image failed:', error);
       // エラーメッセージは handler 内で表示済み
@@ -1021,26 +1537,35 @@ export class ImageModal {
     const allowedFormats = this.options.allowedMimeTypes
       .map(type => type.split('/')[1].toUpperCase())
       .join(', ');
-    
+
     container.innerHTML = `
       <div class="upload-container">
-        <input type="file" id="image-upload-input-${this.instanceId}" 
+        <div class="upload-destination">
+          <label for="upload-folder-select-${this.instanceId}" class="upload-destination-label">アップロード先フォルダ</label>
+          <select id="upload-folder-select-${this.instanceId}" class="upload-folder-select" aria-describedby="upload-folder-meta-${this.instanceId}"></select>
+          <div id="upload-folder-meta-${this.instanceId}" class="upload-folder-meta" aria-live="polite"></div>
+          <div id="upload-permission-warning-${this.instanceId}" class="upload-permission-warning" role="alert" hidden>
+            アップロードできるフォルダがありません。権限設定を確認してください。
+          </div>
+        </div>
+
+        <input type="file" id="image-upload-input-${this.instanceId}"
                accept="image/*" multiple style="display: none;"
                aria-describedby="upload-help-${this.instanceId}">
-        
+
         <button class="upload-btn" id="upload-select-btn-${this.instanceId}" type="button">
           📁 ファイルを選択
         </button>
-        
-        <div class="upload-zone" id="upload-drop-zone-${this.instanceId}" 
+
+        <div class="upload-zone" id="upload-drop-zone-${this.instanceId}"
              role="button" tabindex="0"
              aria-describedby="upload-help-${this.instanceId}"
-             aria-label="画像をドラッグ&ドロップまたはクリックしてアップロード">
-          <div style="font-size: 48px; margin-bottom: 12px;">📤</div>
-          <p style="margin: 0; font-size: 18px; font-weight: 500;">ここに画像をドラッグ&ドロップ</p>
-          <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.8;">または上のボタンでファイルを選択</p>
+             aria-label="アップロード先フォルダを選択してください">
+          <div class="upload-zone-icon" aria-hidden="true">📤</div>
+          <p class="upload-zone-title">アップロード先を選択してください</p>
+          <p class="upload-zone-subtitle">フォルダを選択するとアップロードできます</p>
         </div>
-        
+
         <div class="upload-info">
           <p style="margin: 0 0 8px 0; font-weight: 600;">📋 アップロード制限</p>
           <ul id="upload-help-${this.instanceId}" style="margin: 8px 0;">
@@ -1059,9 +1584,12 @@ export class ImageModal {
         </div>
       </div>
     `;
-    
+
     this.setupUploadEvents(container);
     this.updateFocusableElements();
+    Promise.resolve(this.populateUploadFolders(container)).catch((error) => {
+      console.error('Failed to populate upload folders:', error);
+    });
   }
   
   /**
@@ -1072,59 +1600,76 @@ export class ImageModal {
     const fileInput = container.querySelector(`#image-upload-input-${this.instanceId}`);
     const selectBtn = container.querySelector(`#upload-select-btn-${this.instanceId}`);
     const dropZone = container.querySelector(`#upload-drop-zone-${this.instanceId}`);
-    
-    // ファイル選択ボタン
-    selectBtn.addEventListener('click', () => fileInput.click());
-    
-    // ドロップゾーンクリック
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        fileInput.click();
-      }
-    });
-    
-    // ファイル選択時
-    fileInput.addEventListener('change', (e) => {
-      this.handleFiles(Array.from(e.target.files));
-      e.target.value = ''; // リセット
-    });
-    
-    // ドラッグ&ドロップイベント
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const folderSelect = container.querySelector(`#upload-folder-select-${this.instanceId}`);
+    const permissionWarning = container.querySelector(`#upload-permission-warning-${this.instanceId}`);
+
+    this.uploadElements = {
+      fileInput,
+      selectBtn,
+      dropZone,
+      folderSelect,
+      permissionWarning
+    };
+
+    this.toggleUploadControls(false);
+
+    if (selectBtn && fileInput) {
+      selectBtn.addEventListener('click', () => fileInput.click());
+    }
+
+    if (dropZone && fileInput) {
+      dropZone.addEventListener('click', () => {
+        if (!fileInput.disabled) {
+          fileInput.click();
+        }
       });
-    });
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, () => {
-        dropZone.classList.add('dragover');
-        dropZone.setAttribute('aria-label', '画像をここにドロップしてアップロード');
+      dropZone.addEventListener('keydown', (e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && !fileInput.disabled) {
+          e.preventDefault();
+          fileInput.click();
+        }
       });
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, () => {
-        dropZone.classList.remove('dragover');
-        dropZone.setAttribute('aria-label', '画像をドラッグ&ドロップまたはクリックしてアップロード');
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
       });
-    });
-    
-    dropZone.addEventListener('drop', (e) => {
-      const files = Array.from(e.dataTransfer.files);
-      const imageFiles = files.filter(file => 
-        this.options.allowedMimeTypes.includes(file.type)
-      );
-      
-      if (imageFiles.length !== files.length) {
-        this.handler.showMessage('一部のファイルはサポートされていない形式です', 'warning');
-      }
-      
-      this.handleFiles(imageFiles);
-    });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.remove('dragover');
+        });
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer.files);
+        this.handleFiles(files);
+      });
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        this.handleFiles(Array.from(e.target.files));
+        e.target.value = '';
+      });
+    }
+
+    if (folderSelect) {
+      folderSelect.addEventListener('change', () => {
+        this.currentUploadFolderKey = folderSelect.value;
+        const enabled = this.isUploadAllowed(this.currentUploadFolderKey);
+        this.toggleUploadControls(enabled);
+        this.updateUploadDestinationDisplay();
+      });
+    }
   }
   
   /**
@@ -1133,37 +1678,58 @@ export class ImageModal {
    */
   async handleFiles(files) {
     if (files.length === 0) return;
-    
+
+    const validFiles = files.filter(file => this.options.allowedMimeTypes.includes(file.type));
+    if (!validFiles.length) {
+      this.handler.showMessage('サポートされている画像ファイルを選択してください', 'warning');
+      return;
+    }
+
+    if (validFiles.length !== files.length) {
+      this.handler.showMessage('一部のファイルはサポートされていない形式です', 'warning');
+    }
+
+    const targetFolder = this.getFolderByKey(this.currentUploadFolderKey);
+    if (!targetFolder || !this.isUploadAllowed(targetFolder.key)) {
+      this.handler.showMessage('アップロード先のフォルダを選択する必要があります', 'warning');
+      return;
+    }
+
+    const filesToUpload = validFiles;
+
     const progressContainer = document.querySelector(`#upload-progress-${this.instanceId}`);
     const progressText = document.querySelector(`#progress-text-${this.instanceId}`);
     const progressBar = document.querySelector(`#progress-bar-fill-${this.instanceId}`);
-    
+
     if (progressContainer && progressText && progressBar) {
       progressContainer.style.display = 'block';
-      progressText.textContent = `${files.length}個のファイルをアップロード中...`;
+      progressText.textContent = `${filesToUpload.length}個のファイルをアップロード中...`;
       progressBar.style.width = '0%';
     }
-    
+
     try {
       const results = await this.handler.uploadMultipleImages(
-        files, 
-        this.editor, 
+        filesToUpload,
+        this.editor,
         this.options,
         (progress) => {
           if (progressText && progressBar) {
             const percentage = Math.round((progress.completed / progress.total) * 100);
             progressText.textContent = `${progress.completed}/${progress.total} 完了 (${percentage}%)`;
             progressBar.style.width = `${percentage}%`;
-            
+
             // スクリーンリーダー用
             progressContainer.setAttribute('aria-valuenow', percentage);
             progressContainer.setAttribute('aria-valuetext', `${percentage}% 完了`);
           }
-        }
+        },
+        targetFolder.name || ''
       );
-      
+
       // 成功した場合はギャラリータブに切り替え
       if (results.success.length > 0) {
+        this.shouldReloadGallery = true;
+        this.currentFolderKey = targetFolder.key;
         setTimeout(() => {
           if (this.currentTab !== 'gallery') {
             this.switchTab('gallery');
@@ -1174,7 +1740,7 @@ export class ImageModal {
           }
         }, 1000);
       }
-      
+
     } catch (error) {
       console.error('Multiple file upload failed:', error);
     } finally {

@@ -8,6 +8,7 @@ const CONFIG = {
     email: 3,
     kingdom: 4,
     language: 5,
+    authority: 6,
   },
   LOGIN_ID_COLUMN: 1,
   USERNAME_COLUMN: 2,
@@ -75,6 +76,7 @@ function doPost(e) {
       email: record.email,
       kingdom: record.kingdom,
       language: record.language,
+      authority: record.authority,
     }, origin);
   } catch (error) {
     return buildResponse({
@@ -156,6 +158,7 @@ function findAccount(sheet, identifiers) {
   const emailIndex = (columns.email || CONFIG.EMAIL_COLUMN) - 1;
   const kingdomIndex = typeof columns.kingdom === 'number' ? columns.kingdom - 1 : -1;
   const languageIndex = typeof columns.language === 'number' ? columns.language - 1 : -1;
+  const authorityIndex = typeof columns.authority === 'number' ? columns.authority - 1 : -1;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
@@ -169,6 +172,7 @@ function findAccount(sheet, identifiers) {
         email: emailIndex >= 0 ? row[emailIndex] || '' : identifiers.email || '',
         kingdom: kingdomIndex >= 0 ? row[kingdomIndex] || '' : '',
         language: languageIndex >= 0 ? row[languageIndex] || '' : '',
+        authority: authorityIndex >= 0 ? row[authorityIndex] || '' : '',
       };
     }
 
@@ -179,6 +183,7 @@ function findAccount(sheet, identifiers) {
         email: row[emailIndex] || identifiers.email || '',
         kingdom: kingdomIndex >= 0 ? row[kingdomIndex] || '' : '',
         language: languageIndex >= 0 ? row[languageIndex] || '' : '',
+        authority: authorityIndex >= 0 ? row[authorityIndex] || '' : '',
       };
     }
   }
@@ -195,6 +200,7 @@ function buildResponse(result, origin) {
     email: result.email || null,
     kingdom: typeof result.kingdom !== 'undefined' ? result.kingdom : null,
     language: typeof result.language !== 'undefined' ? result.language : null,
+    authority: typeof result.authority !== 'undefined' ? result.authority : null,
   };
 
   return createJsonOutput(output, origin);

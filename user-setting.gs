@@ -170,6 +170,7 @@ function handleGetUserSettings(sheet, request) {
     email: record.email,
     kingdom: record.kingdom,
     language: record.language,
+    authority: record.authority,
   };
 }
 
@@ -230,6 +231,7 @@ function handleUpdateUserSettings(sheet, request) {
     email: columns.email ? updatedValues[columns.email - 1] || record.email : record.email,
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
     language: columns.language ? updatedValues[columns.language - 1] || '' : '',
+    authority: record.authority,
   };
 }
 
@@ -377,6 +379,7 @@ function findAccount(sheet, identifiers) {
             : identifiers.email || '',
         kingdom: columns.kingdom ? row[columns.kingdom - 1] || '' : '',
         language: columns.language ? sanitizeLanguage(row[columns.language - 1]) : 'ja',
+        authority: columns.authority ? sanitizeAuthority(row[columns.authority - 1]) : null,
       };
     }
   }
@@ -448,6 +451,9 @@ function buildResponse(result, origin) {
   }
   if (Object.prototype.hasOwnProperty.call(result, 'language')) {
     payload.language = result.language || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(result, 'authority')) {
+    payload.authority = result.authority;
   }
 
   return createJsonOutput(payload, origin);
