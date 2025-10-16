@@ -1317,6 +1317,19 @@
             return value === 'en' ? 'en' : 'ja';
         }
 
+        function parseAuthority(value) {
+            if (value === null || value === undefined || value === '') {
+                return null;
+            }
+            const number = Number(value);
+            return Number.isFinite(number) ? number : null;
+        }
+
+        function getCurrentUserAuthority() {
+            const loginState = getStoredLoginState();
+            return parseAuthority(loginState?.user?.authority);
+        }
+
         function setUserSettingsMessage(message, type = '') {
             if (!userSettingsMessage) {
                 return;
@@ -1401,7 +1414,8 @@
                     username: result.username || fallbackName || '',
                     email: result.email || email,
                     kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : '',
-                    language: sanitizeLanguage((result.language || '').trim().toLowerCase())
+                    language: sanitizeLanguage((result.language || '').trim().toLowerCase()),
+                    authority: parseAuthority(result.authority)
                 };
 
                 userSettingsState.data = settings;
@@ -1414,7 +1428,8 @@
                     loginId: settings.loginId,
                     email: settings.email,
                     kingdom: settings.kingdom,
-                    language: settings.language
+                    language: settings.language,
+                    authority: settings.authority
                 });
                 updateLoginUI();
             } catch (error) {
@@ -1475,7 +1490,8 @@
                     username: result.username || username,
                     email: result.email || payload.email,
                     kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : normalizedKingdom,
-                    language: sanitizeLanguage((result.language || language).toLowerCase())
+                    language: sanitizeLanguage((result.language || language).toLowerCase()),
+                    authority: parseAuthority(result.authority)
                 };
 
                 userSettingsState.data = updatedSettings;
@@ -1486,7 +1502,8 @@
                     loginId: updatedSettings.loginId,
                     email: updatedSettings.email,
                     language: updatedSettings.language,
-                    kingdom: updatedSettings.kingdom
+                    kingdom: updatedSettings.kingdom,
+                    authority: updatedSettings.authority
                 });
                 setUserSettingsMessage('保存しました。', 'success');
                 updateLoginUI();
@@ -1719,6 +1736,7 @@
         const APPS_SCRIPT_ENDPOINT = WIKI_APPS_SCRIPT_ENDPOINT;
 
         const TOOLBAR_PLUGIN_ENDPOINT = 'https://script.google.com/macros/s/AKfycbz2PcPzS6AQAhl8idB41xDa1K3hoOf8WPdbLM8l2qUGqK3j9oJ_JB32rdYUMllwyvRrzw/exec';
+        const DRIVE_IMAGE_PERMISSION_ENDPOINT = TOOLBAR_PLUGIN_ENDPOINT;
 
         const TOOLBAR_FEATURES = [
             {
@@ -3910,7 +3928,9 @@
                         addToToolbar: false,
                         toolbarSelector: '.toolbar',
                         buttonClass: 'btn',
-                        debug: false
+                        debug: false,
+                        permissionsEndpoint: DRIVE_IMAGE_PERMISSION_ENDPOINT,
+                        userAuthority: getCurrentUserAuthority()
                     }),
                     YouTubeEmbed
                 ],

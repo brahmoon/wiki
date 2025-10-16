@@ -199,6 +199,172 @@
             font-size: 22px;
         }
 
+        .authority-settings {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .authority-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.05);
+            border: 1px solid #efefed;
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .authority-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .authority-title h2 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .authority-title p {
+            margin: 4px 0 0 0;
+            color: #6b6a67;
+            font-size: 14px;
+        }
+
+        .authority-role-toggle {
+            display: inline-flex;
+            gap: 8px;
+            padding: 4px;
+            background: #f7f6f3;
+            border-radius: 999px;
+            border: 1px solid #e0dfdc;
+        }
+
+        .authority-role-button {
+            border: 0;
+            background: transparent;
+            padding: 8px 20px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #6b6a67;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .authority-role-button:hover {
+            background: rgba(35, 131, 226, 0.1);
+            color: #2383e2;
+        }
+
+        .authority-role-button.active,
+        .authority-role-button.is-active {
+            background: #2383e2;
+            color: #fff;
+            box-shadow: 0 8px 18px rgba(35, 131, 226, 0.25);
+        }
+
+        .authority-folder-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .authority-folder-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: 1px solid #ecebe7;
+            background: #fafaf9;
+        }
+
+        .authority-folder-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .authority-folder-name {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #37352f;
+        }
+
+        .authority-folder-meta {
+            margin: 6px 0 0 0;
+            font-size: 13px;
+            color: #6b6a67;
+        }
+
+        .authority-permission-group {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .authority-permission-group label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .authority-permission-group input[type='checkbox'] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .authority-loading,
+        .authority-error,
+        .authority-empty {
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px dashed #d0cfcc;
+            color: #6b6a67;
+            background: #fafaf9;
+        }
+
+        .authority-error {
+            border-color: #f0b8b2;
+            color: #c0352b;
+            background: #fff4f2;
+        }
+
+        .authority-empty {
+            border-style: solid;
+        }
+
+        .authority-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .authority-status {
+            font-size: 14px;
+            color: #6b6a67;
+            min-height: 24px;
+        }
+
+        .authority-status.is-success {
+            color: #0f7b6c;
+        }
+
+        .authority-status.is-error {
+            color: #c0352b;
+        }
+
         .plugin-card p {
             margin: 0;
             color: #6b6a67;
@@ -631,6 +797,34 @@
                         </div>
                     </div>
                 </section>
+                <section id="authority-settings" class="authority-settings" hidden aria-hidden="true">
+                    <div class="authority-card">
+                        <div class="authority-header">
+                            <div class="authority-title">
+                                <h2>Drive画像フォルダ権限</h2>
+                                <p>フォルダごとのアップロード・削除権限をロール単位で管理します。</p>
+                            </div>
+                            <div id="authority-role-toggle" class="authority-role-toggle" role="radiogroup" aria-label="権限対象">
+                                <button type="button" class="authority-role-button" data-authority-role="Editor" aria-pressed="false">Editor</button>
+                                <button type="button" class="authority-role-button" data-authority-role="Moderator" aria-pressed="false">Moderator</button>
+                            </div>
+                        </div>
+                        <div id="authority-loading" class="authority-loading" role="status" aria-live="polite" hidden>
+                            <div class="loading-spinner" aria-hidden="true"></div>
+                            <p>フォルダ一覧と権限情報を読み込んでいます…</p>
+                        </div>
+                        <div id="authority-error" class="authority-error" role="alert" hidden></div>
+                        <div id="authority-empty" class="authority-empty" hidden>
+                            <p>表示するDrive画像フォルダが見つかりません。</p>
+                            <p style="margin-top: 8px;">Google Driveでフォルダを作成するとここに表示されます。</p>
+                        </div>
+                        <div id="authority-folder-list" class="authority-folder-list" role="group" aria-live="polite"></div>
+                        <div class="authority-actions">
+                            <button id="authority-save" class="btn btn-primary" type="button" disabled>保存</button>
+                            <div id="authority-status" class="authority-status" role="status" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </section>
                 <section id="member-management" class="member-management" hidden aria-hidden="true">
                     <div class="member-card">
                         <div class="member-status">
@@ -692,6 +886,10 @@
         const ADMIN_AUTH_ENDPOINT = 'https://script.google.com/macros/s/AKfycbz2PcPzS6AQAhl8idB41xDa1K3hoOf8WPdbLM8l2qUGqK3j9oJ_JB32rdYUMllwyvRrzw/exec';
         const ADMIN_AUTH_TIMEOUT = 10000;
         const MEMBER_LIST_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyctRzUunZUChpQSkvMsvoMmj5Ulk1_xlw9oFptvW9kRUfIxS8VKywF-FWmJL22hnFJAg/exec';
+        const DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbytAAym-sjES9hdBK_0LES7nQ6H4mwxCgADk7u9xY--YRIWlkEJrvK2FMHmJG74zQ7E/exec';
+        const DRIVE_IMAGE_PERMISSION_ENDPOINT = ADMIN_AUTH_ENDPOINT;
+        const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator'];
+        const DRIVE_IMAGE_ROOT_KEY = '__root__';
         const MENU_LABELS = {
             general: 'Wiki設定',
             member: 'ユーザー管理',
@@ -754,6 +952,14 @@
         const pluginSaveButton = document.getElementById('plugin-save');
         const pluginStatus = document.getElementById('plugin-status');
         const pluginLoading = document.getElementById('plugin-loading');
+        const authoritySection = document.getElementById('authority-settings');
+        const authorityRoleToggle = document.getElementById('authority-role-toggle');
+        const authorityFolderList = document.getElementById('authority-folder-list');
+        const authorityLoading = document.getElementById('authority-loading');
+        const authorityError = document.getElementById('authority-error');
+        const authorityEmpty = document.getElementById('authority-empty');
+        const authoritySaveButton = document.getElementById('authority-save');
+        const authorityStatus = document.getElementById('authority-status');
         const memberManagement = document.getElementById('member-management');
         const memberReloadButton = document.getElementById('member-reload');
         const memberLoading = document.getElementById('member-loading');
@@ -785,6 +991,22 @@
         let pluginSavingInProgress = false;
 
         const pluginCheckboxMap = new Map();
+        const authorityCheckboxMap = new Map();
+        const authorityRoleButtons = authorityRoleToggle
+            ? Array.from(authorityRoleToggle.querySelectorAll('[data-authority-role]'))
+            : [];
+        const driveImageAuthorityState = {
+            loaded: false,
+            loading: false,
+            saving: false,
+            dirty: false,
+            currentRole: 'Editor',
+            folders: [],
+            permissionsByRole: {
+                Editor: {},
+                Moderator: {}
+            }
+        };
 
         const getStoredLoginState = () => {
             try {
@@ -990,6 +1212,606 @@
                 return checkbox && checkbox.checked ? 1 : 0;
             });
         };
+
+        const resolveAuthorityRole = (value) => {
+            if (value === null || value === undefined) {
+                return null;
+            }
+
+            if (typeof value === 'number') {
+                if (value >= 3) {
+                    return 'Moderator';
+                }
+                if (value >= 2) {
+                    return 'Editor';
+                }
+                return null;
+            }
+
+            const text = value.toString().trim();
+            if (!text) {
+                return null;
+            }
+
+            const lower = text.toLowerCase();
+            if (lower === 'moderator') {
+                return 'Moderator';
+            }
+            if (lower === 'editor') {
+                return 'Editor';
+            }
+
+            const numeric = Number(text);
+            if (Number.isFinite(numeric)) {
+                return resolveAuthorityRole(numeric);
+            }
+
+            return null;
+        };
+
+        const normalizeFolderKey = (value) => {
+            const text = value === null || value === undefined ? '' : value;
+            const trimmed = text.toString().trim();
+            return trimmed ? trimmed : DRIVE_IMAGE_ROOT_KEY;
+        };
+
+        const extractImageAuthorities = (authorities) => {
+            if (!authorities || typeof authorities !== 'object') {
+                return {};
+            }
+            if (authorities.Image && typeof authorities.Image === 'object') {
+                return authorities.Image;
+            }
+            if (authorities.image && typeof authorities.image === 'object') {
+                return authorities.image;
+            }
+            return {};
+        };
+
+        const clearAuthorityStatus = () => {
+            if (!authorityStatus) {
+                return;
+            }
+            authorityStatus.textContent = '';
+            authorityStatus.classList.remove('is-success', 'is-error');
+        };
+
+        const setAuthorityStatus = (message, status) => {
+            if (!authorityStatus) {
+                return;
+            }
+            authorityStatus.textContent = message || '';
+            authorityStatus.classList.remove('is-success', 'is-error');
+            if (status === 'success') {
+                authorityStatus.classList.add('is-success');
+            } else if (status === 'error') {
+                authorityStatus.classList.add('is-error');
+            }
+        };
+
+        const updateAuthoritySaveButtonState = () => {
+            if (!authoritySaveButton) {
+                return;
+            }
+            const shouldDisable =
+                !driveImageAuthorityState.loaded ||
+                driveImageAuthorityState.loading ||
+                driveImageAuthorityState.saving ||
+                !driveImageAuthorityState.dirty;
+            authoritySaveButton.disabled = shouldDisable;
+        };
+
+        const setAuthorityDirty = (isDirty) => {
+            driveImageAuthorityState.dirty = Boolean(isDirty);
+            updateAuthoritySaveButtonState();
+        };
+
+        const updateAuthorityInteractivity = () => {
+            const disabled = driveImageAuthorityState.loading || driveImageAuthorityState.saving;
+            authorityCheckboxMap.forEach((controls) => {
+                controls.upload.disabled = disabled;
+                controls.delete.disabled = disabled;
+            });
+        };
+
+        const clearAuthorityError = () => {
+            if (!authorityError) {
+                return;
+            }
+            authorityError.hidden = true;
+            authorityError.setAttribute('aria-hidden', 'true');
+            authorityError.textContent = '';
+        };
+
+        const showAuthorityError = (message) => {
+            if (authorityError) {
+                authorityError.textContent = message || '権限設定の取得に失敗しました。';
+                authorityError.hidden = false;
+                authorityError.setAttribute('aria-hidden', 'false');
+            }
+            if (authorityFolderList) {
+                authorityFolderList.textContent = '';
+                authorityFolderList.setAttribute('aria-hidden', 'true');
+            }
+            authorityCheckboxMap.clear();
+            setAuthorityEmptyState(false);
+            updateAuthorityInteractivity();
+            setAuthorityDirty(false);
+        };
+
+        const setAuthorityEmptyState = (visible) => {
+            if (!authorityEmpty) {
+                return;
+            }
+            authorityEmpty.hidden = !visible;
+            authorityEmpty.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        };
+
+        const setAuthorityLoading = (isLoading) => {
+            driveImageAuthorityState.loading = Boolean(isLoading);
+            if (authorityLoading) {
+                authorityLoading.hidden = !isLoading;
+                authorityLoading.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
+            }
+            if (authorityFolderList) {
+                authorityFolderList.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+                if (isLoading) {
+                    authorityFolderList.setAttribute('aria-hidden', 'true');
+                }
+            }
+            if (isLoading) {
+                clearAuthorityError();
+                setAuthorityEmptyState(false);
+                clearAuthorityStatus();
+            }
+            updateAuthorityInteractivity();
+            updateAuthoritySaveButtonState();
+        };
+
+        const setAuthoritySaving = (isSaving) => {
+            driveImageAuthorityState.saving = Boolean(isSaving);
+            updateAuthorityInteractivity();
+            updateAuthoritySaveButtonState();
+        };
+
+        const syncAuthorityStateWithFolders = () => {
+            const folderKeys = driveImageAuthorityState.folders.map((folder) => normalizeFolderKey(folder.key));
+
+            DRIVE_IMAGE_ROLES.forEach((role) => {
+                const permissions = driveImageAuthorityState.permissionsByRole[role] || {};
+                folderKeys.forEach((key) => {
+                    if (!permissions[key]) {
+                        permissions[key] = { upload: false, delete: false };
+                    } else {
+                        permissions[key] = {
+                            upload: Boolean(permissions[key].upload),
+                            delete: Boolean(permissions[key].delete)
+                        };
+                    }
+                });
+                Object.keys(permissions).forEach((key) => {
+                    if (!folderKeys.includes(key)) {
+                        delete permissions[key];
+                    }
+                });
+                driveImageAuthorityState.permissionsByRole[role] = permissions;
+            });
+        };
+
+        const getRolePermissions = (role) => {
+            const resolved = resolveAuthorityRole(role);
+            if (!resolved) {
+                return {};
+            }
+            if (!driveImageAuthorityState.permissionsByRole[resolved]) {
+                driveImageAuthorityState.permissionsByRole[resolved] = {};
+            }
+            return driveImageAuthorityState.permissionsByRole[resolved];
+        };
+
+        const getCurrentRolePermissions = () => {
+            return getRolePermissions(driveImageAuthorityState.currentRole);
+        };
+
+        const applyPermissionsToUI = () => {
+            const permissions = getCurrentRolePermissions();
+            authorityCheckboxMap.forEach((controls, key) => {
+                const normalizedKey = normalizeFolderKey(key);
+                const state = permissions[normalizedKey] || { upload: false, delete: false };
+                controls.upload.checked = Boolean(state.upload);
+                controls.delete.checked = Boolean(state.delete);
+            });
+        };
+
+        const handleAuthorityCheckboxChange = (event) => {
+            const checkbox = event.target;
+            if (!checkbox || checkbox.type !== 'checkbox' || checkbox.disabled) {
+                return;
+            }
+            const folderKey = normalizeFolderKey(checkbox.dataset.folderKey);
+            const permissionKey = checkbox.dataset.permission === 'delete' ? 'delete' : 'upload';
+            const permissions = getCurrentRolePermissions();
+            if (!permissions[folderKey]) {
+                permissions[folderKey] = { upload: false, delete: false };
+            }
+            permissions[folderKey][permissionKey] = checkbox.checked;
+            driveImageAuthorityState.permissionsByRole[driveImageAuthorityState.currentRole] = permissions;
+            setAuthorityDirty(true);
+            clearAuthorityStatus();
+        };
+
+        const updateAuthorityRoleButtonsUI = () => {
+            authorityRoleButtons.forEach((button) => {
+                const role = resolveAuthorityRole(button.dataset.authorityRole);
+                const isActive = role === driveImageAuthorityState.currentRole;
+                button.classList.toggle('active', Boolean(isActive));
+                button.classList.toggle('is-active', Boolean(isActive));
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+        };
+
+        const normalizeFolderRecord = (folder) => {
+            if (!folder || typeof folder !== 'object') {
+                return null;
+            }
+            const key = normalizeFolderKey(folder.key || folder.name || '');
+            const displayName = folder.displayName || folder.name || (key === DRIVE_IMAGE_ROOT_KEY ? '未分類' : key);
+            const path = folder.path || `Image${key === DRIVE_IMAGE_ROOT_KEY ? '' : `/${folder.name || ''}`}`;
+            const imageCount = typeof folder.imageCount === 'number' ? folder.imageCount : 0;
+            return {
+                id: folder.id || key,
+                key,
+                name: folder.name || '',
+                displayName,
+                path,
+                imageCount
+            };
+        };
+
+        const renderAuthorityFolders = () => {
+            if (!authorityFolderList) {
+                return;
+            }
+            authorityFolderList.textContent = '';
+            authorityFolderList.setAttribute('aria-hidden', 'false');
+            authorityCheckboxMap.clear();
+
+            if (!driveImageAuthorityState.folders.length) {
+                setAuthorityEmptyState(true);
+                authorityFolderList.setAttribute('aria-hidden', 'true');
+                updateAuthorityInteractivity();
+                return;
+            }
+
+            setAuthorityEmptyState(false);
+
+            driveImageAuthorityState.folders.forEach((folder) => {
+                const normalizedKey = normalizeFolderKey(folder.key);
+                const safeKey = normalizedKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+                const item = document.createElement('div');
+                item.className = 'authority-folder-item';
+
+                const info = document.createElement('div');
+                info.className = 'authority-folder-info';
+
+                const name = document.createElement('p');
+                name.className = 'authority-folder-name';
+                name.textContent = folder.displayName || folder.name || (normalizedKey === DRIVE_IMAGE_ROOT_KEY ? '未分類' : normalizedKey);
+
+                const meta = document.createElement('p');
+                meta.className = 'authority-folder-meta';
+                const imageCount = typeof folder.imageCount === 'number' ? folder.imageCount : 0;
+                meta.textContent = `パス: ${folder.path} ／ 画像数: ${imageCount}`;
+
+                info.appendChild(name);
+                info.appendChild(meta);
+
+                const controls = document.createElement('div');
+                controls.className = 'authority-permission-group';
+
+                const uploadCheckbox = document.createElement('input');
+                uploadCheckbox.type = 'checkbox';
+                uploadCheckbox.id = `authority-upload-${safeKey}`;
+                uploadCheckbox.dataset.folderKey = normalizedKey;
+                uploadCheckbox.dataset.permission = 'upload';
+
+                const uploadLabel = document.createElement('label');
+                uploadLabel.setAttribute('for', uploadCheckbox.id);
+                uploadLabel.appendChild(uploadCheckbox);
+                uploadLabel.appendChild(document.createTextNode('アップロード'));
+
+                const deleteCheckbox = document.createElement('input');
+                deleteCheckbox.type = 'checkbox';
+                deleteCheckbox.id = `authority-delete-${safeKey}`;
+                deleteCheckbox.dataset.folderKey = normalizedKey;
+                deleteCheckbox.dataset.permission = 'delete';
+
+                const deleteLabel = document.createElement('label');
+                deleteLabel.setAttribute('for', deleteCheckbox.id);
+                deleteLabel.appendChild(deleteCheckbox);
+                deleteLabel.appendChild(document.createTextNode('削除'));
+
+                uploadCheckbox.addEventListener('change', handleAuthorityCheckboxChange);
+                deleteCheckbox.addEventListener('change', handleAuthorityCheckboxChange);
+
+                controls.appendChild(uploadLabel);
+                controls.appendChild(deleteLabel);
+
+                item.appendChild(info);
+                item.appendChild(controls);
+
+                authorityFolderList.appendChild(item);
+                authorityCheckboxMap.set(normalizedKey, { upload: uploadCheckbox, delete: deleteCheckbox });
+            });
+
+            updateAuthorityInteractivity();
+            applyPermissionsToUI();
+        };
+
+        const fetchDriveImageFolders = async () => {
+            if (!DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT) {
+                throw new Error('Drive画像APIのエンドポイントが設定されていません。');
+            }
+            const url = new URL(DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT);
+            url.searchParams.set('action', 'folders');
+            url.searchParams.set('_', Date.now().toString());
+
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                mode: 'cors',
+                credentials: 'omit'
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                throw new Error((errorText && errorText.trim()) || `フォルダ一覧の取得に失敗しました (HTTP ${response.status})`);
+            }
+
+            const result = await response.json().catch(() => null);
+            if (!result || !result.success) {
+                throw new Error((result && (result.message || result.error)) || 'フォルダ一覧の取得に失敗しました。');
+            }
+
+            const folders = Array.isArray(result.folders) ? result.folders : [];
+            return folders.map(normalizeFolderRecord).filter(Boolean);
+        };
+
+        const mergeAuthorityData = (authorities) => {
+            const imageAuthorities = extractImageAuthorities(authorities);
+            const nextPermissions = {};
+            DRIVE_IMAGE_ROLES.forEach((role) => {
+                nextPermissions[role] = {};
+            });
+
+            Object.keys(imageAuthorities).forEach((folderKey) => {
+                const normalizedKey = normalizeFolderKey(folderKey);
+                const folderEntry = imageAuthorities[folderKey];
+                if (!folderEntry || typeof folderEntry !== 'object') {
+                    return;
+                }
+
+                Object.keys(folderEntry).forEach((roleKey) => {
+                    const role = resolveAuthorityRole(roleKey);
+                    if (!role) {
+                        return;
+                    }
+                    if (!nextPermissions[role]) {
+                        nextPermissions[role] = {};
+                    }
+                    const value = folderEntry[roleKey] || {};
+                    nextPermissions[role][normalizedKey] = {
+                        upload: Boolean(value.upload),
+                        delete: Boolean(value.delete)
+                    };
+                });
+            });
+
+            DRIVE_IMAGE_ROLES.forEach((role) => {
+                if (!nextPermissions[role]) {
+                    nextPermissions[role] = {};
+                }
+            });
+
+            driveImageAuthorityState.permissionsByRole = nextPermissions;
+            syncAuthorityStateWithFolders();
+        };
+
+        const fetchDriveImageAuthorityData = async () => {
+            if (!DRIVE_IMAGE_PERMISSION_ENDPOINT) {
+                throw new Error('権限管理APIのエンドポイントが設定されていません。');
+            }
+
+            const payload = {
+                action: 'getDriveImageAuthorities',
+                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
+
+            const response = await fetch(DRIVE_IMAGE_PERMISSION_ENDPOINT, {
+                method: 'POST',
+                mode: 'cors',
+                credentials: 'omit',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                throw new Error((errorText && errorText.trim()) || `権限設定の取得に失敗しました (HTTP ${response.status})`);
+            }
+
+            const result = await response.json().catch(() => null);
+            if (!result || !result.success) {
+                throw new Error((result && result.message) || '権限設定の取得に失敗しました。');
+            }
+
+            return result.authorities || {};
+        };
+
+        const buildAuthorityPayload = () => {
+            const payload = {};
+            const validKeys = new Set(driveImageAuthorityState.folders.map((folder) => normalizeFolderKey(folder.key)));
+
+            DRIVE_IMAGE_ROLES.forEach((role) => {
+                const permissions = driveImageAuthorityState.permissionsByRole[role] || {};
+                Object.keys(permissions).forEach((folderKey) => {
+                    if (!validKeys.has(folderKey)) {
+                        return;
+                    }
+                    if (!payload[folderKey]) {
+                        payload[folderKey] = {};
+                    }
+                    payload[folderKey][role] = {
+                        upload: Boolean(permissions[folderKey].upload),
+                        delete: Boolean(permissions[folderKey].delete)
+                    };
+                });
+            });
+
+            return { Image: payload };
+        };
+
+        const ensureAuthorityDataLoaded = async () => {
+            if (driveImageAuthorityState.loading || driveImageAuthorityState.loaded) {
+                return;
+            }
+
+            setAuthorityLoading(true);
+
+            try {
+                const [folders, authorities] = await Promise.all([
+                    fetchDriveImageFolders(),
+                    fetchDriveImageAuthorityData()
+                ]);
+
+                driveImageAuthorityState.folders = folders;
+                mergeAuthorityData(authorities);
+                driveImageAuthorityState.loaded = true;
+                setAuthorityDirty(false);
+
+                renderAuthorityFolders();
+                updateAuthorityRoleButtonsUI();
+                applyPermissionsToUI();
+
+                if (!folders.length) {
+                    clearAuthorityStatus();
+                } else {
+                    setAuthorityStatus('最新の権限設定を読み込みました。', 'success');
+                }
+            } catch (error) {
+                console.error('Drive画像権限の取得に失敗しました。', error);
+                driveImageAuthorityState.loaded = false;
+                showAuthorityError(error && error.message ? error.message : '権限設定の取得に失敗しました。');
+            } finally {
+                setAuthorityLoading(false);
+            }
+        };
+
+        const saveDriveImageAuthorities = async () => {
+            if (!driveImageAuthorityState.loaded) {
+                setAuthorityStatus('権限データの読み込み完了を待ってから保存してください。', 'error');
+                return;
+            }
+
+            if (!driveImageAuthorityState.dirty || driveImageAuthorityState.saving) {
+                return;
+            }
+
+            if (!adminVerificationResult || !adminVerificationResult.success) {
+                setAuthorityStatus('管理者認証が確認できません。ページを再読み込みしてください。', 'error');
+                return;
+            }
+
+            const payload = {
+                action: 'updateDriveImageAuthorities',
+                authorities: buildAuthorityPayload(),
+                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
+
+            try {
+                clearAuthorityStatus();
+                setAuthoritySaving(true);
+
+                const response = await fetch(DRIVE_IMAGE_PERMISSION_ENDPOINT, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error((errorText && errorText.trim()) || `権限設定の保存に失敗しました (HTTP ${response.status})`);
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || !result.success) {
+                    throw new Error((result && result.message) || '権限設定の保存に失敗しました。');
+                }
+
+                mergeAuthorityData(result.authorities || {});
+                setAuthorityDirty(false);
+                setAuthorityStatus('権限設定を保存しました。', 'success');
+            } catch (error) {
+                console.error('Drive画像権限の保存に失敗しました。', error);
+                setAuthorityStatus(error && error.message ? error.message : '権限設定の保存に失敗しました。', 'error');
+            } finally {
+                setAuthoritySaving(false);
+                applyPermissionsToUI();
+            }
+        };
+
+        const showAuthoritySection = () => {
+            if (authoritySection) {
+                authoritySection.hidden = false;
+                authoritySection.setAttribute('aria-hidden', 'false');
+            }
+        };
+
+        const hideAuthoritySection = () => {
+            if (authoritySection) {
+                authoritySection.hidden = true;
+                authoritySection.setAttribute('aria-hidden', 'true');
+            }
+        };
+
+        const prepareDriveImageAuthoritySettings = () => {
+            showAuthoritySection();
+            if (!driveImageAuthorityState.loaded && !driveImageAuthorityState.loading) {
+                ensureAuthorityDataLoaded();
+            } else {
+                renderAuthorityFolders();
+                updateAuthorityRoleButtonsUI();
+                applyPermissionsToUI();
+                updateAuthoritySaveButtonState();
+            }
+        };
+
+        updateAuthorityRoleButtonsUI();
+
+        authorityRoleButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const role = resolveAuthorityRole(button.dataset.authorityRole);
+                if (!role || driveImageAuthorityState.currentRole === role) {
+                    return;
+                }
+                driveImageAuthorityState.currentRole = role;
+                updateAuthorityRoleButtonsUI();
+                applyPermissionsToUI();
+                clearAuthorityStatus();
+            });
+        });
+
+        updateAuthoritySaveButtonState();
 
         const setMemberReloading = (isLoading) => {
             if (!memberReloadButton) {
@@ -1530,6 +2352,7 @@
             const description = MENU_DESCRIPTIONS[currentPage] || '';
             const isMemberPage = currentPage === 'member';
             const isPluginPage = currentPage === 'plugin';
+            const isAuthorityPage = currentPage === 'authority';
 
             contentTitle.textContent = label;
             contentDescription.textContent = description;
@@ -1540,19 +2363,27 @@
                 setPlaceholderVisibility(false);
                 showMemberSection();
                 hidePluginSettingsSection();
+                hideAuthoritySection();
                 fetchMemberRecords(false);
             } else if (isPluginPage) {
                 hideMemberSection();
                 setPlaceholderVisibility(false);
                 showPluginSettingsSection();
+                hideAuthoritySection();
                 if (!pluginSettingsLoaded && !pluginLoadingInProgress) {
                     loadToolbarPluginSettings();
                 } else {
                     updatePluginSaveButtonState();
                 }
+            } else if (isAuthorityPage) {
+                hideMemberSection();
+                hidePluginSettingsSection();
+                setPlaceholderVisibility(false);
+                prepareDriveImageAuthoritySettings();
             } else {
                 hideMemberSection();
                 hidePluginSettingsSection();
+                hideAuthoritySection();
                 setPlaceholderVisibility(true);
                 placeholderTitle.textContent = `${label} は現在準備中です`;
                 placeholderDescription.textContent = 'このページでは将来的に管理者向けの設定操作が提供される予定です。';
@@ -1676,6 +2507,7 @@
                 });
 
                 pluginSaveButton?.addEventListener('click', saveToolbarPluginSettings);
+                authoritySaveButton?.addEventListener('click', saveDriveImageAuthorities);
 
                 returnEditorButton.addEventListener('click', () => {
                     window.location.href = './edit.html';

@@ -4,6 +4,9 @@
  * @class DriveImageHandler
  */
 export class DriveImageHandler {
+  static ROOT_FOLDER_KEY = '__root__';
+  static DEFAULT_PERMISSION_CACHE_TTL = 5 * 60 * 1000;
+
   /**
    * 画像ファイルをGoogle Driveにアップロード（CORS対応版）
    * @param {File} file - アップロードするファイル
@@ -11,19 +14,21 @@ export class DriveImageHandler {
    * @param {Object} options - 設定オプション
    * @returns {Promise<Object>} アップロード結果
    */
-  static async uploadImage(file, editor, options) {
+  static async uploadImage(file, editor, options, folderName = null) {
     const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     try {
       if (!this.validateFile(file, options)) {
         throw new Error(`ファイル検証に失敗: ${file.name}`);
       }
-      
+
       this.showLoading(`"${file.name}" をアップロード中...`);
-      
+
       // Base64に変換（プリフライトリクエストを回避するため）
       const base64Data = await this.fileToBase64(file);
-      
+
+      const normalizedFolder = this.normalizeFolderName(folderName, options);
+
       // リクエストデータを作成
       const requestData = {
         file: base64Data,
@@ -31,7 +36,8 @@ export class DriveImageHandler {
         mimetype: file.type,
         size: file.size.toString(),
         uploadId: uploadId,
-        method: 'base64'
+        method: 'base64',
+        folderName: normalizedFolder || undefined
       };
       
       const startTime = Date.now();
@@ -265,18 +271,18 @@ export class DriveImageHandler {
    * @param {Function} progressCallback - 進捗コールバック
    * @returns {Promise<Object>} アップロード結果統計
    */
-  static async uploadMultipleImages(files, editor, options, progressCallback = null) {
+  static async uploadMultipleImages(files, editor, options, progressCallback = null, folderName = null) {
     if (!files || files.length === 0) return { success: [], errors: [] };
-    
+
     const results = { success: [], errors: [] };
     const maxConcurrent = Math.min(options.maxConcurrentUploads || 2, 2); // CORS回避のため最大2並列
-    
+
     // ファイルをチャンクに分割して並列処理
     for (let i = 0; i < files.length; i += maxConcurrent) {
       const chunk = files.slice(i, i + maxConcurrent);
       const promises = chunk.map(async (file) => {
         try {
-          const result = await this.uploadImage(file, editor, options);
+          const result = await this.uploadImage(file, editor, options, folderName);
           results.success.push(result);
           
           if (progressCallback) {
@@ -473,22 +479,26 @@ export class DriveImageHandler {
       }
       
       const result = await response.json();
-      
+
       if (result.success) {
-        const images = result.images || [];
-        
+        const folders = this.extractGalleryFolders(result);
+
         if (options.debug) {
-          console.log(`Loaded ${images.length} images from gallery`);
+          const totalImages = folders.reduce((sum, folder) => sum + folder.images.length, 0);
+          console.log(`Loaded ${folders.length} folders and ${totalImages} images from gallery`);
         }
-        
-        return images;
+
+        return {
+          folders,
+          updatedAt: result.updatedAt || null
+        };
       } else {
         throw new Error(result.error || 'ギャラリーの読み込みに失敗しました');
       }
     } catch (error) {
       console.error('Gallery load error:', error);
       this.showMessage(`ギャラリー読み込みエラー: ${this.formatGalleryError(error)}`, 'error');
-      return [];
+      return { folders: [] };
     }
   }
   
@@ -512,11 +522,220 @@ export class DriveImageHandler {
       return error.message;
     }
   }
-  
+
+  static sanitizeFolderLabel(label) {
+    return (label || '').toString().trim();
+  }
+
+  static getFolderKey(label) {
+    const sanitized = this.sanitizeFolderLabel(label);
+    return sanitized || this.ROOT_FOLDER_KEY;
+  }
+
+  static normalizeFolderName(folderName, options) {
+    const provided = (folderName || '').toString().trim();
+    const fallback = options && typeof options.defaultFolderName === 'string'
+      ? options.defaultFolderName.toString().trim()
+      : '';
+    const candidate = provided || fallback;
+    if (!candidate || candidate === this.ROOT_FOLDER_KEY) {
+      return '';
+    }
+    return candidate.replace(/[\\/]/g, '').trim();
+  }
+
+  static normalizeImageRecord(image, folderLabel, folderKey, actualName = '') {
+    if (!image || typeof image !== 'object') {
+      return null;
+    }
+    const normalized = { ...image };
+    normalized.folderName = actualName || folderLabel;
+    normalized.folderDisplayName = folderLabel;
+    normalized.folderKey = folderKey;
+    normalized.thumbnail = normalized.thumbnail || normalized.url || '';
+    normalized.name = normalized.name || normalized.filename || normalized.fileName || '';
+    return normalized;
+  }
+
+  static normalizeFolderMetadata(folder) {
+    if (!folder || typeof folder !== 'object') {
+      return null;
+    }
+    const rawName = typeof folder.name === 'string' ? folder.name : '';
+    const label = this.sanitizeFolderLabel(folder.displayName || folder.label || rawName);
+    const key = folder.key ? this.getFolderKey(folder.key) : this.getFolderKey(rawName || label);
+    const images = Array.isArray(folder.images)
+      ? folder.images
+          .map((image) => this.normalizeImageRecord(image, label || rawName || '', key, rawName))
+          .filter(Boolean)
+      : [];
+    return {
+      id: folder.id || key,
+      name: rawName,
+      displayName: label || rawName || '未分類',
+      key,
+      path: folder.path || '',
+      imageCount: typeof folder.imageCount === 'number' ? folder.imageCount : images.length,
+      images
+    };
+  }
+
+  static extractGalleryFolders(result) {
+    const folders = [];
+    if (Array.isArray(result?.folders)) {
+      result.folders.forEach((folder) => {
+        const normalized = this.normalizeFolderMetadata(folder);
+        if (normalized) {
+          folders.push(normalized);
+        }
+      });
+    }
+
+    if ((!folders.length || result?.includeRoot) && Array.isArray(result?.images)) {
+      const key = this.ROOT_FOLDER_KEY;
+      const rawName = '';
+      const label = this.sanitizeFolderLabel(result.rootName) || '未分類';
+      const images = result.images
+        .map((image) => this.normalizeImageRecord(image, label, key, rawName))
+        .filter(Boolean);
+
+      folders.push({
+        id: key,
+        name: rawName,
+        displayName: label,
+        key,
+        path: '',
+        imageCount: images.length,
+        images
+      });
+    }
+
+    return folders;
+  }
+
+  static resolveRole(options) {
+    if (!options) {
+      return null;
+    }
+    if (options.userRole) {
+      const role = options.userRole.toString().trim();
+      if (role) {
+        return role;
+      }
+    }
+    const authority = options.userAuthority;
+    const numeric = Number(authority);
+    if (Number.isFinite(numeric)) {
+      if (numeric >= 3) {
+        return 'Moderator';
+      }
+      if (numeric >= 2) {
+        return 'Editor';
+      }
+    }
+    return null;
+  }
+
+  static getPermissionCacheKey(options) {
+    const role = this.resolveRole(options);
+    return role ? role.toLowerCase() : null;
+  }
+
+  static getCachedPermissions(options) {
+    const cacheKey = this.getPermissionCacheKey(options);
+    if (!cacheKey) {
+      return {};
+    }
+    const cached = this.permissionCache.get(cacheKey);
+    return cached ? cached.data : {};
+  }
+
+  static normalizePermissions(rawPermissions) {
+    if (!rawPermissions || typeof rawPermissions !== 'object') {
+      return {};
+    }
+    const normalized = {};
+    Object.keys(rawPermissions).forEach((key) => {
+      const label = this.sanitizeFolderLabel(key);
+      const folderKey = this.getFolderKey(label || key);
+      const value = rawPermissions[key] || {};
+      normalized[folderKey] = {
+        label: label || '',
+        upload: Boolean(value.upload),
+        delete: Boolean(value.delete)
+      };
+    });
+    return normalized;
+  }
+
+  static async fetchPermissions(options, role) {
+    if (!options?.permissionsEndpoint || !role) {
+      return {};
+    }
+
+    try {
+      const response = await fetch(options.permissionsEndpoint, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify({
+          action: 'getDriveImagePermissions',
+          role,
+          authority: options.userAuthority ?? null
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(errorText || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json().catch(() => null);
+      if (result && result.success) {
+        return this.normalizePermissions(result.permissions);
+      }
+    } catch (error) {
+      console.error('Failed to fetch drive image permissions:', error);
+    }
+
+    return {};
+  }
+
+  static async ensurePermissions(options) {
+    const cacheKey = this.getPermissionCacheKey(options);
+    if (!cacheKey) {
+      return {};
+    }
+
+    const cached = this.permissionCache.get(cacheKey);
+    const ttl = options?.permissionCacheTimeout || this.DEFAULT_PERMISSION_CACHE_TTL;
+    if (cached && Date.now() - cached.timestamp < ttl) {
+      return cached.data;
+    }
+
+    const role = this.resolveRole(options);
+    if (!role) {
+      this.permissionCache.set(cacheKey, { data: {}, timestamp: Date.now() });
+      return {};
+    }
+
+    const permissions = await this.fetchPermissions(options, role);
+    this.permissionCache.set(cacheKey, { data: permissions, timestamp: Date.now() });
+    return permissions;
+  }
+
+  static async getPermissions(options) {
+    return this.ensurePermissions(options);
+  }
+
   /**
    * 簡易キャッシュ管理（削除機能追加）
    */
   static cache = new Map();
+  static permissionCache = new Map();
   
   static getCache(key) {
     return this.cache.get(key);
@@ -537,6 +756,7 @@ export class DriveImageHandler {
   
   static clearCache() {
     this.cache.clear();
+    this.permissionCache.clear();
   }
   
   /**

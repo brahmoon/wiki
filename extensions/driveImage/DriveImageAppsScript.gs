@@ -8,6 +8,7 @@
 
 const DRIVE_IMAGE_FOLDER_PROPERTY = '1RiX0j4Dh33wQETm1OIjcXWuxcYd9xHx6';
 const DEFAULT_UPLOAD_FOLDER_NAME = 'Image';
+const ROOT_FOLDER_KEY = '__root__';
 
 /**
  * Handles GET requests (e.g. gallery listing).
@@ -18,8 +19,13 @@ function doGet(e) {
   const action = (e && e.parameter && e.parameter.action || '').toString().toLowerCase();
 
   if (action === 'gallery') {
-    const images = listGalleryImages();
-    return createJsonOutput({ success: true, images });
+    const folders = listImageFolders({ includeImages: true });
+    return createJsonOutput({ success: true, folders });
+  }
+
+  if (action === 'folders') {
+    const folders = listImageFolders({ includeImages: false });
+    return createJsonOutput({ success: true, folders });
   }
 
   return createJsonOutput({
@@ -153,8 +159,9 @@ function handleBase64Upload(data) {
     };
   }
 
-  const folder = getUploadFolder();
-  const file = folder.createFile(blob);
+  const rootFolder = getUploadFolder();
+  const targetFolder = getOrCreateTargetFolder(rootFolder, data.folderName);
+  const file = targetFolder.createFile(blob);
 
   try {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -184,20 +191,66 @@ function handleBase64Upload(data) {
 }
 
 /**
- * Lists the available images for the gallery action.
+ * Lists image folders and optionally their images.
+ * @param {{includeImages?: boolean}} options
  * @return {Array<Object>}
  */
-function listGalleryImages() {
-  const folder = getUploadFolder();
-  const files = folder.getFiles();
+function listImageFolders(options) {
+  const includeImages = Boolean(options && options.includeImages);
+  const rootFolder = getUploadFolder();
+  const childFolders = rootFolder.getFolders();
+
+  const childEntries = [];
+
+  while (childFolders.hasNext()) {
+    const folder = childFolders.next();
+    const folderName = folder.getName();
+    const images = includeImages ? listImagesInFolder(folder) : [];
+    const imageCount = includeImages ? images.length : countImagesInFolder(folder);
+
+    childEntries.push({
+      id: folder.getId(),
+      name: folderName,
+      displayName: folderName,
+      key: folderName,
+      path: DEFAULT_UPLOAD_FOLDER_NAME + '/' + folderName,
+      imageCount: imageCount,
+      images: includeImages ? images : []
+    });
+  }
+
+  childEntries.sort(function (a, b) {
+    const aName = (a.displayName || '').toString();
+    const bName = (b.displayName || '').toString();
+    return aName.localeCompare(bName, 'ja');
+  });
+
+  const rootImages = includeImages ? listImagesInFolder(rootFolder) : [];
+  const rootImageCount = includeImages ? rootImages.length : countImagesInFolder(rootFolder);
+
+  return [{
+    id: rootFolder.getId(),
+    name: '',
+    displayName: '未分類',
+    key: ROOT_FOLDER_KEY,
+    path: DEFAULT_UPLOAD_FOLDER_NAME,
+    imageCount: rootImageCount,
+    images: includeImages ? rootImages : []
+  }].concat(childEntries);
+}
+
+function listImagesInFolder(folder) {
   const images = [];
+  const files = folder.getFiles();
 
   while (files.hasNext()) {
     const file = files.next();
+    if (!isImageMimeType(file.getMimeType())) {
+      continue;
+    }
     const id = file.getId();
-
     images.push({
-      id,
+      id: id,
       name: file.getName(),
       mimeType: file.getMimeType(),
       size: file.getSize(),
@@ -209,6 +262,18 @@ function listGalleryImages() {
   }
 
   return images;
+}
+
+function countImagesInFolder(folder) {
+  let count = 0;
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    if (isImageMimeType(file.getMimeType())) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 /**
@@ -234,6 +299,32 @@ function getUploadFolder() {
   }
 
   return root.createFolder(DEFAULT_UPLOAD_FOLDER_NAME);
+}
+
+function sanitizeFolderName(name) {
+  if (!name) {
+    return '';
+  }
+  return name.toString().trim().replace(/[\\/:*?"<>|]/g, '').slice(0, 128);
+}
+
+function getOrCreateTargetFolder(rootFolder, folderName) {
+  const sanitized = sanitizeFolderName(folderName);
+  if (!sanitized || sanitized === ROOT_FOLDER_KEY) {
+    return rootFolder;
+  }
+  const existing = rootFolder.getFoldersByName(sanitized);
+  if (existing.hasNext()) {
+    return existing.next();
+  }
+  return rootFolder.createFolder(sanitized);
+}
+
+function isImageMimeType(mimeType) {
+  if (!mimeType) {
+    return false;
+  }
+  return mimeType.toString().toLowerCase().indexOf('image/') === 0;
 }
 
 /**
