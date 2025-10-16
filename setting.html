@@ -1972,22 +1972,22 @@
                 select.insertBefore(placeholder, select.firstChild);
             }
 
+            const status = document.createElement('span');
+            status.className = 'member-authority-status';
+            status.setAttribute('role', 'status');
+            
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn-primary member-authority-update';
             button.textContent = '変更';
-
-            const status = document.createElement('span');
-            status.className = 'member-authority-status';
-            status.setAttribute('role', 'status');
 
             button.addEventListener('click', () => {
                 handleAuthorityUpdate(member, select, button, status, updatedCell);
             });
 
             control.appendChild(select);
+            control.appendChild(status); 
             control.appendChild(button);
-            control.appendChild(status);
 
             cell.appendChild(control);
             return cell;
