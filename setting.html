@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wiki 管理設定</title>
     <link rel="stylesheet" href="./styles/editor.css" />
+    <script src="./scripts/appsScriptEndpoints.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -883,11 +884,11 @@
     </div>
     <script>
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
-        const ADMIN_AUTH_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxqJEfpYVc3Xtpf_NXdB0j-EUDefyFw04F1ZEtPnandolXMUsxnSAlQUVk8FL5hz0BubA/exec';
+        const APPS_SCRIPT_ENDPOINT_ADMIN_AUTH = window.APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
         const ADMIN_AUTH_TIMEOUT = 10000;
-        const USER_SETTINGS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3fjjyy7ioBSrhQC07zZ4RFdUMVVsWD8OuZvq0kcCwXP7k1FX1_X4L9_MRbAM4OgYmpA/exec';
-        const DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyvK1s6Zs4ccn_yeSh2Xz8MWOa5AO8y_GsqRr8BacITxMU8MhcEFDVm7IT56ZZUvWXE/exec';
-        const DRIVE_IMAGE_PERMISSION_ENDPOINT = ADMIN_AUTH_ENDPOINT;
+        const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
+        const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
+        const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION = APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
         const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator'];
         const DRIVE_IMAGE_ROOT_KEY = '__root__';
         const MENU_LABELS = {
@@ -1550,10 +1551,10 @@
         };
 
         const fetchDriveImageFolders = async () => {
-            if (!DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT) {
+            if (!APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE) {
                 throw new Error('Drive画像APIのエンドポイントが設定されていません。');
             }
-            const url = new URL(DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT);
+            const url = new URL(APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE);
             url.searchParams.set('action', 'folders');
             url.searchParams.set('_', Date.now().toString());
 
@@ -1618,7 +1619,7 @@
         };
 
         const fetchDriveImageAuthorityData = async () => {
-            if (!DRIVE_IMAGE_PERMISSION_ENDPOINT) {
+            if (!APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION) {
                 throw new Error('権限管理APIのエンドポイントが設定されていません。');
             }
 
@@ -1629,7 +1630,7 @@
                 googleEmail: currentLoginState?.user?.email || ''
             };
 
-            const response = await fetch(DRIVE_IMAGE_PERMISSION_ENDPOINT, {
+            const response = await fetch(APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION, {
                 method: 'POST',
                 mode: 'cors',
                 credentials: 'omit',
@@ -1738,7 +1739,7 @@
                 clearAuthorityStatus();
                 setAuthoritySaving(true);
 
-                const response = await fetch(DRIVE_IMAGE_PERMISSION_ENDPOINT, {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
@@ -2053,7 +2054,7 @@
                 throw new Error('管理者認証が確認できません。ページを再読み込みしてください。');
             }
 
-            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+            if (!APPS_SCRIPT_ENDPOINT_ADMIN_AUTH || APPS_SCRIPT_ENDPOINT_ADMIN_AUTH.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
                 throw new Error('管理者認証APIのエンドポイントが設定されていません。');
             }
 
@@ -2066,7 +2067,7 @@
                 googleEmail: currentLoginState?.user?.email || ''
             };
 
-            const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+            const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                 method: 'POST',
                 mode: 'cors',
                 credentials: 'omit',
@@ -2094,7 +2095,7 @@
                 return;
             }
 
-            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+            if (!APPS_SCRIPT_ENDPOINT_ADMIN_AUTH || APPS_SCRIPT_ENDPOINT_ADMIN_AUTH.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
                 setPluginStatusMessage('プラグイン設定APIのエンドポイントが設定されていません。', 'error');
                 return;
             }
@@ -2103,7 +2104,7 @@
             clearPluginStatus();
 
             try {
-                const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
@@ -2153,7 +2154,7 @@
                 return;
             }
 
-            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+            if (!APPS_SCRIPT_ENDPOINT_ADMIN_AUTH || APPS_SCRIPT_ENDPOINT_ADMIN_AUTH.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
                 setPluginStatusMessage('プラグイン設定APIのエンドポイントが設定されていません。', 'error');
                 return;
             }
@@ -2175,7 +2176,7 @@
             }
 
             try {
-                const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
@@ -2291,7 +2292,7 @@
                 memberDataLoaded = false;
             }
 
-            if (!USER_SETTINGS_ENDPOINT || USER_SETTINGS_ENDPOINT.includes('YOUR_DEPLOYMENT_ID')) {
+            if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
                 showMemberError('ユーザー情報のAPIエンドポイントが正しく設定されていません。');
                 return;
             }
@@ -2308,7 +2309,7 @@
             setMemberLoading(true);
 
             try {
-                const response = await fetch(USER_SETTINGS_ENDPOINT, {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
@@ -2391,7 +2392,7 @@
         };
 
         const callAdminAuthorizationApi = async (loginState) => {
-            if (!ADMIN_AUTH_ENDPOINT || ADMIN_AUTH_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+            if (!APPS_SCRIPT_ENDPOINT_ADMIN_AUTH || APPS_SCRIPT_ENDPOINT_ADMIN_AUTH.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
                 throw new Error('管理者認証APIのエンドポイントが設定されていません。');
             }
 
@@ -2407,7 +2408,7 @@
                     origin: window.location.origin
                 };
 
-                const response = await fetch(ADMIN_AUTH_ENDPOINT, {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',

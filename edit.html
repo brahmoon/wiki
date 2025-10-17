@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wiki with TipTap</title>
     <link rel="stylesheet" href="./styles/editor.css">
+    <script src="./scripts/appsScriptEndpoints.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -1136,7 +1137,7 @@
         import { WikiDataService } from './scripts/wikiDataService.js';
 
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
-        const USER_SETTINGS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3fjjyy7ioBSrhQC07zZ4RFdUMVVsWD8OuZvq0kcCwXP7k1FX1_X4L9_MRbAM4OgYmpA/exec';
+        const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
 
         const loginStatusText = document.getElementById('login-status-text');
@@ -1218,7 +1219,7 @@
         };
 
         const callUserSettingsApi = async (payload) => {
-            if (!USER_SETTINGS_ENDPOINT || USER_SETTINGS_ENDPOINT.includes('YOUR_DEPLOYMENT_ID')) {
+            if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
                 throw new Error('ユーザー設定APIのエンドポイントが設定されていません。');
             }
 
@@ -1226,7 +1227,7 @@
             const timeoutId = window.setTimeout(() => controller.abort(), USER_SETTINGS_REQUEST_TIMEOUT);
 
             try {
-                const response = await fetch(USER_SETTINGS_ENDPOINT, {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
@@ -1730,13 +1731,10 @@
          * - wiki-backend.gs (spreadsheet storage)
          * - extensions/driveImage/DriveImageAppsScript.gs (Drive image management)
          */
-        const WIKI_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyFiFm2zdtkPhuZ4EOJ-yLEGnw_opM5hxQBb7EE-sSg2mJ9pOU3HTrFoAXgIeb5J2Q91w/exec';
-        const DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyvK1s6Zs4ccn_yeSh2Xz8MWOa5AO8y_GsqRr8BacITxMU8MhcEFDVm7IT56ZZUvWXE/exec';
-
-        const APPS_SCRIPT_ENDPOINT = WIKI_APPS_SCRIPT_ENDPOINT;
-
-        const TOOLBAR_PLUGIN_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxqJEfpYVc3Xtpf_NXdB0j-EUDefyFw04F1ZEtPnandolXMUsxnSAlQUVk8FL5hz0BubA/exec';
-        const DRIVE_IMAGE_PERMISSION_ENDPOINT = TOOLBAR_PLUGIN_ENDPOINT;
+        const APPS_SCRIPT_ENDPOINT_WIKI = window.APPS_SCRIPT_ENDPOINT_WIKI;
+        const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
+        const APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN = window.APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN;
+        const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION = APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN;
 
         const TOOLBAR_FEATURES = [
             {
@@ -1815,11 +1813,11 @@
         }
 
         window.APP_ENDPOINTS = {
-          wiki: WIKI_APPS_SCRIPT_ENDPOINT,
-          driveImage: DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT
+          wiki: APPS_SCRIPT_ENDPOINT_WIKI,
+          driveImage: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE
         };
 
-        const dataService = new WikiDataService({ endpoint: APPS_SCRIPT_ENDPOINT });
+        const dataService = new WikiDataService({ endpoint: APPS_SCRIPT_ENDPOINT_WIKI });
         const PAGE_LINK_CACHE_KEY = 'wiki.pageLinkCache';
 
         const state = {
@@ -2576,14 +2574,14 @@
         }
 
         async function loadToolbarPluginConfig() {
-            if (!TOOLBAR_PLUGIN_ENDPOINT || TOOLBAR_PLUGIN_ENDPOINT.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+            if (!APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN || APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
                 applyToolbarConfigStates(null);
                 state.toolbarConfig.loaded = false;
                 return;
             }
 
             try {
-                const response = await fetch(TOOLBAR_PLUGIN_ENDPOINT, {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
@@ -3916,7 +3914,7 @@
                     }),
                     PageLinkCard,
                     DriveImageExtension.configure({
-                        webAppUrl: DRIVE_IMAGE_APPS_SCRIPT_ENDPOINT,
+                        webAppUrl: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE,
                         maxFileSize: 10 * 1024 * 1024,
                         allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
                         uploadTimeout: 45000,
@@ -3929,7 +3927,7 @@
                         toolbarSelector: '.toolbar',
                         buttonClass: 'btn',
                         debug: false,
-                        permissionsEndpoint: DRIVE_IMAGE_PERMISSION_ENDPOINT,
+                        permissionsEndpoint: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION,
                         userAuthority: getCurrentUserAuthority()
                     }),
                     YouTubeEmbed
