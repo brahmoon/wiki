@@ -164,6 +164,7 @@
         <div id="status" class="status-message" role="status" aria-live="polite"></div>
         <div class="button-group">
             <button id="login-btn" class="btn-primary" type="button" disabled>Googleでログイン</button>
+            <button id="register-btn" class="btn-secondary" type="button">新規ユーザー登録</button>
             <button id="return-btn" class="btn-secondary" type="button">エディタに戻る</button>
             <button id="logout-btn" class="btn-danger" type="button" style="display: none;">ログアウト</button>
         </div>
@@ -196,6 +197,7 @@
             loginButton: document.getElementById('login-btn'),
             returnButton: document.getElementById('return-btn'),
             logoutButton: document.getElementById('logout-btn'),
+            registerButton: document.getElementById('register-btn'),
             status: document.getElementById('status'),
             profile: document.getElementById('profile')
         };
@@ -463,6 +465,9 @@
         elements.logoutButton.addEventListener('click', handleLogoutClick);
         elements.returnButton.addEventListener('click', () => {
             window.location.href = buildReturnUrl();
+        });
+        elements.registerButton.addEventListener('click', () => {
+            window.location.href = 'resister.html';
         });
 
         window.addEventListener('storage', (event) => {
