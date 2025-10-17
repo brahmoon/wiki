@@ -1133,6 +1133,7 @@
         import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
+        import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
@@ -1327,6 +1328,8 @@
             return Number.isFinite(number) ? number : null;
         }
 
+        let driveImageExtensionInstance = null;
+
         function resolveDriveImageRoleFromAuthority(authority) {
             if (authority === null || authority === undefined) {
                 return null;
@@ -1354,6 +1357,32 @@
 
         function getCurrentUserDriveImageRole() {
             return resolveDriveImageRoleFromAuthority(getCurrentUserAuthority());
+        }
+
+        function refreshDriveImageUserPermissions() {
+            const extension = driveImageExtensionInstance;
+            if (!extension) {
+                return;
+            }
+
+            const authority = getCurrentUserAuthority();
+            const role = resolveDriveImageRoleFromAuthority(authority);
+
+            extension.options.userAuthority = authority ?? null;
+            extension.options.userRole = role ?? '';
+
+            if (extension.modal) {
+                if (extension.modal.options) {
+                    extension.modal.options.userAuthority = authority ?? null;
+                    extension.modal.options.userRole = role ?? '';
+                }
+                extension.modal.permissionsLoaded = false;
+                extension.modal.permissions = {};
+            }
+
+            if (DriveImageHandler?.permissionCache?.clear) {
+                DriveImageHandler.permissionCache.clear();
+            }
         }
 
         function setUserSettingsMessage(message, type = '') {
@@ -1457,6 +1486,7 @@
                     language: settings.language,
                     authority: settings.authority
                 });
+                refreshDriveImageUserPermissions();
                 updateLoginUI();
             } catch (error) {
                 console.error('ユーザー設定の取得中にエラーが発生しました。', error);
@@ -1531,6 +1561,7 @@
                     kingdom: updatedSettings.kingdom,
                     authority: updatedSettings.authority
                 });
+                refreshDriveImageUserPermissions();
                 setUserSettingsMessage('保存しました。', 'success');
                 updateLoginUI();
             } catch (error) {
@@ -1603,6 +1634,7 @@
                 });
             }
             clearStoredLoginState();
+            refreshDriveImageUserPermissions();
             userSettingsState.data = null;
             userSettingsState.loginId = null;
             lastLoginIdentifier = null;
@@ -3967,6 +3999,8 @@
                     }
                 }
             });
+            driveImageExtensionInstance = state.editor?.extensionManager?.extensions?.find((extension) => extension.name === 'driveImage') || null;
+            refreshDriveImageUserPermissions();
             renderToolbar();
             prepareToolbarUpdates();
             refreshToolbarAffordances();
