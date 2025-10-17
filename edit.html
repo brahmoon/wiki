@@ -1139,6 +1139,7 @@
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
+        const ADMIN_AUTHORITY_VALUE = 99; // DriveImage の管理者ロールに対応する権限値（authorize.gs と揃える）
 
         const loginStatusText = document.getElementById('login-status-text');
         const loginButton = document.getElementById('login-button');
@@ -1326,9 +1327,33 @@
             return Number.isFinite(number) ? number : null;
         }
 
+        function resolveDriveImageRoleFromAuthority(authority) {
+            if (authority === null || authority === undefined) {
+                return null;
+            }
+            const numericAuthority = Number(authority);
+            if (!Number.isFinite(numericAuthority)) {
+                return null;
+            }
+            if (numericAuthority >= ADMIN_AUTHORITY_VALUE) {
+                return 'Administrator';
+            }
+            if (numericAuthority >= 3) {
+                return 'Moderator';
+            }
+            if (numericAuthority >= 2) {
+                return 'Editor';
+            }
+            return null;
+        }
+
         function getCurrentUserAuthority() {
             const loginState = getStoredLoginState();
             return parseAuthority(loginState?.user?.authority);
+        }
+
+        function getCurrentUserDriveImageRole() {
+            return resolveDriveImageRoleFromAuthority(getCurrentUserAuthority());
         }
 
         function setUserSettingsMessage(message, type = '') {
@@ -3930,7 +3955,8 @@
                         buttonClass: 'btn',
                         debug: false,
                         permissionsEndpoint: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION,
-                        userAuthority: getCurrentUserAuthority()
+                        userAuthority: getCurrentUserAuthority(),
+                        userRole: getCurrentUserDriveImageRole()
                     }),
                     YouTubeEmbed
                 ],
