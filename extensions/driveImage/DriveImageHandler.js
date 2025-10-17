@@ -626,6 +626,21 @@ export class DriveImageHandler {
     const authority = options.userAuthority;
     const numeric = Number(authority);
     if (Number.isFinite(numeric)) {
+      const adminThreshold = (() => {
+        if (typeof globalThis !== 'undefined' && typeof globalThis.DRIVE_IMAGE_ADMIN_AUTHORITY !== 'undefined') {
+          const parsed = Number(globalThis.DRIVE_IMAGE_ADMIN_AUTHORITY);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        if (typeof DRIVE_IMAGE_ADMIN_AUTHORITY !== 'undefined') {
+          const parsed = Number(DRIVE_IMAGE_ADMIN_AUTHORITY);
+          return Number.isFinite(parsed) ? parsed : null;
+        }
+        return null;
+      })();
+
+      if (adminThreshold !== null && numeric >= adminThreshold) {
+        return 'Administrator';
+      }
       if (numeric >= 3) {
         return 'Moderator';
       }
