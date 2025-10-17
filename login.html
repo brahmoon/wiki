@@ -100,6 +100,18 @@
             background: #ebe9e4;
         }
 
+        .btn-outline-primary {
+            background: #fff;
+            color: #2383e2;
+            border-color: #2383e2;
+        }
+
+        .btn-outline-primary:hover:not(:disabled) {
+            background: #e6f1fc;
+            color: #1a6bc2;
+            border-color: #1a6bc2;
+        }
+
         .btn-danger {
             background: #fff4f2;
             border-color: #f0b8b2;
@@ -164,7 +176,7 @@
         <div id="status" class="status-message" role="status" aria-live="polite"></div>
         <div class="button-group">
             <button id="login-btn" class="btn-primary" type="button" disabled>Googleでログイン</button>
-            <button id="register-btn" class="btn-secondary" type="button">新規ユーザー登録</button>
+            <button id="register-btn" class="btn-outline-primary" type="button">新規ユーザー登録</button>
             <button id="return-btn" class="btn-secondary" type="button">エディタに戻る</button>
             <button id="logout-btn" class="btn-danger" type="button" style="display: none;">ログアウト</button>
         </div>

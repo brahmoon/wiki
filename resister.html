@@ -193,6 +193,7 @@
             <button id="login-btn" class="btn-primary" type="button" disabled>Googleでログイン</button>
             <button id="register-btn" class="btn-secondary" type="submit" form="register-form" disabled style="display: none;">ユーザー登録</button>
             <button id="logout-btn" class="btn-secondary" type="button" style="display: none;">ログアウト</button>
+            <button id="login-redirect-btn" class="btn-primary" type="button" style="display: none;">ログイン画面へ移動</button>
         </div>
     </div>
     <script>
@@ -213,17 +214,39 @@
             isProcessing: false,
             registrationCompleted: false,
             hasCheckedRegistration: false,
-            isExistingUser: false
+            isExistingUser: false,
+            shouldAutoRedirect: false
         };
 
         const elements = {
             loginButton: document.getElementById('login-btn'),
             registerButton: document.getElementById('register-btn'),
             logoutButton: document.getElementById('logout-btn'),
+            loginRedirectButton: document.getElementById('login-redirect-btn'),
             status: document.getElementById('status'),
             profile: document.getElementById('profile'),
             form: document.getElementById('register-form'),
             usernameInput: document.getElementById('username-input')
+        };
+
+        let loginRedirectTimer = null;
+
+        const clearLoginRedirectTimer = () => {
+            if (loginRedirectTimer) {
+                window.clearTimeout(loginRedirectTimer);
+                loginRedirectTimer = null;
+            }
+        };
+
+        const scheduleLoginRedirect = () => {
+            clearLoginRedirectTimer();
+            if (!state.shouldAutoRedirect) {
+                return;
+            }
+            loginRedirectTimer = window.setTimeout(() => {
+                state.shouldAutoRedirect = false;
+                window.location.href = 'login.html';
+            }, 2000);
         };
 
         const setStatus = (message, type = '') => {
@@ -272,6 +295,8 @@
                 state.registrationCompleted ||
                 state.isProcessing ||
                 !elements.usernameInput.value.trim();
+            const shouldShowLoginRedirectButton = state.registrationCompleted || state.isExistingUser;
+            elements.loginRedirectButton.style.display = shouldShowLoginRedirectButton ? '' : 'none';
             elements.loginButton.disabled = !state.googleClient || state.isProcessing;
             elements.logoutButton.style.display = hasUser ? '' : 'none';
             elements.loginButton.style.display = hasUser ? 'none' : '';
@@ -298,6 +323,8 @@
                 if (result.success) {
                     state.isExistingUser = true;
                     state.registrationCompleted = true;
+                    state.shouldAutoRedirect = false;
+                    clearLoginRedirectTimer();
                     setStatus('このGoogleアカウントはすでにユーザー登録されています。ログインページからログインしてください。', 'status-success');
                     return;
                 }
@@ -305,6 +332,7 @@
                 if (message.includes('見つかりません')) {
                     state.isExistingUser = false;
                     state.registrationCompleted = false;
+                    state.shouldAutoRedirect = false;
                     elements.usernameInput.value = user.name || '';
                     setStatus('ユーザー名を確認して「ユーザー登録」を押してください。', 'status-success');
                     return;
@@ -315,6 +343,7 @@
                 state.hasCheckedRegistration = false;
                 state.isExistingUser = false;
                 state.registrationCompleted = false;
+                state.shouldAutoRedirect = false;
                 throw new Error(error && error.message ? error.message : 'ユーザー登録状況の確認に失敗しました。');
             } finally {
                 updateUI();
@@ -398,6 +427,7 @@
                 state.registrationCompleted = false;
                 state.tokenResponse = tokenResponse;
                 state.hasCheckedRegistration = false;
+                state.shouldAutoRedirect = false;
                 state.isExistingUser = false;
                 updateUI();
 
@@ -410,6 +440,7 @@
                 state.registrationCompleted = false;
                 state.hasCheckedRegistration = false;
                 state.isExistingUser = false;
+                state.shouldAutoRedirect = false;
                 setStatus(error.message || 'Googleアカウントの取得に失敗しました。', 'status-error');
             } finally {
                 state.isProcessing = false;
@@ -452,16 +483,20 @@
             try {
                 const result = await callAppsScript(payload);
                 if (!result.success) {
+                    state.shouldAutoRedirect = false;
                     setStatus(result.message || 'ユーザー登録に失敗しました。', 'status-error');
                     return;
                 }
                 state.registrationCompleted = true;
                 state.isExistingUser = true;
                 state.hasCheckedRegistration = true;
-                setStatus(result.message || 'ユーザー登録が完了しました。ログインページに戻ってエディタを利用できます。', 'status-success');
+                state.shouldAutoRedirect = true;
+                setStatus((result.message || 'ユーザー登録が完了しました。') + ' 数秒後にログインページへ移動します。', 'status-success');
                 updateUI();
+                scheduleLoginRedirect();
             } catch (error) {
                 console.error(error);
+                state.shouldAutoRedirect = false;
                 setStatus(error.message || 'ユーザー登録でエラーが発生しました。', 'status-error');
             } finally {
                 state.isProcessing = false;
@@ -478,6 +513,8 @@
             state.registrationCompleted = false;
             state.hasCheckedRegistration = false;
             state.isExistingUser = false;
+            state.shouldAutoRedirect = false;
+            clearLoginRedirectTimer();
             elements.usernameInput.value = '';
             setStatus('ログアウトしました。別のアカウントで再度ログインできます。', 'status-success');
             updateUI();
@@ -499,6 +536,9 @@
 
         elements.loginButton.addEventListener('click', handleLoginClick);
         elements.logoutButton.addEventListener('click', handleLogoutClick);
+        elements.loginRedirectButton.addEventListener('click', () => {
+            window.location.href = 'login.html';
+        });
         elements.form.addEventListener('submit', handleRegisterSubmit);
         elements.usernameInput.addEventListener('input', updateUI);
 
