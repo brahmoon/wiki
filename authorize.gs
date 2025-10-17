@@ -49,7 +49,17 @@ const AUTHORITIES_CONFIG = {
   }
 };
 
-const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator'];
+const DRIVE_IMAGE_ADMIN_ROLE = typeof ADMINISTRATOR_ROLE !== 'undefined'
+  ? ADMINISTRATOR_ROLE
+  : 'Administrator';
+const DRIVE_IMAGE_ADMIN_AUTHORITY = typeof ADMIN_AUTHORITY_VALUE !== 'undefined'
+  ? ADMIN_AUTHORITY_VALUE
+  : 99;
+const DRIVE_IMAGE_ROLES = Array.from(new Set([
+  DRIVE_IMAGE_ADMIN_ROLE,
+  'Moderator',
+  'Editor'
+]));
 const DRIVE_IMAGE_ROOT_KEY = '__root__';
 
 function doGet(e) {
@@ -370,6 +380,12 @@ function resolveDriveImageRole(value) {
   }
 
   if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      return null;
+    }
+    if (value >= DRIVE_IMAGE_ADMIN_AUTHORITY) {
+      return DRIVE_IMAGE_ADMIN_ROLE;
+    }
     if (value >= 3) {
       return 'Moderator';
     }
@@ -385,6 +401,9 @@ function resolveDriveImageRole(value) {
   }
 
   const lower = stringValue.toLowerCase();
+  if (lower === DRIVE_IMAGE_ADMIN_ROLE.toLowerCase() || lower === 'administrator' || lower === 'admin') {
+    return DRIVE_IMAGE_ADMIN_ROLE;
+  }
   if (lower === 'moderator') {
     return 'Moderator';
   }
@@ -398,6 +417,26 @@ function resolveDriveImageRole(value) {
   }
 
   return null;
+}
+
+function compareDriveImageRoles(roleA, roleB) {
+  if (roleA === roleB) {
+    return 0;
+  }
+
+  const indexA = DRIVE_IMAGE_ROLES.indexOf(roleA);
+  const indexB = DRIVE_IMAGE_ROLES.indexOf(roleB);
+
+  if (indexA === -1 && indexB === -1) {
+    return roleA.localeCompare(roleB, 'ja');
+  }
+  if (indexA === -1) {
+    return 1;
+  }
+  if (indexB === -1) {
+    return -1;
+  }
+  return indexA - indexB;
 }
 
 function resolveDriveImageRoleFromRequest(request) {
@@ -555,7 +594,7 @@ function writeDriveImageAuthorities(authorities) {
     }
     const roleA = (a[(columns.role || 3) - 1] || '').toString();
     const roleB = (b[(columns.role || 3) - 1] || '').toString();
-    return DRIVE_IMAGE_ROLES.indexOf(roleA) - DRIVE_IMAGE_ROLES.indexOf(roleB);
+    return compareDriveImageRoles(roleA, roleB);
   });
 
   const existingValues = existingRowCount > 0
