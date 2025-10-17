@@ -183,7 +183,7 @@
             </p>
         </header>
         <div id="profile" class="profile-card" style="display: none;"></div>
-        <form id="register-form" class="form-group" novalidate>
+        <form id="register-form" class="form-group" novalidate style="display: none;">
             <label for="username-input">ユーザー名 (UserName)</label>
             <input id="username-input" type="text" name="username" placeholder="例: 山田 太郎" autocomplete="name" disabled>
             <div class="input-help">Wiki内で表示される名前です。Googleで取得した名前を元に編集できます。</div>
@@ -191,7 +191,7 @@
         <div id="status" class="status-message" role="status" aria-live="polite"></div>
         <div class="button-group">
             <button id="login-btn" class="btn-primary" type="button" disabled>Googleでログイン</button>
-            <button id="register-btn" class="btn-secondary" type="submit" form="register-form" disabled>ユーザー登録</button>
+            <button id="register-btn" class="btn-secondary" type="submit" form="register-form" disabled style="display: none;">ユーザー登録</button>
             <button id="logout-btn" class="btn-secondary" type="button" style="display: none;">ログアウト</button>
         </div>
     </div>
@@ -211,7 +211,9 @@
             user: null,
             tokenResponse: null,
             isProcessing: false,
-            registrationCompleted: false
+            registrationCompleted: false,
+            hasCheckedRegistration: false,
+            isExistingUser: false
         };
 
         const elements = {
@@ -256,12 +258,17 @@
 
         const updateUI = () => {
             const hasUser = Boolean(state.user);
-            elements.usernameInput.disabled = !hasUser || state.registrationCompleted;
-            if (hasUser && !state.registrationCompleted && !elements.usernameInput.value.trim()) {
-                elements.usernameInput.value = state.user.name || '';
-            }
+            const showRegistrationForm =
+                hasUser &&
+                state.hasCheckedRegistration &&
+                !state.isExistingUser &&
+                !state.registrationCompleted;
+
+            elements.form.style.display = showRegistrationForm ? 'flex' : 'none';
+            elements.usernameInput.disabled = !showRegistrationForm || state.registrationCompleted;
+            elements.registerButton.style.display = showRegistrationForm ? '' : 'none';
             elements.registerButton.disabled =
-                !hasUser ||
+                !showRegistrationForm ||
                 state.registrationCompleted ||
                 state.isProcessing ||
                 !elements.usernameInput.value.trim();
@@ -269,6 +276,49 @@
             elements.logoutButton.style.display = hasUser ? '' : 'none';
             elements.loginButton.style.display = hasUser ? 'none' : '';
             renderProfile(state.user);
+        };
+
+        const checkRegistrationStatus = async (user) => {
+            if (!user?.email) {
+                throw new Error('Googleアカウントの情報が確認できませんでした。');
+            }
+
+            setStatus('アカウント登録状況を確認しています...');
+            const payload = {
+                action: 'getUserSettings',
+                loginId: user.email,
+                email: user.email
+            };
+
+            try {
+                const result = await callAppsScript(payload);
+                const message = (result && result.message) || '';
+                state.hasCheckedRegistration = true;
+
+                if (result.success) {
+                    state.isExistingUser = true;
+                    state.registrationCompleted = true;
+                    setStatus('このGoogleアカウントはすでにユーザー登録されています。ログインページからログインしてください。', 'status-success');
+                    return;
+                }
+
+                if (message.includes('見つかりません')) {
+                    state.isExistingUser = false;
+                    state.registrationCompleted = false;
+                    elements.usernameInput.value = user.name || '';
+                    setStatus('ユーザー名を確認して「ユーザー登録」を押してください。', 'status-success');
+                    return;
+                }
+
+                throw new Error(message || 'ユーザー登録状況の確認に失敗しました。');
+            } catch (error) {
+                state.hasCheckedRegistration = false;
+                state.isExistingUser = false;
+                state.registrationCompleted = false;
+                throw new Error(error && error.message ? error.message : 'ユーザー登録状況の確認に失敗しました。');
+            } finally {
+                updateUI();
+            }
         };
 
         const callAppsScript = async (payload) => {
@@ -347,13 +397,19 @@
                 };
                 state.registrationCompleted = false;
                 state.tokenResponse = tokenResponse;
-                elements.usernameInput.value = user.name || '';
-                setStatus('ユーザー名を確認して「ユーザー登録」を押してください。', 'status-success');
+                state.hasCheckedRegistration = false;
+                state.isExistingUser = false;
+                updateUI();
+
+                await checkRegistrationStatus(state.user);
             } catch (error) {
                 console.error(error);
                 await revokeAccessToken(tokenResponse?.access_token);
                 state.user = null;
                 state.tokenResponse = null;
+                state.registrationCompleted = false;
+                state.hasCheckedRegistration = false;
+                state.isExistingUser = false;
                 setStatus(error.message || 'Googleアカウントの取得に失敗しました。', 'status-error');
             } finally {
                 state.isProcessing = false;
@@ -400,6 +456,8 @@
                     return;
                 }
                 state.registrationCompleted = true;
+                state.isExistingUser = true;
+                state.hasCheckedRegistration = true;
                 setStatus(result.message || 'ユーザー登録が完了しました。ログインページに戻ってエディタを利用できます。', 'status-success');
                 updateUI();
             } catch (error) {
@@ -418,6 +476,8 @@
             state.user = null;
             state.tokenResponse = null;
             state.registrationCompleted = false;
+            state.hasCheckedRegistration = false;
+            state.isExistingUser = false;
             elements.usernameInput.value = '';
             setStatus('ログアウトしました。別のアカウントで再度ログインできます。', 'status-success');
             updateUI();
