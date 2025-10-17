@@ -9,6 +9,223 @@
 const DRIVE_IMAGE_FOLDER_PROPERTY = '1RiX0j4Dh33wQETm1OIjcXWuxcYd9xHx6';
 const DEFAULT_UPLOAD_FOLDER_NAME = 'Image';
 const ROOT_FOLDER_KEY = '__root__';
+const ADMINISTRATOR_ROLE = 'Administrator';
+
+/**
+ * Initializes the Drive image authority sheet using the current Drive structure.
+ *
+ * Administrator permissions default to full access (upload/delete enabled) while
+ * every other role is initialized with read-only access. This can be executed
+ * once after deploying the Apps Script or whenever the Drive folder structure
+ * changes drastically and the sheet requires a reset.
+ *
+ * @return {{success: boolean, message: string, rows?: number, folders?: number}}
+ */
+function Initialize() {
+  const config = getDriveImageAuthoritiesConfig();
+  if (!config.sheetId) {
+    throw new Error('権限シートのスプレッドシートIDが設定されていません。');
+  }
+
+  const spreadsheet = SpreadsheetApp.openById(config.sheetId);
+  let sheet = spreadsheet.getSheetByName(config.sheetName);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(config.sheetName);
+  }
+
+  ensureDriveImageAuthoritiesHeader(sheet, config);
+
+  const folderKeys = collectDriveImageFolderKeys();
+  if (!folderKeys.length) {
+    return {
+      success: true,
+      message: 'Drive上に対象フォルダが存在しないため、権限シートは更新されませんでした。',
+      folders: 0,
+      rows: 0
+    };
+  }
+
+  const timestamp = new Date();
+  const roles = getDriveImageRolesForInitialization();
+  const adminRole = ADMINISTRATOR_ROLE;
+  const lastColumn = Math.max(sheet.getLastColumn(), config.requiredColumns);
+  const rows = [];
+
+  folderKeys.forEach(function(folderKey) {
+    roles.forEach(function(role) {
+      const row = new Array(lastColumn).fill('');
+      row[config.columns.type - 1] = 'Image';
+      row[config.columns.folderKey - 1] = folderKey;
+      row[config.columns.role - 1] = role;
+      const isAdmin = role === adminRole;
+      row[config.columns.canUpload - 1] = isAdmin;
+      row[config.columns.canDelete - 1] = isAdmin;
+      if (config.columns.updatedAt) {
+        row[config.columns.updatedAt - 1] = timestamp;
+      }
+      rows.push(row);
+    });
+  });
+
+  clearExistingDriveImageAuthorityRows(sheet, config);
+
+  if (!rows.length) {
+    return {
+      success: true,
+      message: '権限シートを初期化しました（書き込み対象の行はありませんでした）。',
+      folders: folderKeys.length,
+      rows: 0
+    };
+  }
+
+  const availableRows = sheet.getMaxRows() - config.headerRow;
+  if (rows.length > availableRows) {
+    const additionalRows = rows.length - availableRows;
+    sheet.insertRowsAfter(sheet.getMaxRows(), additionalRows);
+  }
+
+  sheet.getRange(config.headerRow + 1, 1, rows.length, lastColumn).setValues(rows);
+
+  return {
+    success: true,
+    message: 'Drive画像権限シートを初期化しました。',
+    folders: folderKeys.length,
+    rows: rows.length
+  };
+}
+
+function getDriveImageRolesForInitialization() {
+  var baseRoles = [];
+  if (typeof DRIVE_IMAGE_ROLES !== 'undefined' && Array.isArray(DRIVE_IMAGE_ROLES)) {
+    baseRoles = DRIVE_IMAGE_ROLES.slice();
+  } else {
+    baseRoles = ['Editor', 'Moderator'];
+  }
+
+  if (baseRoles.indexOf(ADMINISTRATOR_ROLE) === -1) {
+    baseRoles.push(ADMINISTRATOR_ROLE);
+  }
+
+  // 他に必要となり得る基本ロールが欠けている場合は補完する
+  ['Moderator', 'Editor'].forEach(function(role) {
+    if (baseRoles.indexOf(role) === -1) {
+      baseRoles.push(role);
+    }
+  });
+
+  // Administratorを先頭にして残りは元の順序を維持
+  baseRoles.sort(function(a, b) {
+    if (a === ADMINISTRATOR_ROLE && b !== ADMINISTRATOR_ROLE) {
+      return -1;
+    }
+    if (b === ADMINISTRATOR_ROLE && a !== ADMINISTRATOR_ROLE) {
+      return 1;
+    }
+    return 0;
+  });
+
+  return baseRoles;
+}
+
+function collectDriveImageFolderKeys() {
+  const rootFolder = getUploadFolder();
+  const keys = new Set();
+  keys.add(ROOT_FOLDER_KEY);
+
+  const folders = rootFolder.getFolders();
+  while (folders.hasNext()) {
+    const folder = folders.next();
+    const name = (folder && folder.getName) ? folder.getName() : '';
+    const trimmed = name ? name.toString().trim() : '';
+    if (trimmed) {
+      keys.add(trimmed);
+    }
+  }
+
+  return Array.from(keys).sort(function(a, b) {
+    if (a === ROOT_FOLDER_KEY) {
+      return -1;
+    }
+    if (b === ROOT_FOLDER_KEY) {
+      return 1;
+    }
+    return a.localeCompare(b, 'ja');
+  });
+}
+
+function getDriveImageAuthoritiesConfig() {
+  const defaults = {
+    sheetId: null,
+    sheetName: 'Authorities',
+    headerRow: 1,
+    columns: {
+      type: 1,
+      folderKey: 2,
+      role: 3,
+      canUpload: 4,
+      canDelete: 5,
+      updatedAt: 6
+    }
+  };
+
+  if (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG && AUTH_CONFIG.SHEET_ID) {
+    defaults.sheetId = AUTH_CONFIG.SHEET_ID;
+  }
+
+  if (typeof AUTHORITIES_CONFIG !== 'undefined' && AUTHORITIES_CONFIG) {
+    defaults.sheetName = AUTHORITIES_CONFIG.SHEET_NAME || defaults.sheetName;
+    defaults.headerRow = AUTHORITIES_CONFIG.HEADER_ROW_INDEX || defaults.headerRow;
+    if (AUTHORITIES_CONFIG.COLUMNS) {
+      defaults.columns = Object.assign({}, defaults.columns, AUTHORITIES_CONFIG.COLUMNS);
+    }
+  }
+
+  const columnIndexes = defaults.columns || {};
+  const requiredColumns = Object.keys(columnIndexes).reduce(function(max, key) {
+    const index = Number(columnIndexes[key]);
+    return Number.isFinite(index) && index > max ? index : max;
+  }, 0);
+
+  return {
+    sheetId: defaults.sheetId,
+    sheetName: defaults.sheetName,
+    headerRow: defaults.headerRow,
+    columns: columnIndexes,
+    requiredColumns: Math.max(requiredColumns, 1)
+  };
+}
+
+function ensureDriveImageAuthoritiesHeader(sheet, config) {
+  const headerRow = config.headerRow || 1;
+  const requiredColumns = config.requiredColumns || 6;
+
+  if (typeof ensureAuthoritiesHeader === 'function') {
+    ensureAuthoritiesHeader(sheet);
+    return;
+  }
+
+  const headers = ['Type', 'Folder Key', 'Role', 'Can Upload', 'Can Delete'];
+  if (config.columns.updatedAt) {
+    headers.push('Updated At');
+  }
+
+  sheet.getRange(headerRow, 1, 1, Math.max(headers.length, requiredColumns)).setValues([headers]);
+}
+
+function clearExistingDriveImageAuthorityRows(sheet, config) {
+  const headerRow = config.headerRow || 1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= headerRow) {
+    return;
+  }
+
+  const rowCount = lastRow - headerRow;
+  if (rowCount <= 0) {
+    return;
+  }
+
+  sheet.getRange(headerRow + 1, 1, rowCount, sheet.getLastColumn()).clearContent();
+}
 
 /**
  * Handles GET requests (e.g. gallery listing).

@@ -1006,7 +1006,7 @@ export class ImageModal {
       return permission;
     }
     const role = this.handler.resolveRole(this.options);
-    if (role === 'Moderator') {
+    if (role === 'Administrator' || role === 'Moderator') {
       return { upload: true, delete: true };
     }
     return { upload: false, delete: false };
