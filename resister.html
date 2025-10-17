@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiki ユーザー登録</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="./scripts/appsScriptEndpoints.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            color: #37352f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .register-card {
+            width: min(520px, 100%);
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.08);
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .register-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .register-description {
+            font-size: 14px;
+            color: #6b6a67;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .profile-card {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #e0dfdc;
+            background: #fafaf9;
+        }
+
+        .profile-card img {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .profile-name {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .profile-email,
+        .profile-login-id {
+            font-size: 13px;
+            color: #6b6a67;
+            margin-top: 4px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        input[type="text"] {
+            height: 44px;
+            border-radius: 8px;
+            border: 1px solid #d0d0cc;
+            padding: 0 14px;
+            font-size: 15px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #2383e2;
+            box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.15);
+        }
+
+        .input-help {
+            font-size: 12px;
+            color: #6b6a67;
+            line-height: 1.5;
+        }
+
+        .status-message {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #55534e;
+        }
+
+        .status-message.status-error {
+            color: #c0352b;
+        }
+
+        .status-message.status-success {
+            color: #0f7b6c;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        button {
+            height: 44px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-primary {
+            background: #2383e2;
+            color: #fff;
+            border-color: #1d70c4;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1a6bc2;
+        }
+
+        .btn-secondary {
+            background: #f7f6f3;
+            border-color: #e9e9e7;
+            color: #37352f;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #ebe9e4;
+        }
+
+        @media (max-width: 520px) {
+            body {
+                padding: 16px;
+            }
+
+            .register-card {
+                padding: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="register-card">
+        <header>
+            <div class="register-title">Googleアカウントでユーザー登録</div>
+            <p class="register-description">
+                Wikiを利用するにはGoogleアカウントでログインし、表示名として利用するユーザー名を登録してください。
+            </p>
+        </header>
+        <div id="profile" class="profile-card" style="display: none;"></div>
+        <form id="register-form" class="form-group" novalidate>
+            <label for="username-input">ユーザー名 (UserName)</label>
+            <input id="username-input" type="text" name="username" placeholder="例: 山田 太郎" autocomplete="name" disabled>
+            <div class="input-help">Wiki内で表示される名前です。Googleで取得した名前を元に編集できます。</div>
+        </form>
+        <div id="status" class="status-message" role="status" aria-live="polite"></div>
+        <div class="button-group">
+            <button id="login-btn" class="btn-primary" type="button" disabled>Googleでログイン</button>
+            <button id="register-btn" class="btn-secondary" type="submit" form="register-form" disabled>ユーザー登録</button>
+            <button id="logout-btn" class="btn-secondary" type="button" style="display: none;">ログアウト</button>
+        </div>
+    </div>
+    <script>
+        const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
+
+        const CONFIG = {
+            CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com',
+            APPS_SCRIPT_ENDPOINT_USER_SETTINGS,
+            DEFAULT_LANGUAGE: 'ja'
+        };
+
+        const APP_SCRIPT_REQUEST_TIMEOUT = 20000;
+
+        const state = {
+            googleClient: null,
+            user: null,
+            tokenResponse: null,
+            isProcessing: false,
+            registrationCompleted: false
+        };
+
+        const elements = {
+            loginButton: document.getElementById('login-btn'),
+            registerButton: document.getElementById('register-btn'),
+            logoutButton: document.getElementById('logout-btn'),
+            status: document.getElementById('status'),
+            profile: document.getElementById('profile'),
+            form: document.getElementById('register-form'),
+            usernameInput: document.getElementById('username-input')
+        };
+
+        const setStatus = (message, type = '') => {
+            elements.status.textContent = message;
+            elements.status.classList.remove('status-error', 'status-success');
+            if (type) {
+                elements.status.classList.add(type);
+            }
+        };
+
+        const renderProfile = (user) => {
+            if (!user) {
+                elements.profile.style.display = 'none';
+                elements.profile.innerHTML = '';
+                return;
+            }
+            const image = user.picture
+                ? `<img src="${user.picture}" alt="${user.name || user.email}のプロフィール写真">`
+                : '';
+            const displayName = user.name || user.email;
+            const loginIdRow = `<div class="profile-login-id">ログインID: ${user.email}</div>`;
+            elements.profile.innerHTML = `
+                ${image}
+                <div>
+                    <div class="profile-name">${displayName}</div>
+                    <div class="profile-email">${user.email}</div>
+                    ${loginIdRow}
+                </div>
+            `;
+            elements.profile.style.display = 'flex';
+        };
+
+        const updateUI = () => {
+            const hasUser = Boolean(state.user);
+            elements.usernameInput.disabled = !hasUser || state.registrationCompleted;
+            if (hasUser && !state.registrationCompleted && !elements.usernameInput.value.trim()) {
+                elements.usernameInput.value = state.user.name || '';
+            }
+            elements.registerButton.disabled =
+                !hasUser ||
+                state.registrationCompleted ||
+                state.isProcessing ||
+                !elements.usernameInput.value.trim();
+            elements.loginButton.disabled = !state.googleClient || state.isProcessing;
+            elements.logoutButton.style.display = hasUser ? '' : 'none';
+            elements.loginButton.style.display = hasUser ? 'none' : '';
+            renderProfile(state.user);
+        };
+
+        const callAppsScript = async (payload) => {
+            if (!CONFIG.APPS_SCRIPT_ENDPOINT_USER_SETTINGS || CONFIG.APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
+                throw new Error('ユーザー登録サービスのURLが設定されていません。管理者にお問い合わせください。');
+            }
+
+            const controller = new AbortController();
+            const timer = window.setTimeout(() => controller.abort(), APP_SCRIPT_REQUEST_TIMEOUT);
+
+            try {
+                const response = await fetch(CONFIG.APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error(`ユーザー登録サービスとの通信に失敗しました (HTTP ${response.status})${errorText ? `: ${errorText}` : ''}`);
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result) {
+                    throw new Error('ユーザー登録サービスからのレスポンス解析に失敗しました。');
+                }
+
+                return result;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('ユーザー登録サービスへのリクエストがタイムアウトしました。');
+                }
+                throw error;
+            } finally {
+                window.clearTimeout(timer);
+            }
+        };
+
+        const revokeAccessToken = async (token) => {
+            if (!token) return;
+            try {
+                await fetch('https://oauth2.googleapis.com/revoke', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `token=${encodeURIComponent(token)}`
+                });
+            } catch (error) {
+                console.warn('Failed to revoke token', error);
+            }
+        };
+
+        const handleGoogleLoginSuccess = async (tokenResponse) => {
+            state.isProcessing = true;
+            setStatus('Googleアカウントを確認しています...');
+            updateUI();
+            try {
+                const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                    headers: {
+                        Authorization: `Bearer ${tokenResponse.access_token}`
+                    }
+                });
+                if (!userResponse.ok) {
+                    throw new Error('ユーザー情報の取得に失敗しました。');
+                }
+                const user = await userResponse.json();
+                state.user = {
+                    ...user,
+                    email: user.email
+                };
+                state.registrationCompleted = false;
+                state.tokenResponse = tokenResponse;
+                elements.usernameInput.value = user.name || '';
+                setStatus('ユーザー名を確認して「ユーザー登録」を押してください。', 'status-success');
+            } catch (error) {
+                console.error(error);
+                await revokeAccessToken(tokenResponse?.access_token);
+                state.user = null;
+                state.tokenResponse = null;
+                setStatus(error.message || 'Googleアカウントの取得に失敗しました。', 'status-error');
+            } finally {
+                state.isProcessing = false;
+                updateUI();
+            }
+        };
+
+        const handleLoginClick = () => {
+            if (!state.googleClient || state.isProcessing) {
+                return;
+            }
+            setStatus('Googleに接続しています...');
+            state.googleClient.requestAccessToken();
+        };
+
+        const handleRegisterSubmit = async (event) => {
+            event.preventDefault();
+            if (!state.user || state.isProcessing || state.registrationCompleted) {
+                return;
+            }
+            const username = elements.usernameInput.value.trim();
+            if (!username) {
+                setStatus('ユーザー名を入力してください。', 'status-error');
+                return;
+            }
+
+            const payload = {
+                action: 'registerUser',
+                loginId: state.user.email,
+                email: state.user.email,
+                username,
+                language: CONFIG.DEFAULT_LANGUAGE,
+                authority: 1
+            };
+
+            state.isProcessing = true;
+            setStatus('ユーザーを登録しています...');
+            updateUI();
+
+            try {
+                const result = await callAppsScript(payload);
+                if (!result.success) {
+                    setStatus(result.message || 'ユーザー登録に失敗しました。', 'status-error');
+                    return;
+                }
+                state.registrationCompleted = true;
+                setStatus(result.message || 'ユーザー登録が完了しました。ログインページに戻ってエディタを利用できます。', 'status-success');
+                updateUI();
+            } catch (error) {
+                console.error(error);
+                setStatus(error.message || 'ユーザー登録でエラーが発生しました。', 'status-error');
+            } finally {
+                state.isProcessing = false;
+                updateUI();
+            }
+        };
+
+        const handleLogoutClick = async () => {
+            if (state.tokenResponse?.access_token) {
+                await revokeAccessToken(state.tokenResponse.access_token);
+            }
+            state.user = null;
+            state.tokenResponse = null;
+            state.registrationCompleted = false;
+            elements.usernameInput.value = '';
+            setStatus('ログアウトしました。別のアカウントで再度ログインできます。', 'status-success');
+            updateUI();
+        };
+
+        const initializeGoogleClient = () => {
+            if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+                window.setTimeout(initializeGoogleClient, 200);
+                return;
+            }
+            state.googleClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: CONFIG.CLIENT_ID,
+                scope: 'openid https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+                callback: handleGoogleLoginSuccess
+            });
+            elements.loginButton.disabled = false;
+            updateUI();
+        };
+
+        elements.loginButton.addEventListener('click', handleLoginClick);
+        elements.logoutButton.addEventListener('click', handleLogoutClick);
+        elements.form.addEventListener('submit', handleRegisterSubmit);
+        elements.usernameInput.addEventListener('input', updateUI);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeGoogleClient();
+            updateUI();
+            setStatus('Googleアカウントでログインし、ユーザー名を登録してください。');
+        });
+    </script>
+</body>
+</html>

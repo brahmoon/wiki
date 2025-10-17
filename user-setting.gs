@@ -53,6 +53,8 @@ function doPost(e) {
         return buildResponse(handleGetUserSettings(sheet, request), origin);
       case 'updateUserSettings':
         return buildResponse(handleUpdateUserSettings(sheet, request), origin);
+      case 'registerUser':
+        return buildResponse(handleRegisterUser(sheet, request), origin);
       default:
         return buildResponse(
           {
@@ -232,6 +234,83 @@ function handleUpdateUserSettings(sheet, request) {
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
     language: columns.language ? updatedValues[columns.language - 1] || '' : '',
     authority: record.authority,
+  };
+}
+
+function handleRegisterUser(sheet, request) {
+  const email = (request.email || '').toString().trim();
+  if (!email) {
+    return {
+      success: false,
+      message: 'Googleアカウントのメールアドレスを取得できませんでした。',
+    };
+  }
+
+  const normalizedUsername = (request.username || '').toString().trim();
+  if (!normalizedUsername) {
+    return {
+      success: false,
+      message: 'ユーザーネームを入力してください。',
+    };
+  }
+
+  const loginId = (request.loginId || email).toString().trim() || email;
+
+  const existingAccount = findAccount(sheet, {
+    loginId: loginId,
+    email: email,
+  });
+
+  if (existingAccount) {
+    return {
+      success: false,
+      message: 'このメールアドレスはすでに登録されています。',
+      loginId: existingAccount.loginId,
+      username: existingAccount.username,
+      email: existingAccount.email,
+      authority: existingAccount.authority,
+    };
+  }
+
+  const columns = CONFIG.COLUMNS || {};
+  const kingdomValue = sanitizeKingdom(request.kingdom);
+  const languageValue = sanitizeLanguage(request.language || 'ja');
+  const lastColumn = sheet.getLastColumn();
+  const newRowValues = new Array(Math.max(lastColumn, 1)).fill('');
+
+  if (columns.loginId) {
+    newRowValues[columns.loginId - 1] = loginId;
+  }
+  if (columns.username) {
+    newRowValues[columns.username - 1] = normalizedUsername;
+  }
+  if (columns.email) {
+    newRowValues[columns.email - 1] = email;
+  }
+  if (columns.kingdom) {
+    newRowValues[columns.kingdom - 1] = kingdomValue;
+  }
+  if (columns.language) {
+    newRowValues[columns.language - 1] = languageValue;
+  }
+  if (columns.authority) {
+    newRowValues[columns.authority - 1] = 1;
+  }
+  if (columns.updatedAt) {
+    newRowValues[columns.updatedAt - 1] = new Date();
+  }
+
+  sheet.appendRow(newRowValues);
+
+  return {
+    success: true,
+    message: 'ユーザーを登録しました。',
+    loginId: columns.loginId ? newRowValues[columns.loginId - 1] : loginId,
+    username: normalizedUsername,
+    email: email,
+    kingdom: kingdomValue,
+    language: languageValue,
+    authority: 1,
   };
 }
 
