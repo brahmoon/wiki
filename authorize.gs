@@ -439,33 +439,6 @@ function compareDriveImageRoles(roleA, roleB) {
   return indexA - indexB;
 }
 
-function resolveDriveImageRoleFromRequest(request) {
-  if (!request || typeof request !== 'object') {
-    return null;
-  }
-
-  const directRole = resolveDriveImageRole(request.role);
-  if (directRole) {
-    return directRole;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(request, 'authorityLevel')) {
-    const roleFromLevel = resolveDriveImageRole(request.authorityLevel);
-    if (roleFromLevel) {
-      return roleFromLevel;
-    }
-  }
-
-  if (Object.prototype.hasOwnProperty.call(request, 'authority')) {
-    const roleFromAuthority = resolveDriveImageRole(request.authority);
-    if (roleFromAuthority) {
-      return roleFromAuthority;
-    }
-  }
-
-  return null;
-}
-
 function extractImageAuthoritiesPayload(authorities) {
   if (!authorities || typeof authorities !== 'object') {
     return {};
@@ -729,35 +702,62 @@ function updateDriveImageAuthorities(sheet, request) {
 }
 
 function getDriveImagePermissions(request) {
-  const role = resolveDriveImageRoleFromRequest(request);
-  if (!role) {
+  const normalizedGoogleEmail = normalizeId(request.googleEmail || request.email);
+  if (!normalizedGoogleEmail) {
+    return {
+      success: false,
+      message: 'Googleアカウント情報が指定されていません。'
+    };
+  }
+
+  const sheet = getAccountsSheet();
+  if (!sheet) {
+    return {
+      success: false,
+      message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`
+    };
+  }
+
+  const account = findAccount(sheet, {
+    googleEmail: request.googleEmail,
+    email: request.email
+  });
+
+  if (!account) {
     return {
       success: true,
       message: '権限を判定できませんでした。',
-      permissions: {}
+      permissions: {},
+      authority: null,
+      role: ''
     };
   }
+
+  const authorityValue = parseAuthorityValue(account.authority);
+  const role = resolveDriveImageRole(authorityValue);
 
   const authorities = readDriveImageAuthorities();
   const imageAuthorities = authorities.Image || {};
   const permissions = {};
 
-  Object.keys(imageAuthorities).forEach((folderKey) => {
-    const folderEntry = imageAuthorities[folderKey];
-    if (!folderEntry || typeof folderEntry !== 'object') {
-      return;
-    }
+  if (role) {
+    Object.keys(imageAuthorities).forEach((folderKey) => {
+      const folderEntry = imageAuthorities[folderKey];
+      if (!folderEntry || typeof folderEntry !== 'object') {
+        return;
+      }
 
-    const roleEntry = folderEntry[role];
-    if (!roleEntry || typeof roleEntry !== 'object') {
-      return;
-    }
+      const roleEntry = folderEntry[role];
+      if (!roleEntry || typeof roleEntry !== 'object') {
+        return;
+      }
 
-    permissions[folderKey] = {
-      upload: Boolean(roleEntry.upload),
-      delete: Boolean(roleEntry.delete)
-    };
-  });
+      permissions[folderKey] = {
+        upload: Boolean(roleEntry.upload),
+        delete: Boolean(roleEntry.delete)
+      };
+    });
+  }
 
   if (!Object.prototype.hasOwnProperty.call(permissions, DRIVE_IMAGE_ROOT_KEY)) {
     permissions[DRIVE_IMAGE_ROOT_KEY] = { upload: false, delete: false };
@@ -766,7 +766,11 @@ function getDriveImagePermissions(request) {
   return {
     success: true,
     message: 'Drive画像の権限を返却しました。',
-    permissions
+    permissions,
+    authority: authorityValue,
+    role: role || '',
+    email: account.email || '',
+    loginId: account.loginId || ''
   };
 }
 
@@ -969,6 +973,10 @@ function findAccount(sheet, identifiers) {
   const usernameIndex = AUTH_CONFIG.USERNAME_COLUMN - 1;
   const emailIndex = AUTH_CONFIG.EMAIL_COLUMN - 1;
 
+  const authorityIndex = AUTH_CONFIG.AUTHORITY_COLUMN
+    ? AUTH_CONFIG.AUTHORITY_COLUMN - 1
+    : -1;
+
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
     const rowLoginId = loginIndex >= 0 ? normalizeId(row[loginIndex]) : '';
@@ -978,7 +986,8 @@ function findAccount(sheet, identifiers) {
       return {
         loginId: row[loginIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
-        email: row[emailIndex] || ''
+        email: row[emailIndex] || '',
+        authority: authorityIndex >= 0 ? row[authorityIndex] : null
       };
     }
 
@@ -986,7 +995,8 @@ function findAccount(sheet, identifiers) {
       return {
         loginId: row[loginIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
-        email: row[emailIndex] || ''
+        email: row[emailIndex] || '',
+        authority: authorityIndex >= 0 ? row[authorityIndex] : null
       };
     }
 
@@ -994,7 +1004,8 @@ function findAccount(sheet, identifiers) {
       return {
         loginId: row[loginIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
-        email: row[emailIndex] || ''
+        email: row[emailIndex] || '',
+        authority: authorityIndex >= 0 ? row[authorityIndex] : null
       };
     }
   }
@@ -1018,7 +1029,9 @@ function buildResponse(result, origin) {
     'updatedAt',
     'toolbarConfig',
     'authorities',
-    'permissions'
+    'permissions',
+    'authority',
+    'role'
   ];
 
   optionalFields.forEach(function(field) {

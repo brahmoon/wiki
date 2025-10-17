@@ -1140,7 +1140,6 @@
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
-        const ADMIN_AUTHORITY_VALUE = 99; // DriveImage の管理者ロールに対応する権限値（authorize.gs と揃える）
 
         const loginStatusText = document.getElementById('login-status-text');
         const loginButton = document.getElementById('login-button');
@@ -1330,33 +1329,10 @@
 
         let driveImageExtensionInstance = null;
 
-        function resolveDriveImageRoleFromAuthority(authority) {
-            if (authority === null || authority === undefined) {
-                return null;
-            }
-            const numericAuthority = Number(authority);
-            if (!Number.isFinite(numericAuthority)) {
-                return null;
-            }
-            if (numericAuthority >= ADMIN_AUTHORITY_VALUE) {
-                return 'Administrator';
-            }
-            if (numericAuthority >= 3) {
-                return 'Moderator';
-            }
-            if (numericAuthority >= 2) {
-                return 'Editor';
-            }
-            return null;
-        }
-
-        function getCurrentUserAuthority() {
+        function getCurrentUserGoogleEmail() {
             const loginState = getStoredLoginState();
-            return parseAuthority(loginState?.user?.authority);
-        }
-
-        function getCurrentUserDriveImageRole() {
-            return resolveDriveImageRoleFromAuthority(getCurrentUserAuthority());
+            const email = (loginState?.user?.email || '').trim();
+            return email;
         }
 
         function refreshDriveImageUserPermissions() {
@@ -1365,16 +1341,17 @@
                 return;
             }
 
-            const authority = getCurrentUserAuthority();
-            const role = resolveDriveImageRoleFromAuthority(authority);
+            const googleEmail = getCurrentUserGoogleEmail();
 
-            extension.options.userAuthority = authority ?? null;
-            extension.options.userRole = role ?? '';
+            extension.options.userGoogleEmail = googleEmail;
+            extension.options.userAuthority = null;
+            extension.options.userRole = '';
 
             if (extension.modal) {
                 if (extension.modal.options) {
-                    extension.modal.options.userAuthority = authority ?? null;
-                    extension.modal.options.userRole = role ?? '';
+                    extension.modal.options.userGoogleEmail = googleEmail;
+                    extension.modal.options.userAuthority = null;
+                    extension.modal.options.userRole = '';
                 }
                 extension.modal.permissionsLoaded = false;
                 extension.modal.permissions = {};
@@ -3987,8 +3964,9 @@
                         buttonClass: 'btn',
                         debug: false,
                         permissionsEndpoint: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION,
-                        userAuthority: getCurrentUserAuthority(),
-                        userRole: getCurrentUserDriveImageRole()
+                        userAuthority: null,
+                        userRole: '',
+                        userGoogleEmail: getCurrentUserGoogleEmail()
                     }),
                     YouTubeEmbed
                 ],

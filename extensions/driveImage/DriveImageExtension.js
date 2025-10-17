@@ -18,6 +18,7 @@ export const DriveImageExtension = Extension.create({
       permissionCacheTimeout: DriveImageHandler.DEFAULT_PERMISSION_CACHE_TTL,
       userAuthority: null,
       userRole: '',
+      userGoogleEmail: '',
       defaultFolderName: '',
       recaptchaSiteKey: null,
       addToToolbar: true,
