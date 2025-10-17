@@ -591,6 +591,66 @@ function writeDriveImageAuthorities(authorities) {
   sheet.getRange(startRow, 1, outputRows.length, lastColumn).setValues(outputRows);
 }
 
+function initializeDriveImageAuthoritiesSheet() {
+  try {
+    const adminRole = typeof ADMINISTRATOR_ROLE !== 'undefined' ? ADMINISTRATOR_ROLE : 'Administrator';
+    const rootKey = typeof DRIVE_IMAGE_ROOT_KEY !== 'undefined' ? DRIVE_IMAGE_ROOT_KEY : '__root__';
+
+    const roles = (typeof getDriveImageRolesForInitialization === 'function'
+      ? getDriveImageRolesForInitialization()
+      : [adminRole, 'Moderator', 'Editor']
+    ).slice();
+
+    if (roles.indexOf(adminRole) === -1) {
+      roles.unshift(adminRole);
+    }
+
+    const folderKeysSource = typeof collectDriveImageFolderKeys === 'function'
+      ? collectDriveImageFolderKeys()
+      : [rootKey];
+    const folderKeys = Array.isArray(folderKeysSource) ? folderKeysSource.slice() : [rootKey];
+
+    if (!folderKeys.length) {
+      folderKeys.push(rootKey);
+    }
+
+    if (folderKeys.indexOf(rootKey) === -1) {
+      folderKeys.unshift(rootKey);
+    }
+
+    const authorities = { Image: {} };
+
+    folderKeys.forEach((folderKey) => {
+      if (!authorities.Image[folderKey]) {
+        authorities.Image[folderKey] = {};
+      }
+
+      roles.forEach((role) => {
+        const isAdmin = role === adminRole;
+        authorities.Image[folderKey][role] = {
+          upload: isAdmin,
+          delete: isAdmin
+        };
+      });
+    });
+
+    writeDriveImageAuthorities(authorities);
+
+    return {
+      success: true,
+      message: 'Drive画像権限シートを初期化しました。',
+      folders: folderKeys.length,
+      rows: folderKeys.length * roles.length
+    };
+  } catch (error) {
+    const message = error && error.message ? error.message : error;
+    return {
+      success: false,
+      message: `権限シートの初期化に失敗しました: ${message}`
+    };
+  }
+}
+
 function getDriveImageAuthorities(sheet, request) {
   const verification = verifyAdminAccess(sheet, request);
   if (!verification.success) {
