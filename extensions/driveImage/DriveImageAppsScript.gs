@@ -45,18 +45,48 @@ function getDriveImageRolesForInitialization() {
 }
 
 function collectDriveImageFolderKeys() {
-  const rootFolder = getUploadFolder();
   const keys = new Set();
   keys.add(ROOT_FOLDER_KEY);
 
-  const folders = rootFolder.getFolders();
-  while (folders.hasNext()) {
-    const folder = folders.next();
-    const name = (folder && folder.getName) ? folder.getName() : '';
-    const trimmed = name ? name.toString().trim() : '';
-    if (trimmed) {
-      keys.add(trimmed);
+  const addFolderKey = function(folder) {
+    if (!folder || typeof folder.getName !== 'function') {
+      return;
     }
+
+    const rawName = folder.getName();
+    const sanitized = typeof sanitizeFolderName === 'function'
+      ? sanitizeFolderName(rawName)
+      : (rawName || '').toString().trim();
+
+    if (sanitized && sanitized !== ROOT_FOLDER_KEY) {
+      keys.add(sanitized);
+    }
+  };
+
+  try {
+    const uploadRoot = getUploadFolder();
+    addFolderKey(uploadRoot);
+
+    const nestedFolders = uploadRoot && typeof uploadRoot.getFolders === 'function'
+      ? uploadRoot.getFolders()
+      : null;
+
+    if (nestedFolders) {
+      while (nestedFolders.hasNext()) {
+        addFolderKey(nestedFolders.next());
+      }
+    }
+  } catch (error) {
+    Logger.log('[DriveImage] Failed to enumerate upload root folders: %s', error);
+  }
+
+  try {
+    const allFolders = DriveApp.searchFolders("trashed = false");
+    while (allFolders.hasNext()) {
+      addFolderKey(allFolders.next());
+    }
+  } catch (error) {
+    Logger.log('[DriveImage] Failed to enumerate Drive folders: %s', error);
   }
 
   return Array.from(keys).sort(function(a, b) {
