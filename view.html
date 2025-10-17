@@ -5,24 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wikiページ表示</title>
   <link rel="stylesheet" href="./styles/editor.css">
-  <script>
-    (function ensureAppEndpoints() {
-      const defaults = {
-        wiki: 'https://script.google.com/macros/s/AKfycbyFiFm2zdtkPhuZ4EOJ-yLEGnw_opM5hxQBb7EE-sSg2mJ9pOU3HTrFoAXgIeb5J2Q91w/exec',
-        driveImage: 'https://script.google.com/macros/s/AKfycbyvK1s6Zs4ccn_yeSh2Xz8MWOa5AO8y_GsqRr8BacITxMU8MhcEFDVm7IT56ZZUvWXE/exec',
-      };
-
-      if (!window.APP_ENDPOINTS) {
-        window.APP_ENDPOINTS = defaults;
-        return;
-      }
-
-      window.APP_ENDPOINTS = {
-        ...defaults,
-        ...window.APP_ENDPOINTS,
-      };
-    })();
-  </script>
+  <script src="./scripts/appsScriptEndpoints.js"></script>
   <style>
     body {
       margin: 0;
@@ -456,8 +439,7 @@
     const DEFAULT_TIMEOUT = 25000;
     const LOGIN_STORAGE_KEY = 'wikiLoginState';
 
-    const WIKI_APPS_SCRIPT_ENDPOINT = (window.APP_ENDPOINTS && window.APP_ENDPOINTS.wiki)
-      window.APP_ENDPOINTS.wiki;
+    const APPS_SCRIPT_ENDPOINT_WIKI = window.APPS_SCRIPT_ENDPOINT_WIKI;
 
     function fetchWithoutPreflight(url, options = {}, timeout = DEFAULT_TIMEOUT) {
       return new Promise((resolve, reject) => {
@@ -500,7 +482,7 @@
       let response;
       try {
         response = await fetchWithoutPreflight(
-          WIKI_APPS_SCRIPT_ENDPOINT,
+          APPS_SCRIPT_ENDPOINT_WIKI,
           {
             method: 'POST',
             body: JSON.stringify(payload),

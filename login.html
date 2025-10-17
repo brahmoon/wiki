@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wiki ログイン</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="./scripts/appsScriptEndpoints.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -168,11 +169,13 @@
         </div>
     </div>
     <script>
+        const APPS_SCRIPT_ENDPOINT_LOGIN = window.APPS_SCRIPT_ENDPOINT_LOGIN;
+
         const CONFIG = {
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com',
             LOGIN_STORAGE_KEY: 'wikiLoginState',
             DEFAULT_REDIRECT_PATH: 'edit.html',
-            LOGIN_APPS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbw4DPAmRq9f-zikBUH4MLWxfhVPmMI1dJpmMWeiDWkKxQwPKLPZa1wp4pZk3eav2zJ4/exec'
+            APPS_SCRIPT_ENDPOINT_LOGIN
         };
 
         const state = {
@@ -200,7 +203,7 @@
         const APP_SCRIPT_REQUEST_TIMEOUT = 20000;
 
         const callAppsScript = async (payload) => {
-            if (!CONFIG.LOGIN_APPS_ENDPOINT || CONFIG.LOGIN_APPS_ENDPOINT.includes('YOUR_DEPLOYMENT_ID')) {
+            if (!CONFIG.APPS_SCRIPT_ENDPOINT_LOGIN || CONFIG.APPS_SCRIPT_ENDPOINT_LOGIN.includes('YOUR_DEPLOYMENT_ID')) {
                 throw new Error('Apps ScriptのURLが設定されていません。管理者にお問い合わせください。');
             }
 
@@ -208,7 +211,7 @@
             const timer = window.setTimeout(() => controller.abort(), APP_SCRIPT_REQUEST_TIMEOUT);
 
             try {
-                const response = await fetch(CONFIG.LOGIN_APPS_ENDPOINT, {
+                const response = await fetch(CONFIG.APPS_SCRIPT_ENDPOINT_LOGIN, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
