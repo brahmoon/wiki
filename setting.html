@@ -686,6 +686,10 @@
             pointer-events: none;
         }
 
+        .authority-saving-overlay {
+            z-index: 20;
+        }
+
         .loading-content {
             display: flex;
             flex-direction: column;
@@ -888,6 +892,17 @@
             <p class="loading-message">認証処理を確認しています…</p>
         </div>
     </div>
+    <div
+        id="authority-saving-overlay"
+        class="loading-overlay authority-saving-overlay"
+        hidden
+        aria-hidden="true"
+    >
+        <div class="loading-content" role="status" aria-live="polite">
+            <div class="loading-spinner" aria-hidden="true"></div>
+            <p class="loading-message">権限設定を保存しています…</p>
+        </div>
+    </div>
     <script>
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_ADMIN_AUTH = window.APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
@@ -985,6 +1000,7 @@
         const authorizationRetryButton = document.getElementById('authorization-retry');
         const authorizationLoginButton = document.getElementById('authorization-login');
         const loadingOverlay = document.getElementById('loading-overlay');
+        const authoritySavingOverlay = document.getElementById('authority-saving-overlay');
 
         const params = new URLSearchParams(window.location.search);
         const requestedPage = (params.get('page') || '').trim().toLowerCase();
@@ -1400,7 +1416,14 @@
         };
 
         const setAuthoritySaving = (isSaving) => {
-            driveImageAuthorityState.saving = Boolean(isSaving);
+            const saving = Boolean(isSaving);
+            driveImageAuthorityState.saving = saving;
+
+            if (authoritySavingOverlay) {
+                authoritySavingOverlay.hidden = !saving;
+                authoritySavingOverlay.setAttribute('aria-hidden', saving ? 'false' : 'true');
+            }
+
             updateAuthorityInteractivity();
             updateAuthoritySaveButtonState();
         };
@@ -1707,19 +1730,22 @@
             const payload = {};
             const validKeys = new Set(driveImageAuthorityState.folders.map((folder) => normalizeFolderKey(folder.key)));
 
-            DRIVE_IMAGE_MUTABLE_ROLES.forEach((role) => {
-                const permissions = driveImageAuthorityState.permissionsByRole[role] || {};
-                Object.keys(permissions).forEach((folderKey) => {
-                    if (!validKeys.has(folderKey)) {
-                        return;
-                    }
-                    if (!payload[folderKey]) {
-                        payload[folderKey] = {};
-                    }
-                    payload[folderKey][role] = {
-                        upload: Boolean(permissions[folderKey].upload),
-                        delete: Boolean(permissions[folderKey].delete)
+            validKeys.forEach((folderKey) => {
+                payload[folderKey] = {};
+                DRIVE_IMAGE_ROLES.forEach((role) => {
+                    const permissions = driveImageAuthorityState.permissionsByRole[role] || {};
+                    const current = permissions[folderKey] || { upload: false, delete: false };
+                    const entry = {
+                        upload: Boolean(current.upload),
+                        delete: Boolean(current.delete)
                     };
+
+                    if (DRIVE_IMAGE_READ_ONLY_ROLES.has(role)) {
+                        entry.upload = true;
+                        entry.delete = true;
+                    }
+
+                    payload[folderKey][role] = entry;
                 });
             });
 
