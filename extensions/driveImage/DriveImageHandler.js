@@ -652,8 +652,20 @@ export class DriveImageHandler {
   }
 
   static getPermissionCacheKey(options) {
+    if (!options) {
+      return null;
+    }
+
+    const email = (options.userGoogleEmail || options.userEmail || '')
+      .toString()
+      .trim()
+      .toLowerCase();
+    if (email) {
+      return `user:${email}`;
+    }
+
     const role = this.resolveRole(options);
-    return role ? role.toLowerCase() : null;
+    return role ? `role:${role.toLowerCase()}` : null;
   }
 
   static getCachedPermissions(options) {
@@ -662,7 +674,25 @@ export class DriveImageHandler {
       return {};
     }
     const cached = this.permissionCache.get(cacheKey);
-    return cached ? cached.data : {};
+    if (!cached) {
+      return {};
+    }
+    this.applyResolvedPermissionMeta(options, cached.meta);
+    return cached.data;
+  }
+
+  static applyResolvedPermissionMeta(options, meta) {
+    if (!options || !meta || typeof meta !== 'object') {
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(meta, 'authority')) {
+      options.userAuthority = meta.authority;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(meta, 'role')) {
+      options.userRole = meta.role || '';
+    }
   }
 
   static normalizePermissions(rawPermissions) {
@@ -683,13 +713,18 @@ export class DriveImageHandler {
     return normalized;
   }
 
-  static async fetchPermissions(options, role) {
-    if (!options?.permissionsEndpoint || !role) {
-      return {};
+  static async fetchPermissions(options) {
+    const endpoint = options?.permissionsEndpoint;
+    const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
+      .toString()
+      .trim();
+
+    if (!endpoint || !googleEmail) {
+      return { permissions: {}, authority: null, role: '' };
     }
 
     try {
-      const response = await fetch(options.permissionsEndpoint, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         mode: 'cors',
         credentials: 'omit',
@@ -698,8 +733,8 @@ export class DriveImageHandler {
         },
         body: JSON.stringify({
           action: 'getDriveImagePermissions',
-          role,
-          authority: options.userAuthority ?? null
+          googleEmail,
+          email: googleEmail
         })
       });
 
@@ -709,36 +744,58 @@ export class DriveImageHandler {
       }
 
       const result = await response.json().catch(() => null);
-      if (result && result.success) {
-        return this.normalizePermissions(result.permissions);
+      const payload = {
+        permissions: {},
+        authority: null,
+        role: ''
+      };
+
+      if (result && typeof result === 'object') {
+        if (Object.prototype.hasOwnProperty.call(result, 'authority')) {
+          payload.authority = result.authority;
+        }
+        if (Object.prototype.hasOwnProperty.call(result, 'role')) {
+          payload.role = result.role || '';
+        }
+
+        if (result.success) {
+          payload.permissions = this.normalizePermissions(result.permissions);
+        } else if (result.message) {
+          console.warn('Drive image permission request was not successful:', result.message);
+        }
       }
+
+      return payload;
     } catch (error) {
       console.error('Failed to fetch drive image permissions:', error);
     }
 
-    return {};
+    return { permissions: {}, authority: null, role: '' };
   }
 
   static async ensurePermissions(options) {
     const cacheKey = this.getPermissionCacheKey(options);
-    if (!cacheKey) {
-      return {};
-    }
-
-    const cached = this.permissionCache.get(cacheKey);
     const ttl = options?.permissionCacheTimeout || this.DEFAULT_PERMISSION_CACHE_TTL;
-    if (cached && Date.now() - cached.timestamp < ttl) {
-      return cached.data;
+    if (cacheKey) {
+      const cached = this.permissionCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < ttl) {
+        this.applyResolvedPermissionMeta(options, cached.meta);
+        return cached.data;
+      }
     }
 
-    const role = this.resolveRole(options);
-    if (!role) {
-      this.permissionCache.set(cacheKey, { data: {}, timestamp: Date.now() });
-      return {};
+    const result = await this.fetchPermissions(options);
+    const permissions = result.permissions || {};
+    const meta = {
+      authority: Object.prototype.hasOwnProperty.call(result, 'authority') ? result.authority : null,
+      role: Object.prototype.hasOwnProperty.call(result, 'role') ? result.role || '' : ''
+    };
+    this.applyResolvedPermissionMeta(options, meta);
+
+    if (cacheKey) {
+      this.permissionCache.set(cacheKey, { data: permissions, timestamp: Date.now(), meta });
     }
 
-    const permissions = await this.fetchPermissions(options, role);
-    this.permissionCache.set(cacheKey, { data: permissions, timestamp: Date.now() });
     return permissions;
   }
 
