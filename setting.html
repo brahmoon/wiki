@@ -324,6 +324,11 @@
             height: 18px;
         }
 
+        .authority-permission-group label.is-disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
         .authority-loading,
         .authority-error,
         .authority-empty {
@@ -808,6 +813,7 @@
                             <div id="authority-role-toggle" class="authority-role-toggle" role="radiogroup" aria-label="権限対象">
                                 <button type="button" class="authority-role-button" data-authority-role="Editor" aria-pressed="false">Editor</button>
                                 <button type="button" class="authority-role-button" data-authority-role="Moderator" aria-pressed="false">Moderator</button>
+                                <button type="button" class="authority-role-button" data-authority-role="Administrator" aria-pressed="false">Administrator</button>
                             </div>
                         </div>
                         <div id="authority-loading" class="authority-loading" role="status" aria-live="polite" hidden>
@@ -889,7 +895,10 @@
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION = APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
-        const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator'];
+        const DRIVE_IMAGE_ADMIN_ROLE = 'Administrator';
+        const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator', DRIVE_IMAGE_ADMIN_ROLE];
+        const DRIVE_IMAGE_MUTABLE_ROLES = DRIVE_IMAGE_ROLES.filter((role) => role !== DRIVE_IMAGE_ADMIN_ROLE);
+        const DRIVE_IMAGE_READ_ONLY_ROLES = new Set([DRIVE_IMAGE_ADMIN_ROLE]);
         const DRIVE_IMAGE_ROOT_KEY = '__root__';
         const MENU_LABELS = {
             general: 'Wiki設定',
@@ -1005,7 +1014,8 @@
             folders: [],
             permissionsByRole: {
                 Editor: {},
-                Moderator: {}
+                Moderator: {},
+                [DRIVE_IMAGE_ADMIN_ROLE]: {}
             }
         };
 
@@ -1220,6 +1230,9 @@
             }
 
             if (typeof value === 'number') {
+                if (value >= ADMIN_AUTHORITY_VALUE) {
+                    return DRIVE_IMAGE_ADMIN_ROLE;
+                }
                 if (value >= 3) {
                     return 'Moderator';
                 }
@@ -1235,6 +1248,9 @@
             }
 
             const lower = text.toLowerCase();
+            if (lower === 'administrator' || lower === 'admin') {
+                return DRIVE_IMAGE_ADMIN_ROLE;
+            }
             if (lower === 'moderator') {
                 return 'Moderator';
             }
@@ -1308,10 +1324,24 @@
         };
 
         const updateAuthorityInteractivity = () => {
-            const disabled = driveImageAuthorityState.loading || driveImageAuthorityState.saving;
+            const isProcessing = driveImageAuthorityState.loading || driveImageAuthorityState.saving;
+            const isReadOnlyRole = DRIVE_IMAGE_READ_ONLY_ROLES.has(driveImageAuthorityState.currentRole);
             authorityCheckboxMap.forEach((controls) => {
-                controls.upload.disabled = disabled;
-                controls.delete.disabled = disabled;
+                const shouldDisable = isProcessing || isReadOnlyRole;
+                if (controls.upload) {
+                    controls.upload.disabled = shouldDisable;
+                }
+                if (controls.delete) {
+                    controls.delete.disabled = shouldDisable;
+                }
+                if (controls.uploadLabel) {
+                    controls.uploadLabel.classList.toggle('is-disabled', shouldDisable);
+                    controls.uploadLabel.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+                }
+                if (controls.deleteLabel) {
+                    controls.deleteLabel.classList.toggle('is-disabled', shouldDisable);
+                    controls.deleteLabel.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+                }
             });
         };
 
@@ -1380,15 +1410,22 @@
 
             DRIVE_IMAGE_ROLES.forEach((role) => {
                 const permissions = driveImageAuthorityState.permissionsByRole[role] || {};
+                const isReadOnlyRole = DRIVE_IMAGE_READ_ONLY_ROLES.has(role);
                 folderKeys.forEach((key) => {
+                    let nextState;
                     if (!permissions[key]) {
-                        permissions[key] = { upload: false, delete: false };
+                        nextState = { upload: false, delete: false };
                     } else {
-                        permissions[key] = {
+                        nextState = {
                             upload: Boolean(permissions[key].upload),
                             delete: Boolean(permissions[key].delete)
                         };
                     }
+                    if (isReadOnlyRole) {
+                        nextState.upload = true;
+                        nextState.delete = true;
+                    }
+                    permissions[key] = nextState;
                 });
                 Object.keys(permissions).forEach((key) => {
                     if (!folderKeys.includes(key)) {
@@ -1419,14 +1456,22 @@
             authorityCheckboxMap.forEach((controls, key) => {
                 const normalizedKey = normalizeFolderKey(key);
                 const state = permissions[normalizedKey] || { upload: false, delete: false };
-                controls.upload.checked = Boolean(state.upload);
-                controls.delete.checked = Boolean(state.delete);
+                const isReadOnlyRole = DRIVE_IMAGE_READ_ONLY_ROLES.has(driveImageAuthorityState.currentRole);
+                if (controls.upload) {
+                    controls.upload.checked = isReadOnlyRole ? true : Boolean(state.upload);
+                }
+                if (controls.delete) {
+                    controls.delete.checked = isReadOnlyRole ? true : Boolean(state.delete);
+                }
             });
         };
 
         const handleAuthorityCheckboxChange = (event) => {
             const checkbox = event.target;
             if (!checkbox || checkbox.type !== 'checkbox' || checkbox.disabled) {
+                return;
+            }
+            if (DRIVE_IMAGE_READ_ONLY_ROLES.has(driveImageAuthorityState.currentRole)) {
                 return;
             }
             const folderKey = normalizeFolderKey(checkbox.dataset.folderKey);
@@ -1543,7 +1588,12 @@
                 item.appendChild(controls);
 
                 authorityFolderList.appendChild(item);
-                authorityCheckboxMap.set(normalizedKey, { upload: uploadCheckbox, delete: deleteCheckbox });
+                authorityCheckboxMap.set(normalizedKey, {
+                    upload: uploadCheckbox,
+                    delete: deleteCheckbox,
+                    uploadLabel,
+                    deleteLabel
+                });
             });
 
             updateAuthorityInteractivity();
@@ -1657,7 +1707,7 @@
             const payload = {};
             const validKeys = new Set(driveImageAuthorityState.folders.map((folder) => normalizeFolderKey(folder.key)));
 
-            DRIVE_IMAGE_ROLES.forEach((role) => {
+            DRIVE_IMAGE_MUTABLE_ROLES.forEach((role) => {
                 const permissions = driveImageAuthorityState.permissionsByRole[role] || {};
                 Object.keys(permissions).forEach((folderKey) => {
                     if (!validKeys.has(folderKey)) {
@@ -1808,6 +1858,7 @@
                 driveImageAuthorityState.currentRole = role;
                 updateAuthorityRoleButtonsUI();
                 applyPermissionsToUI();
+                updateAuthorityInteractivity();
                 clearAuthorityStatus();
             });
         });
