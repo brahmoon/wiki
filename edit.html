@@ -1565,14 +1565,14 @@
         };
 
         const handleLogout = () => {
-            const state = getStoredLoginState();
-            if (state?.accessToken) {
+            const loginState = getStoredLoginState();
+            if (loginState?.accessToken) {
                 fetch('https://oauth2.googleapis.com/revoke', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: `token=${encodeURIComponent(state.accessToken)}`
+                    body: `token=${encodeURIComponent(loginState.accessToken)}`
                 }).catch((error) => {
                     console.warn('Failed to revoke token', error);
                 });
@@ -1582,6 +1582,8 @@
             userSettingsState.loginId = null;
             lastLoginIdentifier = null;
             updateLoginUI();
+            const targetPage = state.currentPageId || initialPageIdFromQuery || '';
+            window.location.replace(buildLoginUrl(targetPage));
         };
 
         const handleWikiSettingsNavigation = () => {
