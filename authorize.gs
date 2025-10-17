@@ -734,7 +734,11 @@ function getDriveImagePermissions(request) {
   }
 
   const authorityValue = parseAuthorityValue(account.authority);
-  const role = resolveDriveImageRole(authorityValue);
+  const role = resolveDriveImageRole(
+    authorityValue !== null && authorityValue !== undefined
+      ? authorityValue
+      : account.authority
+  );
 
   const authorities = readDriveImageAuthorities();
   const imageAuthorities = authorities.Image || {};
@@ -767,7 +771,10 @@ function getDriveImagePermissions(request) {
     success: true,
     message: 'Drive画像の権限を返却しました。',
     permissions,
-    authority: authorityValue,
+    authority:
+      account.authority !== null && account.authority !== undefined && account.authority !== ''
+        ? account.authority
+        : null,
     role: role || '',
     email: account.email || '',
     loginId: account.loginId || ''
