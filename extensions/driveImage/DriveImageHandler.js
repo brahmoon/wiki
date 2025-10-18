@@ -718,12 +718,25 @@ export class DriveImageHandler {
     const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
       .toString()
       .trim();
+    const loginId = (options?.userLoginId || '')
+      .toString()
+      .trim();
 
     if (!endpoint || !googleEmail) {
       return { permissions: {}, authority: null, role: '' };
     }
 
     try {
+      const payload = {
+        action: 'getDriveImagePermissions',
+        googleEmail,
+        email: googleEmail
+      };
+
+      if (loginId) {
+        payload.loginId = loginId;
+      }
+
       const response = await fetch(endpoint, {
         method: 'POST',
         mode: 'cors',
@@ -731,11 +744,7 @@ export class DriveImageHandler {
         headers: {
           'Content-Type': 'text/plain'
         },
-        body: JSON.stringify({
-          action: 'getDriveImagePermissions',
-          googleEmail,
-          email: googleEmail
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {

@@ -730,7 +730,8 @@ function getDriveImagePermissions(request) {
   if (!normalizedGoogleEmail) {
     return {
       success: false,
-      message: 'Googleアカウント情報が指定されていません。'
+      message: 'Googleアカウント情報が指定されていません。',
+      loginId: request.loginId || ''
     };
   }
 
@@ -738,13 +739,15 @@ function getDriveImagePermissions(request) {
   if (!sheet) {
     return {
       success: false,
-      message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`
+      message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`,
+      loginId: request.loginId || ''
     };
   }
 
   const account = findAccount(sheet, {
     googleEmail: request.googleEmail,
-    email: request.email
+    email: request.email,
+    loginId: request.loginId
   });
 
   if (!account) {
@@ -753,7 +756,8 @@ function getDriveImagePermissions(request) {
       message: '権限を判定できませんでした。',
       permissions: {},
       authority: null,
-      role: ''
+      role: '',
+      loginId: request.loginId || ''
     };
   }
 
