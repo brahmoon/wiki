@@ -247,13 +247,16 @@ export const ResizableTable = Table.extend({
       };
 
       const shouldHandleTableEvent = event => {
-        if (event.target?.closest?.('.resize-handle')) return false;
+        const target = event.target;
 
-        const closestTable = event.target?.closest?.('table');
-        if (closestTable !== tableEl) return false;
+        if (!(target instanceof Element)) return false;
+        if (target.closest('.resize-handle')) return false;
 
-        const clickedCell = event.target?.closest?.('td, th');
-        if (clickedCell) return false;
+        const targetTable = target === tableEl ? tableEl : target.closest('table');
+        if (targetTable !== tableEl) return false;
+
+        const clickedCell = target.closest('td, th');
+        if (clickedCell?.closest('table') === tableEl) return false;
 
         return true;
       };
