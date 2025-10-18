@@ -1141,6 +1141,41 @@
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
 
+        const DRIVE_IMAGE_PERMISSION_DEBUG = true;
+
+        if (DRIVE_IMAGE_PERMISSION_DEBUG && DriveImageHandler && typeof DriveImageHandler.fetchPermissions === 'function' && !DriveImageHandler.__permissionDebugPatched) {
+            const originalFetchPermissions = DriveImageHandler.fetchPermissions.bind(DriveImageHandler);
+
+            DriveImageHandler.fetchPermissions = async function patchedFetchPermissions(options) {
+                const endpoint = options?.permissionsEndpoint;
+                const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
+                    .toString()
+                    .trim();
+                const payload = {
+                    action: 'getDriveImagePermissions',
+                    googleEmail,
+                    email: googleEmail
+                };
+
+                console.debug('[DriveImage][Permissions] Sending request', {
+                    endpoint,
+                    payload,
+                    timestamp: new Date().toISOString()
+                });
+
+                const result = await originalFetchPermissions(options);
+
+                console.debug('[DriveImage][Permissions] Received response', {
+                    result,
+                    timestamp: new Date().toISOString()
+                });
+
+                return result;
+            };
+
+            DriveImageHandler.__permissionDebugPatched = true;
+        }
+
         const loginStatusText = document.getElementById('login-status-text');
         const loginButton = document.getElementById('login-button');
         const logoutButton = document.getElementById('logout-button');
