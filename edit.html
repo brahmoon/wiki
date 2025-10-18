@@ -522,6 +522,61 @@
         .resize-handle-se { bottom: 0; right: 0; transform: translate(50%, 50%); cursor: nwse-resize; }
         .resize-handle-sw { bottom: 0; left: 0; transform: translate(-50%, 50%); cursor: nesw-resize; }
 
+        .table-resize-overlay {
+            position: absolute;
+            display: none;
+            z-index: 35;
+            pointer-events: none;
+        }
+
+        .table-resize-overlay.is-visible {
+            display: block;
+            pointer-events: auto;
+        }
+
+        .table-resize-border {
+            position: absolute;
+            inset: -4px;
+            border: 2px solid rgba(35, 131, 226, 0.5);
+            border-radius: 6px;
+            pointer-events: auto;
+            box-sizing: border-box;
+        }
+
+        .table-resize-handle {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .table-resize-handle-half {
+            top: 50%;
+            left: 0;
+            transform: translate(-50%, -50%);
+        }
+
+        .table-resize-handle-full {
+            top: 50%;
+            right: 0;
+            transform: translate(50%, -50%);
+        }
+
+        .table-resize-handle.is-active {
+            background: #1a6bc2;
+        }
+
+        .editor-container table[data-table-width] {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .editor-container table[data-table-width='50%'] {
+            width: 50%;
+        }
+
+        .editor-container table[data-table-width='100%'] {
+            width: 100%;
+        }
+
         .toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -1141,7 +1196,7 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
-        import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
+        import { NodeSelection, Plugin, PluginKey } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
@@ -1194,6 +1249,193 @@
             };
 
             DriveImageHandler.__permissionDebugPatched = true;
+        }
+
+        const TableWithWidth = Table.extend({
+            addAttributes() {
+                const parentAttributes = this.parent?.() || {};
+                return {
+                    ...parentAttributes,
+                    tableWidth: {
+                        default: null,
+                        parseHTML: element => element.getAttribute('data-table-width'),
+                        renderHTML: attrs => {
+                            if (!attrs.tableWidth) {
+                                return {};
+                            }
+                            const widthValue = attrs.tableWidth;
+                            return {
+                                'data-table-width': widthValue,
+                                style: `width: ${widthValue};`
+                            };
+                        }
+                    }
+                };
+            }
+        });
+
+        const tableResizePluginKey = new PluginKey('tableResizeOverlay');
+
+        function getSelectedTableInfo(state, view) {
+            const { selection } = state;
+            if (!(selection instanceof NodeSelection) || selection.node.type.name !== 'table') {
+                return null;
+            }
+            const pos = selection.from;
+            const node = selection.node;
+            const dom = view.nodeDOM(pos);
+            if (!(dom instanceof HTMLElement)) {
+                return null;
+            }
+            return { pos, node, dom };
+        }
+
+        function createTableResizePlugin({ editorContainer, scrollContainer }) {
+            if (!editorContainer) {
+                return null;
+            }
+            return new Plugin({
+                key: tableResizePluginKey,
+                view(view) {
+                    let currentTablePos = null;
+                    const overlay = document.createElement('div');
+                    overlay.className = 'table-resize-overlay';
+                    overlay.style.left = '0px';
+                    overlay.style.top = '0px';
+
+                    const border = document.createElement('div');
+                    border.className = 'table-resize-border';
+
+                    const halfHandle = document.createElement('button');
+                    halfHandle.type = 'button';
+                    halfHandle.className = 'resize-handle table-resize-handle table-resize-handle-half';
+                    halfHandle.dataset.width = '50%';
+                    halfHandle.setAttribute('aria-label', 'テーブル幅を50%に設定');
+
+                    const fullHandle = document.createElement('button');
+                    fullHandle.type = 'button';
+                    fullHandle.className = 'resize-handle table-resize-handle table-resize-handle-full';
+                    fullHandle.dataset.width = '100%';
+                    fullHandle.setAttribute('aria-label', 'テーブル幅を100%に設定');
+
+                    border.appendChild(halfHandle);
+                    border.appendChild(fullHandle);
+                    overlay.appendChild(border);
+                    editorContainer.appendChild(overlay);
+
+                    const preventMouseDown = event => {
+                        event.preventDefault();
+                    };
+
+                    const applyTableWidth = widthValue => {
+                        if (currentTablePos == null) {
+                            return;
+                        }
+                        const state = view.state;
+                        const tableNode = state.doc.nodeAt(currentTablePos);
+                        if (!tableNode) {
+                            return;
+                        }
+                        if (tableNode.attrs.tableWidth === widthValue) {
+                            return;
+                        }
+                        const nextAttrs = {
+                            ...tableNode.attrs,
+                            tableWidth: widthValue
+                        };
+                        const transaction = state.tr.setNodeMarkup(currentTablePos, undefined, nextAttrs, tableNode.marks);
+                        view.dispatch(transaction);
+                        window.requestAnimationFrame(() => {
+                            view.focus();
+                        });
+                    };
+
+                    const toggleTableWidth = () => {
+                        if (currentTablePos == null) {
+                            return;
+                        }
+                        const node = view.state.doc.nodeAt(currentTablePos);
+                        if (!node) {
+                            return;
+                        }
+                        const nextWidth = node.attrs.tableWidth === '50%' ? '100%' : '50%';
+                        applyTableWidth(nextWidth);
+                    };
+
+                    const handleClick = event => {
+                        const target = event.target;
+                        if (!(target instanceof HTMLElement)) {
+                            return;
+                        }
+                        const widthValue = target.dataset.width;
+                        if (widthValue) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            applyTableWidth(widthValue);
+                            return;
+                        }
+                        if (target === border) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            toggleTableWidth();
+                        }
+                    };
+
+                    border.addEventListener('mousedown', preventMouseDown);
+                    halfHandle.addEventListener('mousedown', preventMouseDown);
+                    fullHandle.addEventListener('mousedown', preventMouseDown);
+                    border.addEventListener('click', handleClick);
+                    halfHandle.addEventListener('click', handleClick);
+                    fullHandle.addEventListener('click', handleClick);
+
+                    const updateOverlay = () => {
+                        const info = getSelectedTableInfo(view.state, view);
+                        if (!info) {
+                            currentTablePos = null;
+                            overlay.classList.remove('is-visible');
+                            return;
+                        }
+                        currentTablePos = info.pos;
+                        const rect = info.dom.getBoundingClientRect();
+                        const containerRect = editorContainer.getBoundingClientRect();
+                        const top = rect.top - containerRect.top + editorContainer.scrollTop;
+                        const left = rect.left - containerRect.left + editorContainer.scrollLeft;
+                        overlay.style.width = `${rect.width}px`;
+                        overlay.style.height = `${rect.height}px`;
+                        overlay.style.left = `${left}px`;
+                        overlay.style.top = `${top}px`;
+                        overlay.classList.add('is-visible');
+
+                        const widthAttr = info.node.attrs.tableWidth === '50%' ? '50%' : '100%';
+                        halfHandle.classList.toggle('is-active', widthAttr === '50%');
+                        fullHandle.classList.toggle('is-active', widthAttr === '100%');
+                    };
+
+                    const handleResize = () => {
+                        window.requestAnimationFrame(updateOverlay);
+                    };
+
+                    window.addEventListener('resize', handleResize);
+                    scrollContainer?.addEventListener('scroll', handleResize, { passive: true });
+
+                    updateOverlay();
+
+                    return {
+                        update: updateOverlay,
+                        destroy() {
+                            window.removeEventListener('resize', handleResize);
+                            scrollContainer?.removeEventListener('scroll', handleResize);
+                            border.removeEventListener('mousedown', preventMouseDown);
+                            halfHandle.removeEventListener('mousedown', preventMouseDown);
+                            fullHandle.removeEventListener('mousedown', preventMouseDown);
+                            border.removeEventListener('click', handleClick);
+                            halfHandle.removeEventListener('click', handleClick);
+                            fullHandle.removeEventListener('click', handleClick);
+                            overlay.remove();
+                        }
+                    };
+                }
+            });
         }
 
         const loginStatusText = document.getElementById('login-status-text');
@@ -4003,7 +4245,7 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    Table.configure({ resizable: true }),
+                    TableWithWidth.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,
@@ -4049,6 +4291,15 @@
                     }
                 }
             });
+            if (state.editor) {
+                const plugin = createTableResizePlugin({
+                    editorContainer: elements.editorContainer,
+                    scrollContainer: elements.editorWrapper
+                });
+                if (plugin) {
+                    state.editor.registerPlugin(plugin);
+                }
+            }
             driveImageExtensionInstance = state.editor?.extensionManager?.extensions?.find((extension) => extension.name === 'driveImage') || null;
             refreshDriveImageUserPermissions();
             renderToolbar();
