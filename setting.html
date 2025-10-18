@@ -23,6 +23,20 @@
             display: grid;
             grid-template-columns: 260px 1fr;
             min-height: 100vh;
+            transition: grid-template-columns 0.3s ease;
+        }
+
+        .layout.sidebar-closed {
+            grid-template-columns: 0 1fr;
+        }
+
+        .layout.sidebar-closed .admin-sidebar {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .layout.sidebar-open .admin-sidebar {
+            opacity: 1;
         }
 
         .admin-sidebar {
@@ -30,6 +44,7 @@
             border-right: 1px solid #e9e9e7;
             display: flex;
             flex-direction: column;
+            transition: opacity 0.2s ease;
         }
 
         .sidebar-header {
@@ -100,6 +115,15 @@
             padding: 20px 32px;
             border-bottom: 1px solid #e9e9e7;
             background: #fff;
+            gap: 16px;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+            min-width: 0;
         }
 
         .top-bar-title {
@@ -726,34 +750,83 @@
             }
         }
 
+        .sidebar-toggle {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1px solid #d3d2ce;
+            background: #fff;
+            cursor: pointer;
+            transition: background 0.2s, border 0.2s;
+        }
+
+        .sidebar-toggle:hover {
+            background: #f7f6f3;
+        }
+
+        .sidebar-toggle span {
+            width: 18px;
+            height: 2px;
+            background: #37352f;
+            border-radius: 99px;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.3);
+            z-index: 80;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
         @media (max-width: 960px) {
             .layout {
-                grid-template-columns: 1fr;
+                display: block;
             }
 
             .admin-sidebar {
-                flex-direction: row;
-                overflow-x: auto;
-                border-right: 0;
-                border-bottom: 1px solid #e9e9e7;
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 260px;
+                box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18);
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 90;
+                overflow-y: auto;
+            }
+
+            .layout.sidebar-open .admin-sidebar {
+                transform: translateX(0);
+            }
+
+            .layout.sidebar-closed .admin-sidebar {
+                transform: translateX(-100%);
             }
 
             .sidebar-header {
-                display: none;
+                display: block;
             }
 
             .menu-list {
-                display: flex;
-                padding: 12px 16px;
-            }
-
-            .menu-item {
-                border-radius: 10px;
-                margin-right: 8px;
+                padding: 12px 0 24px;
             }
 
             .admin-main {
-                min-height: auto;
+                min-height: 100vh;
+            }
+
+            .sidebar-toggle {
+                display: inline-flex;
             }
         }
     </style>
@@ -775,7 +848,14 @@
         </aside>
         <main class="admin-main">
             <div class="top-bar">
-                <div class="top-bar-title">Wiki 管理設定</div>
+                <div class="top-bar-left">
+                    <button id="admin-sidebar-toggle" class="sidebar-toggle" type="button" aria-label="管理メニュー" aria-expanded="false">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <div class="top-bar-title">Wiki 管理設定</div>
+                </div>
                 <div class="top-bar-actions">
                     <div id="admin-user" class="admin-user"></div>
                     <button id="return-editor" class="btn" type="button">エディタに戻る</button>
@@ -876,6 +956,7 @@
             </div>
         </main>
     </div>
+    <div id="sidebar-overlay" class="sidebar-overlay hidden" aria-hidden="true"></div>
     <div id="authorization-error" class="authorization-error" hidden aria-hidden="true">
         <div class="authorization-error-card" role="alert" aria-live="assertive">
             <h1>アクセスが拒否されました</h1>
@@ -995,12 +1076,71 @@
         const adminUser = document.getElementById('admin-user');
         const returnEditorButton = document.getElementById('return-editor');
         const layoutRoot = document.querySelector('.layout');
+        const adminSidebar = document.querySelector('.admin-sidebar');
+        const sidebarToggle = document.getElementById('admin-sidebar-toggle');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
         const authorizationError = document.getElementById('authorization-error');
         const authorizationErrorMessage = document.getElementById('authorization-error-message');
         const authorizationRetryButton = document.getElementById('authorization-retry');
         const authorizationLoginButton = document.getElementById('authorization-login');
         const loadingOverlay = document.getElementById('loading-overlay');
         const authoritySavingOverlay = document.getElementById('authority-saving-overlay');
+
+        const SIDEBAR_BREAKPOINT = 960;
+        const sidebarState = {
+            open: window.innerWidth >= SIDEBAR_BREAKPOINT
+        };
+
+        const isDesktop = () => window.innerWidth >= SIDEBAR_BREAKPOINT;
+
+        const setSidebar = (open) => {
+            sidebarState.open = open;
+
+            if (layoutRoot) {
+                layoutRoot.classList.toggle('sidebar-open', open);
+                layoutRoot.classList.toggle('sidebar-closed', !open);
+            }
+
+            if (adminSidebar) {
+                adminSidebar.setAttribute('aria-hidden', open ? 'false' : 'true');
+            }
+
+            if (sidebarOverlay) {
+                if (!isDesktop()) {
+                    sidebarOverlay.classList.toggle('hidden', !open);
+                    sidebarOverlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+                } else {
+                    sidebarOverlay.classList.add('hidden');
+                    sidebarOverlay.setAttribute('aria-hidden', 'true');
+                }
+            }
+
+            if (sidebarToggle) {
+                sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+        };
+
+        setSidebar(sidebarState.open);
+
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                setSidebar(!sidebarState.open);
+            });
+        }
+
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', () => {
+                setSidebar(false);
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            if (isDesktop() && !sidebarState.open) {
+                setSidebar(false);
+            } else {
+                setSidebar(sidebarState.open);
+            }
+        });
 
         const params = new URLSearchParams(window.location.search);
         const requestedPage = (params.get('page') || '').trim().toLowerCase();
@@ -2572,6 +2712,9 @@
                             url.searchParams.set('page', page);
                             window.history.replaceState({}, '', url);
                             updateMenuUI();
+                            if (!isDesktop()) {
+                                setSidebar(false);
+                            }
                         } catch (error) {
                             console.warn('ブラウザ履歴の更新に失敗したため、ページを再読み込みします。', error);
                             window.location.href = `./setting2.html?page=${encodeURIComponent(page)}`;
