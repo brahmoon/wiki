@@ -7,9 +7,9 @@
     WIKI: 'https://script.google.com/macros/s/AKfycbyFiFm2zdtkPhuZ4EOJ-yLEGnw_opM5hxQBb7EE-sSg2mJ9pOU3HTrFoAXgIeb5J2Q91w/exec',
     DRIVE_IMAGE: 'https://script.google.com/macros/s/AKfycbxaS2LMlxk5rx-XK6XTkFG2S58NKTkOnBL3smjF_mbyP_QA0PDJJ2hBE0_-PEX7nSO4/exec',
     LOGIN: 'https://script.google.com/macros/s/AKfycbw4DPAmRq9f-zikBUH4MLWxfhVPmMI1dJpmMWeiDWkKxQwPKLPZa1wp4pZk3eav2zJ4/exec',
-    ADMIN_AUTH: 'https://script.google.com/macros/s/AKfycbyoUshwmmyEWfIO6SqsWfVb2tm9PvnWT-q-Jbz9EYF8sI8cfJ29SQwDPxIlqfGgu_CUOA/exec',
+    ADMIN_AUTH: 'https://script.google.com/macros/s/AKfycbzgnLChZbpzAR73_Ued6zprzwJJTjYoFg0d4VuepJpDqUKo4iP4CNPHkxTCJ-p0X6yvdA/exec',
     USER_SETTINGS: 'https://script.google.com/macros/s/AKfycbzLYkmWzTM7-uu1HeYK7yf8YmOF3hKTr6ddun8Z266SnexD0cUQqs2SORxniltZKUFcQQ/exec',
-    TOOLBAR_PLUGIN: 'https://script.google.com/macros/s/AKfycbyoUshwmmyEWfIO6SqsWfVb2tm9PvnWT-q-Jbz9EYF8sI8cfJ29SQwDPxIlqfGgu_CUOA/exec',
+    TOOLBAR_PLUGIN: 'https://script.google.com/macros/s/AKfycbzgnLChZbpzAR73_Ued6zprzwJJTjYoFg0d4VuepJpDqUKo4iP4CNPHkxTCJ-p0X6yvdA/exec',
   });
 
   globalObject.APPS_SCRIPT_ENDPOINTS = endpoints;
