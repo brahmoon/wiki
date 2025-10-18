@@ -753,7 +753,7 @@ export class DriveImageHandler {
       }
 
       const result = await response.json().catch(() => null);
-      const payload = {
+      const resultPayload = {
         permissions: {},
         authority: null,
         role: ''
@@ -761,20 +761,20 @@ export class DriveImageHandler {
 
       if (result && typeof result === 'object') {
         if (Object.prototype.hasOwnProperty.call(result, 'authority')) {
-          payload.authority = result.authority;
+          resultPayload.authority = result.authority;
         }
         if (Object.prototype.hasOwnProperty.call(result, 'role')) {
-          payload.role = result.role || '';
+          resultPayload.role = result.role || '';
         }
 
         if (result.success) {
-          payload.permissions = this.normalizePermissions(result.permissions);
+          resultPayload.permissions = this.normalizePermissions(result.permissions);
         } else if (result.message) {
           console.warn('Drive image permission request was not successful:', result.message);
         }
       }
 
-      return payload;
+      return resultPayload;
     } catch (error) {
       console.error('Failed to fetch drive image permissions:', error);
     }
