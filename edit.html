@@ -473,14 +473,16 @@
             box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
         }
 
-        .resizable-image {
+        .resizable-image,
+        .resizable-table {
             position: relative;
             display: inline-block;
             max-width: 100%;
             transition: margin 0.2s ease-in;
         }
 
-        .resizable-image img {
+        .resizable-image img,
+        .resizable-table table {
             display: block;
             max-width: 100%;
             height: auto;
@@ -488,7 +490,12 @@
             will-change: width, height;
         }
 
-        .resizable-image.is-selected img {
+        .resizable-table table {
+            margin: 0;
+        }
+
+        .resizable-image.is-selected img,
+        .resizable-table.is-selected table {
             outline: 2px solid rgba(35, 131, 226, 0.5);
             outline-offset: 2px;
         }
@@ -508,7 +515,8 @@
             z-index: 5;
         }
 
-        .resizable-image.is-selected .resize-handle {
+        .resizable-image.is-selected .resize-handle,
+        .resizable-table.is-selected .resize-handle {
             opacity: 1;
             pointer-events: auto;
         }
@@ -1137,12 +1145,12 @@
         import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
         import { Link } from 'https://esm.sh/@tiptap/extension-link';
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
-        import { Table } from 'https://esm.sh/@tiptap/extension-table';
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
         import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
+        import { ResizableTable } from 'https://brahmoon.github.io/wiki/extensions/resizableTable/ResizableTable.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
@@ -4003,7 +4011,12 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    Table.configure({ resizable: true }),
+                    ResizableTable.configure({
+                        resizeConstraints: {
+                            minWidth: 160,
+                            maxWidth: 860
+                        }
+                    }),
                     TableRow,
                     TableHeader,
                     TableCell,
