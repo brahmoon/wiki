@@ -52,9 +52,33 @@ const AUTHORITIES_CONFIG = {
 const DRIVE_IMAGE_ADMIN_ROLE = typeof ADMINISTRATOR_ROLE !== 'undefined'
   ? ADMINISTRATOR_ROLE
   : 'Administrator';
-const DRIVE_IMAGE_ADMIN_AUTHORITY = typeof ADMIN_AUTHORITY_VALUE !== 'undefined'
-  ? ADMIN_AUTHORITY_VALUE
-  : 99;
+// Determine the numeric baseline for administrator privileges. If the host
+// project exposes ADMIN_AUTHORITY_VALUE we honour it, otherwise we derive the
+// highest configured authority level so numeric accounts (e.g. authority=3)
+// continue to map to the administrator role instead of falling back to
+// Moderator.
+const DRIVE_IMAGE_ADMIN_AUTHORITY = (function resolveAdminAuthorityBaseline() {
+  if (typeof ADMIN_AUTHORITY_VALUE !== 'undefined') {
+    const explicit = parseAuthorityValue(ADMIN_AUTHORITY_VALUE);
+    if (explicit !== null) {
+      return explicit;
+    }
+  }
+
+  let highestConfiguredAuthority = null;
+  if (AUTH_CONFIG && Array.isArray(AUTH_CONFIG.ALLOWED_UPDATE_AUTHORITY_VALUES)) {
+    AUTH_CONFIG.ALLOWED_UPDATE_AUTHORITY_VALUES.forEach((value) => {
+      const numeric = parseAuthorityValue(value);
+      if (numeric !== null) {
+        if (highestConfiguredAuthority === null || numeric > highestConfiguredAuthority) {
+          highestConfiguredAuthority = numeric;
+        }
+      }
+    });
+  }
+
+  return highestConfiguredAuthority !== null ? highestConfiguredAuthority : 99;
+})();
 const DRIVE_IMAGE_ROLES = Array.from(new Set([
   DRIVE_IMAGE_ADMIN_ROLE,
   'Moderator',
