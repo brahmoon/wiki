@@ -246,6 +246,52 @@ export const ResizableTable = Table.extend({
         }
       };
 
+      const pointerDownListener = event => {
+        const target = event.target;
+
+        if (!(target instanceof Element)) return;
+        if (target.closest('.resize-handle')) return;
+
+        const isWrapper = target === container;
+        const isTableElement = target === tableEl;
+        const clickedCell = target.closest('td, th');
+        const cellBelongsToTable = clickedCell?.closest('table') === tableEl;
+
+        if (!isWrapper && !isTableElement && !cellBelongsToTable) return;
+
+        if (cellBelongsToTable) {
+          const { clientX, clientY } = event;
+          if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+          const rect = tableEl.getBoundingClientRect();
+          const tolerance = 6;
+          const nearEdge =
+            clientX <= rect.left + tolerance ||
+            clientX >= rect.right - tolerance ||
+            clientY <= rect.top + tolerance ||
+            clientY >= rect.bottom - tolerance;
+
+          if (!nearEdge) return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        focusAndSelect();
+      };
+
+      const clickListener = event => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target !== tableEl) return;
+        if (!container.classList.contains('is-selected')) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        focusAndSelect();
+      };
+
+      container.addEventListener('pointerdown', pointerDownListener);
+      container.addEventListener('click', clickListener);
+
       const shouldHandleTableEvent = event => {
         const target = event.target;
 
@@ -426,6 +472,8 @@ export const ResizableTable = Table.extend({
           click: interceptTableMouseEvent,
         },
         destroy: () => {
+          container.removeEventListener('pointerdown', pointerDownListener);
+          container.removeEventListener('click', clickListener);
         },
       };
     };
