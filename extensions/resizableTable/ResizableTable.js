@@ -248,6 +248,10 @@ export const ResizableTable = Table.extend({
 
       const pointerDownListener = event => {
         if (event.target?.closest?.('.resize-handle')) return;
+
+        const targetTable = event.target === tableEl || tableEl.contains(event.target);
+        if (!targetTable) return;
+
         const rect = tableEl.getBoundingClientRect();
         const tolerance = 6;
         const withinBounds =
@@ -256,17 +260,32 @@ export const ResizableTable = Table.extend({
           event.clientY >= rect.top - tolerance &&
           event.clientY <= rect.bottom + tolerance;
         if (!withinBounds) return;
+
         const nearHorizontalEdge =
           event.clientX <= rect.left + tolerance || event.clientX >= rect.right - tolerance;
         const nearVerticalEdge =
           event.clientY <= rect.top + tolerance || event.clientY >= rect.bottom - tolerance;
-        if (!nearHorizontalEdge && !nearVerticalEdge) return;
+        const nearEdge = nearHorizontalEdge || nearVerticalEdge;
+
+        if (nearEdge) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
+        focusAndSelect();
+      };
+
+      const clickListener = event => {
+        if (event.target?.closest?.('.resize-handle')) return;
+        const targetTable = event.target === tableEl || tableEl.contains(event.target);
+        if (!targetTable) return;
         event.preventDefault();
         event.stopPropagation();
         focusAndSelect();
       };
 
       container.addEventListener('pointerdown', pointerDownListener, true);
+      container.addEventListener('click', clickListener, true);
 
       const applySize = (width, height) => {
         if (Number.isFinite(width)) {
@@ -406,6 +425,7 @@ export const ResizableTable = Table.extend({
         ignoreMutation: mutation => mutation.type === 'attributes' && mutation.target === tableEl,
         destroy: () => {
           container.removeEventListener('pointerdown', pointerDownListener, true);
+          container.removeEventListener('click', clickListener, true);
         },
       };
     };
