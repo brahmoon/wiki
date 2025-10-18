@@ -246,11 +246,26 @@ export const ResizableTable = Table.extend({
         }
       };
 
-      const pointerDownListener = event => {
-        if (event.target?.closest?.('.resize-handle')) return;
+      const shouldHandleTableEvent = event => {
+        const target = event.target;
 
-        const targetTable = event.target === tableEl || tableEl.contains(event.target);
-        if (!targetTable) return;
+        if (!(target instanceof Element)) return false;
+        if (target.closest('.resize-handle')) return false;
+
+        const targetTable = target === tableEl ? tableEl : target.closest('table');
+        if (targetTable !== tableEl) return false;
+
+        const clickedCell = target.closest('td, th');
+        if (clickedCell?.closest('table') === tableEl) return false;
+
+        return true;
+      };
+
+      const pointerDownListener = event => {
+        if (!shouldHandleTableEvent(event)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
 
         const rect = tableEl.getBoundingClientRect();
         const tolerance = 6;
@@ -261,24 +276,12 @@ export const ResizableTable = Table.extend({
           event.clientY <= rect.bottom + tolerance;
         if (!withinBounds) return;
 
-        const nearHorizontalEdge =
-          event.clientX <= rect.left + tolerance || event.clientX >= rect.right - tolerance;
-        const nearVerticalEdge =
-          event.clientY <= rect.top + tolerance || event.clientY >= rect.bottom - tolerance;
-        const nearEdge = nearHorizontalEdge || nearVerticalEdge;
-
-        if (nearEdge) {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-
         focusAndSelect();
       };
 
       const clickListener = event => {
-        if (event.target?.closest?.('.resize-handle')) return;
-        const targetTable = event.target === tableEl || tableEl.contains(event.target);
-        if (!targetTable) return;
+        if (!shouldHandleTableEvent(event)) return;
+
         event.preventDefault();
         event.stopPropagation();
         focusAndSelect();
