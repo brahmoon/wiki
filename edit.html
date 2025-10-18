@@ -477,12 +477,15 @@
             position: relative;
             display: inline-block;
             max-width: 100%;
+            transition: margin 0.2s ease-in;
         }
 
         .resizable-image img {
             display: block;
             max-width: 100%;
             height: auto;
+            transition: width 0.2s ease-in, height 0.2s ease-in;
+            will-change: width, height;
         }
 
         .resizable-image.is-selected img {
