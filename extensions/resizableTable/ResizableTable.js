@@ -261,34 +261,29 @@ export const ResizableTable = Table.extend({
         return true;
       };
 
-      const pointerDownListener = event => {
-        if (!shouldHandleTableEvent(event)) return;
+      const interceptTableMouseEvent = event => {
+        if (!shouldHandleTableEvent(event)) return false;
 
-        event.preventDefault();
-        event.stopPropagation();
-
-        const rect = tableEl.getBoundingClientRect();
-        const tolerance = 6;
-        const withinBounds =
-          event.clientX >= rect.left - tolerance &&
-          event.clientX <= rect.right + tolerance &&
-          event.clientY >= rect.top - tolerance &&
-          event.clientY <= rect.bottom + tolerance;
-        if (!withinBounds) return;
-
-        focusAndSelect();
-      };
-
-      const clickListener = event => {
-        if (!shouldHandleTableEvent(event)) return;
+        if (event.type === 'mousedown') {
+          const { clientX, clientY } = event;
+          if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+            return false;
+          }
+          const rect = tableEl.getBoundingClientRect();
+          const tolerance = 6;
+          const withinBounds =
+            clientX >= rect.left - tolerance &&
+            clientX <= rect.right + tolerance &&
+            clientY >= rect.top - tolerance &&
+            clientY <= rect.bottom + tolerance;
+          if (!withinBounds) return false;
+        }
 
         event.preventDefault();
         event.stopPropagation();
         focusAndSelect();
+        return true;
       };
-
-      container.addEventListener('pointerdown', pointerDownListener, true);
-      container.addEventListener('click', clickListener, true);
 
       const applySize = (width, height) => {
         if (Number.isFinite(width)) {
@@ -426,9 +421,11 @@ export const ResizableTable = Table.extend({
           return true;
         },
         ignoreMutation: mutation => mutation.type === 'attributes' && mutation.target === tableEl,
+        handleDOMEvents: {
+          mousedown: interceptTableMouseEvent,
+          click: interceptTableMouseEvent,
+        },
         destroy: () => {
-          container.removeEventListener('pointerdown', pointerDownListener, true);
-          container.removeEventListener('click', clickListener, true);
         },
       };
     };
