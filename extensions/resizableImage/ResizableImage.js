@@ -91,6 +91,84 @@ const clampDimensionsToConstraints = (width, height, constraints, maxEditorWidth
   };
 };
 
+const snapDimensionsToPercentageSteps = (
+  width,
+  height,
+  aspectRatio,
+  constraints,
+  maxEditorWidth,
+) => {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+
+  const ratio = Number.isFinite(aspectRatio) && aspectRatio > 0
+    ? aspectRatio
+    : width / height;
+
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return null;
+  }
+
+  if (!Number.isFinite(maxEditorWidth) || maxEditorWidth <= 0) {
+    const fallback = clampDimensionsToConstraints(width, height, constraints, maxEditorWidth);
+    if (!fallback) return null;
+    return {
+      width: Math.max(1, Math.round(fallback.width)),
+      height: Math.max(1, Math.round(fallback.height)),
+    };
+  }
+
+  const TOTAL_STEPS = 10;
+  const desiredStep = Math.min(
+    TOTAL_STEPS,
+    Math.max(1, Math.round((width / maxEditorWidth) * TOTAL_STEPS)),
+  );
+  const candidates = [];
+
+  for (let step = 1; step <= TOTAL_STEPS; step += 1) {
+    const candidateWidth = maxEditorWidth * (step / TOTAL_STEPS);
+    const candidateHeight = candidateWidth / ratio;
+    if (!Number.isFinite(candidateHeight) || candidateHeight <= 0) continue;
+
+    const constrained = clampDimensionsToConstraints(
+      candidateWidth,
+      candidateHeight,
+      constraints,
+      maxEditorWidth,
+    );
+    if (!constrained) continue;
+
+    if (Math.abs(constrained.width - candidateWidth) > 1) continue;
+
+    candidates.push({
+      width: Math.max(1, Math.round(constrained.width)),
+      height: Math.max(1, Math.round(constrained.height)),
+      step,
+      difference: Math.abs(step - desiredStep),
+    });
+  }
+
+  if (!candidates.length) {
+    const fallback = clampDimensionsToConstraints(width, height, constraints, maxEditorWidth);
+    if (!fallback) return null;
+    return {
+      width: Math.max(1, Math.round(fallback.width)),
+      height: Math.max(1, Math.round(fallback.height)),
+    };
+  }
+
+  candidates.sort((a, b) => {
+    if (a.difference !== b.difference) {
+      return a.difference - b.difference;
+    }
+    return a.step - b.step;
+  });
+
+  const best = candidates[0];
+  return { width: best.width, height: best.height };
+};
+
 const getAspectRatioFromNode = node => {
   if (!node || !node.attrs) return null;
   const stored = sanitizeAspectRatio(node.attrs.aspectRatio);
@@ -228,18 +306,24 @@ export const ResizableImage = Image.extend({
 
           if (!Number.isFinite(targetWidth) || !Number.isFinite(targetHeight)) return true;
 
-          const constrained = clampDimensionsToConstraints(targetWidth, targetHeight, constraints, maxEditorWidth);
-          if (!constrained) return true;
+          const snapped = snapDimensionsToPercentageSteps(
+            targetWidth,
+            targetHeight,
+            aspectRatio,
+            constraints,
+            maxEditorWidth,
+          );
+          if (!snapped) return true;
 
-          const nextAspectRatio = sanitizeAspectRatio(constrained.width / constrained.height);
+          const nextAspectRatio = sanitizeAspectRatio(snapped.width / snapped.height);
           if (
-            constrained.width === currentWidth &&
-            constrained.height === currentHeight &&
+            snapped.width === currentWidth &&
+            snapped.height === currentHeight &&
             attrs.aspectRatio === nextAspectRatio
           ) return true;
 
-          attrs.width = constrained.width;
-          attrs.height = constrained.height;
+          attrs.width = snapped.width;
+          attrs.height = snapped.height;
           assignAspectRatio(attrs, nextAspectRatio);
 
           transaction = transaction.setNodeMarkup(pos, undefined, attrs);
@@ -358,10 +442,23 @@ export const ResizableImage = Image.extend({
         const maxEditorWidth = getEditorContentWidth(editor);
 
         if (Number.isFinite(nextWidth) && Number.isFinite(nextHeight)) {
-          const constrained = clampDimensionsToConstraints(nextWidth, nextHeight, constraints, maxEditorWidth);
-          if (constrained) {
-            nextWidth = constrained.width;
-            nextHeight = constrained.height;
+          const aspectRatio = sanitizeAspectRatio(current.attrs?.aspectRatio) || (nextHeight ? nextWidth / nextHeight : null);
+          const snapped = snapDimensionsToPercentageSteps(
+            nextWidth,
+            nextHeight,
+            aspectRatio,
+            constraints,
+            maxEditorWidth,
+          );
+          if (snapped) {
+            nextWidth = snapped.width;
+            nextHeight = snapped.height;
+          } else {
+            const constrained = clampDimensionsToConstraints(nextWidth, nextHeight, constraints, maxEditorWidth);
+            if (constrained) {
+              nextWidth = constrained.width;
+              nextHeight = constrained.height;
+            }
           }
         }
         const nextAspectRatio = Number.isFinite(nextWidth) && Number.isFinite(nextHeight) && nextHeight
@@ -427,6 +524,7 @@ export const ResizableImage = Image.extend({
         const rect = imageEl.getBoundingClientRect();
         const initialWidth = Math.max(1, parseDimension(currentNode.attrs.width) ?? rect.width);
         const initialHeight = Math.max(1, parseDimension(currentNode.attrs.height) ?? rect.height);
+        const aspectRatio = initialHeight > 0 ? initialWidth / initialHeight : null;
         const affectsWidth = direction.includes('e') || direction.includes('w');
         const affectsHeight = direction.includes('n') || direction.includes('s');
         const startX = event.clientX;
@@ -435,14 +533,39 @@ export const ResizableImage = Image.extend({
         const maxEditorWidth = getEditorContentWidth(editor);
 
         let latestScale = 1;
+        let lastAppliedSize = { width: initialWidth, height: initialHeight };
         const clampScale = v => {
           let scale = Number.isFinite(v) ? v : latestScale;
           if (!Number.isFinite(scale) || scale <= 0) scale = latestScale;
           return Math.max(0.01, scale);
         };
         const updateScale = scaleValue => {
-          latestScale = clampScale(scaleValue);
-          applySize(initialWidth * latestScale, initialHeight * latestScale);
+          const clampedScale = clampScale(scaleValue);
+          let nextWidth = initialWidth * clampedScale;
+          let nextHeight = initialHeight * clampedScale;
+          if (Number.isFinite(nextWidth) && Number.isFinite(nextHeight)) {
+            const snapped = snapDimensionsToPercentageSteps(
+              nextWidth,
+              nextHeight,
+              aspectRatio,
+              constraints,
+              maxEditorWidth,
+            );
+            if (snapped) {
+              nextWidth = snapped.width;
+              nextHeight = snapped.height;
+              latestScale = nextWidth / initialWidth;
+            } else {
+              latestScale = clampedScale;
+            }
+          } else {
+            latestScale = clampedScale;
+          }
+          lastAppliedSize = {
+            width: Math.max(1, nextWidth),
+            height: Math.max(1, nextHeight),
+          };
+          applySize(lastAppliedSize.width, lastAppliedSize.height);
         };
 
         const pointerId = event.pointerId;
@@ -466,7 +589,7 @@ export const ResizableImage = Image.extend({
           }
           window.removeEventListener('pointermove', handlePointerMove);
           window.removeEventListener('pointerup', handlePointerUp);
-          commitSize(initialWidth * latestScale, initialHeight * latestScale);
+          commitSize(lastAppliedSize.width, lastAppliedSize.height);
         };
 
         if (pointerId && event.target?.setPointerCapture) {
