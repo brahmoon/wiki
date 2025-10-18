@@ -1151,15 +1151,23 @@
                 const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
                     .toString()
                     .trim();
+                const loginId = (options?.userLoginId || '')
+                    .toString()
+                    .trim();
                 const payload = {
                     action: 'getDriveImagePermissions',
                     googleEmail,
                     email: googleEmail
                 };
 
+                if (loginId) {
+                    payload.loginId = loginId;
+                }
+
                 console.debug('[DriveImage][Permissions] Sending request', {
                     endpoint,
                     payload,
+                    loginId,
                     timestamp: new Date().toISOString()
                 });
 
@@ -1167,6 +1175,7 @@
 
                 console.debug('[DriveImage][Permissions] Received response', {
                     result,
+                    loginId,
                     timestamp: new Date().toISOString()
                 });
 
@@ -1370,6 +1379,14 @@
             return email;
         }
 
+        function getCurrentUserLoginId() {
+            const loginState = getStoredLoginState();
+            const loginId = (loginState?.user?.loginId || '')
+                .toString()
+                .trim();
+            return loginId;
+        }
+
         function refreshDriveImageUserPermissions() {
             const extension = driveImageExtensionInstance;
             if (!extension) {
@@ -1377,14 +1394,17 @@
             }
 
             const googleEmail = getCurrentUserGoogleEmail();
+            const loginId = getCurrentUserLoginId();
 
             extension.options.userGoogleEmail = googleEmail;
+            extension.options.userLoginId = loginId;
             extension.options.userAuthority = null;
             extension.options.userRole = '';
 
             if (extension.modal) {
                 if (extension.modal.options) {
                     extension.modal.options.userGoogleEmail = googleEmail;
+                    extension.modal.options.userLoginId = loginId;
                     extension.modal.options.userAuthority = null;
                     extension.modal.options.userRole = '';
                 }
@@ -4001,7 +4021,8 @@
                         permissionsEndpoint: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION,
                         userAuthority: null,
                         userRole: '',
-                        userGoogleEmail: getCurrentUserGoogleEmail()
+                        userGoogleEmail: getCurrentUserGoogleEmail(),
+                        userLoginId: getCurrentUserLoginId()
                     }),
                     YouTubeEmbed
                 ],
