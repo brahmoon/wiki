@@ -246,12 +246,20 @@ export const ResizableTable = Table.extend({
         }
       };
 
-      const pointerDownListener = event => {
-        if (event.target?.closest?.('.resize-handle')) return;
+      const shouldHandleTableEvent = event => {
+        if (event.target?.closest?.('.resize-handle')) return false;
 
         const closestTable = event.target?.closest?.('table');
-        if (closestTable !== tableEl) return;
-        if (event.target !== tableEl) return;
+        if (closestTable !== tableEl) return false;
+
+        const clickedCell = event.target?.closest?.('td, th');
+        if (clickedCell) return false;
+
+        return true;
+      };
+
+      const pointerDownListener = event => {
+        if (!shouldHandleTableEvent(event)) return;
 
         event.preventDefault();
         event.stopPropagation();
@@ -269,11 +277,7 @@ export const ResizableTable = Table.extend({
       };
 
       const clickListener = event => {
-        if (event.target?.closest?.('.resize-handle')) return;
-
-        const closestTable = event.target?.closest?.('table');
-        if (closestTable !== tableEl) return;
-        if (event.target !== tableEl) return;
+        if (!shouldHandleTableEvent(event)) return;
 
         event.preventDefault();
         event.stopPropagation();
