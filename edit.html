@@ -745,6 +745,14 @@
             outline: none;
         }
 
+        @media (pointer: coarse) {
+            .editor-content,
+            .editor .ProseMirror {
+                -webkit-touch-callout: none;
+                touch-action: manipulation;
+            }
+        }
+
         .ProseMirror p.is-editor-empty:first-child::before {
             content: attr(data-placeholder);
             float: left;
@@ -3928,6 +3936,11 @@
                 }
             });
             elements.editor?.addEventListener('click', preventEditorLinkNavigation);
+            elements.editor?.addEventListener('contextmenu', event => {
+                if (!desktopMediaQuery.matches) {
+                    event.preventDefault();
+                }
+            });
             elements.editor?.addEventListener('auxclick', preventEditorLinkNavigation);
             elements.editor?.addEventListener('paste', handleEditorPaste);
             window.addEventListener('resize', () => {
