@@ -169,6 +169,19 @@ export const ResizableTable = Table.extend({
       tableEl.appendChild(contentDom);
       container.appendChild(tableEl);
 
+      const overlay = document.createElement('div');
+      overlay.classList.add('resizable-table-overlay');
+      overlay.style.position = 'absolute';
+      overlay.style.top = '0';
+      overlay.style.right = '0';
+      overlay.style.bottom = '0';
+      overlay.style.left = '0';
+      overlay.style.cursor = 'move';
+      overlay.style.zIndex = '10';
+      overlay.style.display = 'none';
+      overlay.style.pointerEvents = 'none';
+      container.appendChild(overlay);
+
       const applyOptionAttributes = () => {
         const attrs = this.options.HTMLAttributes || {};
         Object.entries(attrs).forEach(([key, value]) => {
@@ -246,44 +259,102 @@ export const ResizableTable = Table.extend({
         }
       };
 
-      const shouldHandleTableEvent = event => {
-        const target = event.target;
+      let overlayActive = false;
+      let allowCellInteractions = false;
 
-        if (!(target instanceof Element)) return false;
-        if (target.closest('.resize-handle')) return false;
-
-        const targetTable = target === tableEl ? tableEl : target.closest('table');
-        if (targetTable !== tableEl) return false;
-
-        const clickedCell = target.closest('td, th');
-        if (clickedCell?.closest('table') === tableEl) return false;
-
-        return true;
+      const showOverlay = () => {
+        if (overlayActive) return;
+        overlayActive = true;
+        overlay.style.display = '';
+        overlay.style.pointerEvents = 'auto';
       };
 
-      const interceptTableMouseEvent = event => {
-        if (!shouldHandleTableEvent(event)) return false;
+      const hideOverlay = () => {
+        if (!overlayActive) return;
+        overlayActive = false;
+        overlay.style.display = 'none';
+        overlay.style.pointerEvents = 'none';
+      };
 
-        if (event.type === 'mousedown') {
-          const { clientX, clientY } = event;
-          if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
-            return false;
+      const forwardIntoTableCell = event => {
+        hideOverlay();
+        allowCellInteractions = true;
+        if (!editor?.view) return;
+        const { clientX, clientY } = event;
+        if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return;
+        const coords = { left: clientX, top: clientY };
+        const posAtCoords = editor.view.posAtCoords?.(coords);
+        if (posAtCoords && typeof posAtCoords.pos === 'number') {
+          editor.view.focus();
+          editor.commands.setTextSelection?.(posAtCoords.pos);
+        }
+      };
+
+      const overlayPointerDown = event => {
+        if (!overlayActive) return;
+        if (!(event.target instanceof Element)) return;
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        focusAndSelect();
+      };
+
+      overlay.addEventListener('pointerdown', overlayPointerDown);
+
+      const overlayDoubleClick = event => {
+        if (!overlayActive) return;
+        event.preventDefault();
+        event.stopPropagation();
+        forwardIntoTableCell(event);
+      };
+
+      overlay.addEventListener('dblclick', overlayDoubleClick);
+
+      const tablePointerDown = event => {
+        if (event.button !== 0) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (overlayActive) return;
+
+        if (allowCellInteractions) {
+          if (target === tableEl) {
+            allowCellInteractions = false;
+            event.preventDefault();
+            event.stopPropagation();
+            showOverlay();
+            focusAndSelect();
           }
-          const rect = tableEl.getBoundingClientRect();
-          const tolerance = 6;
-          const withinBounds =
-            clientX >= rect.left - tolerance &&
-            clientX <= rect.right + tolerance &&
-            clientY >= rect.top - tolerance &&
-            clientY <= rect.bottom + tolerance;
-          if (!withinBounds) return false;
+          return;
         }
 
         event.preventDefault();
         event.stopPropagation();
+        showOverlay();
         focusAndSelect();
-        return true;
       };
+
+      tableEl.addEventListener('pointerdown', tablePointerDown);
+
+      const selectionUpdateListener = () => {
+        if (!editor?.view) return;
+        const pos = typeof getPos === 'function' ? getPos() : null;
+        if (typeof pos !== 'number') return;
+        const state = editor.view.state;
+        const { from, to } = state.selection;
+        const tableStart = pos;
+        const tableEnd = pos + currentNode.nodeSize;
+
+        if (from < tableStart || to > tableEnd) {
+          if (allowCellInteractions) {
+            allowCellInteractions = false;
+          }
+          if (overlayActive) {
+            hideOverlay();
+          }
+        }
+      };
+      editor?.on?.('selectionUpdate', selectionUpdateListener);
 
       const applySize = (width, height) => {
         if (Number.isFinite(width)) {
@@ -399,6 +470,7 @@ export const ResizableTable = Table.extend({
       DIRECTIONS.forEach(direction => {
         const handle = document.createElement('div');
         handle.classList.add('resize-handle', `resize-handle-${direction}`);
+        handle.style.zIndex = '20';
         handle.addEventListener('pointerdown', e => startResize(e, direction));
         container.appendChild(handle);
       });
@@ -407,25 +479,35 @@ export const ResizableTable = Table.extend({
         tableEl.setAttribute('role', 'grid');
       }
 
-      window.requestAnimationFrame(() => validateAndCommitDimensions());
+      window.requestAnimationFrame(() => {
+        validateAndCommitDimensions();
+      });
 
       return {
         dom: container,
         contentDOM: contentDom,
-        selectNode: () => container.classList.add('is-selected'),
-        deselectNode: () => container.classList.remove('is-selected'),
+        selectNode: () => {
+          container.classList.add('is-selected');
+          showOverlay();
+          allowCellInteractions = false;
+        },
+        deselectNode: () => {
+          container.classList.remove('is-selected');
+          hideOverlay();
+        },
         update: updatedNode => {
           if (updatedNode.type !== currentNode.type) return false;
           currentNode = updatedNode;
           applyNodeAttributes(updatedNode.attrs);
           return true;
         },
-        ignoreMutation: mutation => mutation.type === 'attributes' && mutation.target === tableEl,
-        handleDOMEvents: {
-          mousedown: interceptTableMouseEvent,
-          click: interceptTableMouseEvent,
-        },
+        ignoreMutation: mutation =>
+          mutation.type === 'attributes' && (mutation.target === tableEl || mutation.target === contentDom),
         destroy: () => {
+          overlay.removeEventListener('pointerdown', overlayPointerDown);
+          overlay.removeEventListener('dblclick', overlayDoubleClick);
+          tableEl.removeEventListener('pointerdown', tablePointerDown);
+          editor?.off?.('selectionUpdate', selectionUpdateListener);
         },
       };
     };
