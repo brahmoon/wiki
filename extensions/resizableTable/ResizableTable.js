@@ -327,7 +327,11 @@ export const ResizableTable = Table.extend({
           }
           return;
         }
+      };
 
+      const overlayPointerDown = event => {
+        if (!(event.target instanceof Element)) return;
+        if (event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
         showOverlay();
@@ -499,6 +503,7 @@ export const ResizableTable = Table.extend({
           if (updatedNode.type !== currentNode.type) return false;
           currentNode = updatedNode;
           applyNodeAttributes(updatedNode.attrs);
+          updateOverlayModeForSelection();
           return true;
         },
         ignoreMutation: mutation =>
