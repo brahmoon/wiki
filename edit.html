@@ -473,29 +473,19 @@
             box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
         }
 
-        .resizable-image,
-        .resizable-table {
+        .resizable-image {
             position: relative;
             display: inline-block;
             max-width: 100%;
-            transition: margin 0.2s ease-in;
         }
 
-        .resizable-image img,
-        .resizable-table table {
+        .resizable-image img {
             display: block;
             max-width: 100%;
             height: auto;
-            transition: width 0.2s ease-out, height 0.2s ease-out;
-            will-change: width, height;
         }
 
-        .resizable-table table {
-            margin: 0;
-        }
-
-        .resizable-image.is-selected img,
-        .resizable-table.is-selected table {
+        .resizable-image.is-selected img {
             outline: 2px solid rgba(35, 131, 226, 0.5);
             outline-offset: 2px;
         }
@@ -515,19 +505,9 @@
             z-index: 5;
         }
 
-        .resizable-image.is-selected .resize-handle,
-        .resizable-table.is-selected .resize-handle {
+        .resizable-image.is-selected .resize-handle {
             opacity: 1;
             pointer-events: auto;
-        }
-
-        .resizable-table-overlay {
-            background: rgba(128, 128, 128, 0.35);
-            transition: background 0.2s ease;
-        }
-
-        .resizable-table-overlay.is-passthrough {
-            background: transparent;
         }
 
         .resize-handle-n { top: 0; left: 50%; transform: translate(-50%, -50%); cursor: ns-resize; }
@@ -760,14 +740,6 @@
         .ProseMirror {
             min-height: 400px;
             outline: none;
-        }
-
-        @media (pointer: coarse) {
-            .editor-content,
-            .editor .ProseMirror {
-                -webkit-touch-callout: none;
-                touch-action: manipulation;
-            }
         }
 
         .ProseMirror p.is-editor-empty:first-child::before {
@@ -1154,12 +1126,12 @@
         import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
         import { Link } from 'https://esm.sh/@tiptap/extension-link';
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
+        import { Table } from 'https://esm.sh/@tiptap/extension-table';
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
         import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
-        import { ResizableTable } from 'https://brahmoon.github.io/wiki/extensions/resizableTable/ResizableTable.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
@@ -3953,11 +3925,6 @@
                 }
             });
             elements.editor?.addEventListener('click', preventEditorLinkNavigation);
-            elements.editor?.addEventListener('contextmenu', event => {
-                if (!desktopMediaQuery.matches) {
-                    event.preventDefault();
-                }
-            });
             elements.editor?.addEventListener('auxclick', preventEditorLinkNavigation);
             elements.editor?.addEventListener('paste', handleEditorPaste);
             window.addEventListener('resize', () => {
@@ -4020,12 +3987,7 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    ResizableTable.configure({
-                        resizeConstraints: {
-                            minWidth: 160,
-                            maxWidth: 860
-                        }
-                    }),
+                    Table.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,
