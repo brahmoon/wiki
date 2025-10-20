@@ -1265,22 +1265,89 @@
           });
         };
 
+        const isColumnResizeTransaction = tr => {
+          if (!tr) return false;
+
+          const meta = tr.meta;
+          if (meta && typeof meta === 'object') {
+            for (const key of Object.keys(meta)) {
+              if (!key) continue;
+              if (key.includes('columnResizing$') || key.includes('tableColumnResizing$')) {
+                const value = meta[key];
+                if (value && typeof value === 'object') {
+                  const hintKeys = ['setHandle', 'setDrag', 'dragging', 'activeHandle', 'finished', 'clientX'];
+                  if (hintKeys.some(prop => prop in value)) {
+                    return true;
+                  }
+                } else if (value !== undefined) {
+                  return true;
+                }
+              }
+            }
+          }
+
+          if (Array.isArray(tr.steps)) {
+            for (const step of tr.steps) {
+              if (!step || typeof step.toJSON !== 'function') continue;
+              try {
+                const json = step.toJSON();
+                if (
+                  json &&
+                  typeof json === 'object' &&
+                  json.step === 'setNodeMarkup' &&
+                  json.attrs &&
+                  typeof json.attrs === 'object' &&
+                  'colwidth' in json.attrs
+                ) {
+                  return true;
+                }
+              } catch (_) {}
+            }
+          }
+
+          return false;
+        };
+
         const LimitedTable = Table.extend({
           addProseMirrorPlugins() {
             const plugins = this.parent?.() || []
             const limitTableWidthPlugin = new Plugin({
               key: limitTableWidthKey,
               state: {
-                init: () => ({ normalized: false }),
+                init: () => ({ normalized: false, shouldNormalize: false }),
                 apply(tr, value) {
+                  const prev = value || { normalized: false, shouldNormalize: false }
+                  let normalized = !!prev.normalized
+                  let shouldNormalize = !!prev.shouldNormalize
+
                   const meta = tr.getMeta(limitTableWidthKey)
-                  if (meta && typeof meta === 'object' && meta.normalized) {
-                    return { normalized: true }
+                  const hasMeta = meta && typeof meta === 'object'
+                  if (hasMeta && Object.prototype.hasOwnProperty.call(meta, 'normalized')) {
+                    normalized = !!meta.normalized
+                    if (meta.normalized) {
+                      shouldNormalize = false
+                    }
                   }
-                  if (tr.docChanged) {
-                    return { normalized: false }
+                  if (hasMeta && Object.prototype.hasOwnProperty.call(meta, 'shouldNormalize')) {
+                    shouldNormalize = !!meta.shouldNormalize
                   }
-                  return value
+
+                  const normalizedByMeta = !!(hasMeta && meta.normalized)
+
+                  if (!normalizedByMeta) {
+                    const resizeHit = isColumnResizeTransaction(tr)
+                    if (resizeHit) {
+                      shouldNormalize = true
+                    } else if (tr.docChanged) {
+                      shouldNormalize = false
+                    }
+
+                    if (tr.docChanged) {
+                      normalized = false
+                    }
+                  }
+
+                  return { normalized, shouldNormalize }
                 },
               },
               props: {
@@ -1310,8 +1377,12 @@
                   update(view, prevState) {
                     if (!prevState || view.state.doc === prevState.doc) return
                     const pluginState = limitTableWidthKey.getState(view.state)
-                    if (pluginState?.normalized) return
-                    requestAnimationFrame(() => normalizeTableWidths(view))
+                    if (!pluginState?.shouldNormalize) return
+                    requestAnimationFrame(() => {
+                      normalizeTableWidths(view)
+                      const resetTr = view.state.tr.setMeta(limitTableWidthKey, { shouldNormalize: false })
+                      view.dispatch(resetTr)
+                    })
                   },
                 }
               },
