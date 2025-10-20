@@ -1122,7 +1122,7 @@
     </div>
 
     <script type="module">
-        import { Editor, Extension, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
+        import { Editor, Node, mergeAttributes, Extension } from 'https://esm.sh/@tiptap/core';
         import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
         import { Link } from 'https://esm.sh/@tiptap/extension-link';
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
@@ -1137,9 +1137,14 @@
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
-        const TableDeletionBehavior = Table.extend({
+        const TableDeletionBehavior = Extension.create({
+            name: 'tableDeletionBehavior',
             addKeyboardShortcuts() {
-                const parentShortcuts = this.parent?.();
+                const getTableType = () => this.editor?.schema?.nodes?.table || null;
+                const getCellTypes = () => ({
+                    tableCell: this.editor?.schema?.nodes?.tableCell || null,
+                    tableHeader: this.editor?.schema?.nodes?.tableHeader || null
+                });
 
                 const deleteTableNode = (state, dispatch, tablePos, tableNode) => {
                     if (!dispatch || !tableNode) {
@@ -1165,6 +1170,11 @@
                 };
 
                 const deleteAdjacentTable = (direction) => {
+                    const tableType = getTableType();
+                    if (!tableType) {
+                        return false;
+                    }
+
                     const { state, dispatch } = this.editor.view;
                     const { selection } = state;
                     if (!selection.empty) {
@@ -1194,14 +1204,14 @@
                             return false;
                         }
                         const nodeAfter = state.doc.nodeAt(afterPos);
-                        if (!nodeAfter || nodeAfter.type !== this.type) {
+                        if (!nodeAfter || nodeAfter.type !== tableType) {
                             return false;
                         }
                         tableNode = nodeAfter;
                         tablePos = afterPos;
                     } else {
                         const nodeBefore = $from.nodeBefore;
-                        if (!nodeBefore || nodeBefore.type !== this.type) {
+                        if (!nodeBefore || nodeBefore.type !== tableType) {
                             return false;
                         }
                         tableNode = nodeBefore;
@@ -1212,6 +1222,16 @@
                 };
 
                 const focusPreviousEmptyCellOrRemoveTable = () => {
+                    const tableType = getTableType();
+                    if (!tableType) {
+                        return false;
+                    }
+
+                    const { tableCell, tableHeader } = getCellTypes();
+                    if (!tableCell && !tableHeader) {
+                        return false;
+                    }
+
                     const { state, dispatch } = this.editor.view;
                     const { selection } = state;
                     if (!selection.empty) {
@@ -1223,7 +1243,7 @@
                     let cellNode = null;
                     for (let depth = $from.depth; depth > 0; depth -= 1) {
                         const node = $from.node(depth);
-                        if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+                        if (node.type === tableCell || node.type === tableHeader) {
                             cellDepth = depth;
                             cellNode = node;
                             break;
@@ -1242,7 +1262,7 @@
                     let tableDepth = null;
                     for (let depth = cellDepth - 1; depth > 0; depth -= 1) {
                         const node = $from.node(depth);
-                        if (node.type === this.type) {
+                        if (node.type === tableType) {
                             tableNode = node;
                             tableDepth = depth;
                             break;
@@ -1263,12 +1283,11 @@
                 };
 
                 return {
-                    ...(parentShortcuts || {}),
                     Delete: () => {
                         if (deleteAdjacentTable('after')) {
                             return true;
                         }
-                        return parentShortcuts?.Delete ? parentShortcuts.Delete() : false;
+                        return false;
                     },
                     Backspace: () => {
                         if (focusPreviousEmptyCellOrRemoveTable()) {
@@ -1277,7 +1296,7 @@
                         if (deleteAdjacentTable('before')) {
                             return true;
                         }
-                        return parentShortcuts?.Backspace ? parentShortcuts.Backspace() : false;
+                        return false;
                     }
                 };
             }
