@@ -1178,6 +1178,47 @@
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
+        const normalizeTableWidths = (view) => {
+            if (!view?.dom) {
+                return;
+            }
+            const tables = view.dom.querySelectorAll('table');
+            tables.forEach(table => {
+                const wrapper = table.closest('.tableWrapper') || table.parentElement;
+                if (!wrapper) {
+                    return;
+                }
+
+                const wrapperWidth = wrapper.offsetWidth;
+                if (!wrapperWidth) {
+                    return;
+                }
+
+                const cols = table.querySelectorAll('colgroup col');
+                if (!cols.length) {
+                    table.style.width = '100%';
+                    return;
+                }
+
+                const totalWidth = Array.from(cols).reduce((sum, col) => {
+                    const width = parseFloat(col.style.width);
+                    return sum + (Number.isFinite(width) ? width : 0);
+                }, 0);
+
+                if (totalWidth > wrapperWidth && totalWidth > 0) {
+                    const ratio = wrapperWidth / totalWidth;
+                    cols.forEach(col => {
+                        const width = parseFloat(col.style.width);
+                        if (Number.isFinite(width)) {
+                            col.style.width = `${width * ratio}px`;
+                        }
+                    });
+                }
+
+                table.style.width = '100%';
+            });
+        };
+
         const LimitedTable = Table.extend({
             addProseMirrorPlugins() {
                 const plugins = this.parent?.() || [];
@@ -1185,18 +1226,21 @@
                     props: {
                         handleDOMEvents: {
                             mouseup(view) {
-                                const tables = view.dom.querySelectorAll('table');
-                                tables.forEach(table => {
-                                    const parentElement = table.parentElement;
-                                    if (!parentElement) {
-                                        return;
-                                    }
-                                    const parentWidth = parentElement.offsetWidth;
-                                    const tableWidth = table.offsetWidth;
-                                    if (parentWidth > 0 && tableWidth > parentWidth) {
-                                        table.style.width = '100%';
-                                    }
-                                });
+                                requestAnimationFrame(() => normalizeTableWidths(view));
+                                return false;
+                            },
+                            mousemove(view, event) {
+                                const target = event?.target;
+                                if (target instanceof Element && target.closest('.column-resize-handle')) {
+                                    requestAnimationFrame(() => normalizeTableWidths(view));
+                                }
+                                return false;
+                            },
+                            mouseover(view, event) {
+                                const target = event?.target;
+                                if (target instanceof Element && target.closest('.column-resize-handle')) {
+                                    requestAnimationFrame(() => normalizeTableWidths(view));
+                                }
                                 return false;
                             }
                         }
