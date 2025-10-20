@@ -1137,14 +1137,27 @@
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
-        const TableDeletionBehavior = Table.extend({
+        const TableDeletionShortcuts = Extension.create({
+            name: 'tableDeletionShortcuts',
             addKeyboardShortcuts() {
-                const parentShortcuts = this.parent?.() ?? {};
                 const getTableType = () => this.editor?.schema?.nodes?.table || null;
                 const getCellTypes = () => ({
                     tableCell: this.editor?.schema?.nodes?.tableCell || null,
                     tableHeader: this.editor?.schema?.nodes?.tableHeader || null
                 });
+
+                const runCommandSafely = (commandName, ...args) => {
+                    const command = this.editor?.commands?.[commandName];
+                    if (typeof command !== 'function') {
+                        return false;
+                    }
+                    try {
+                        return command(...args) ?? false;
+                    } catch (error) {
+                        console.warn(`Failed to execute ${commandName} after table deletion shortcut.`, error);
+                        return false;
+                    }
+                };
 
                 const deleteTableNode = (state, dispatch, tablePos, tableNode) => {
                     if (!dispatch || !tableNode) {
@@ -1290,25 +1303,33 @@
                 };
 
                 return {
-                    ...parentShortcuts,
-                    Delete: (...args) => {
+                    Delete: () => {
                         if (deleteAdjacentTable('after')) {
                             return true;
                         }
-                        if (parentShortcuts.Delete) {
-                            return parentShortcuts.Delete.apply(this, args);
+                        if (runCommandSafely('deleteSelection')) {
+                            return true;
+                        }
+                        if (runCommandSafely('deleteForward')) {
+                            return true;
                         }
                         return false;
                     },
-                    Backspace: (...args) => {
+                    Backspace: () => {
                         if (focusPreviousEmptyCellOrRemoveTable()) {
                             return true;
                         }
                         if (deleteAdjacentTable('before')) {
                             return true;
                         }
-                        if (parentShortcuts.Backspace) {
-                            return parentShortcuts.Backspace.apply(this, args);
+                        if (runCommandSafely('deleteSelection')) {
+                            return true;
+                        }
+                        if (runCommandSafely('joinBackward')) {
+                            return true;
+                        }
+                        if (runCommandSafely('deleteBackward')) {
+                            return true;
                         }
                         return false;
                     }
@@ -4166,11 +4187,11 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    TableDeletionBehavior.configure({ resizable: true }),
+                    Table.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,
-                    TableDeletionBehavior,
+                    TableDeletionShortcuts,
                     ResizableImage.configure({
                         inline: false,
                         allowBase64: false,
