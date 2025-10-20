@@ -1178,6 +1178,35 @@
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
+        const LimitedTable = Table.extend({
+            addProseMirrorPlugins() {
+                const plugins = this.parent?.() || [];
+                const limitTableWidthPlugin = new Plugin({
+                    props: {
+                        handleDOMEvents: {
+                            mouseup(view) {
+                                const tables = view.dom.querySelectorAll('table');
+                                tables.forEach(table => {
+                                    const parentElement = table.parentElement;
+                                    if (!parentElement) {
+                                        return;
+                                    }
+                                    const parentWidth = parentElement.offsetWidth;
+                                    const tableWidth = table.offsetWidth;
+                                    if (parentWidth > 0 && tableWidth > parentWidth) {
+                                        table.style.width = '100%';
+                                    }
+                                });
+                                return false;
+                            }
+                        }
+                    }
+                });
+
+                return [...plugins, limitTableWidthPlugin];
+            }
+        });
+
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const USER_SETTINGS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzr_h_JgmF4CcnschnmeXbZXLxNxWPphzpkuoJyriYV4ZtwIEHfPEAbG9H-kIe-1tQj/exec';
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
@@ -4100,7 +4129,7 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    Table.configure({ resizable: true }),
+                    LimitedTable.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,
