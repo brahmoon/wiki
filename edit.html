@@ -1122,7 +1122,7 @@
     </div>
 
     <script type="module">
-        import { Editor, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
+        import { Editor, Extension, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
         import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
         import { Link } from 'https://esm.sh/@tiptap/extension-link';
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
@@ -4137,6 +4137,7 @@
                     TableRow,
                     TableHeader,
                     TableCell,
+                    TableDeletionBehavior,
                     ResizableImage.configure({
                         inline: false,
                         allowBase64: false,
