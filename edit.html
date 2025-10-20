@@ -1137,9 +1137,9 @@
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
-        const TableDeletionBehavior = Extension.create({
-            name: 'tableDeletionBehavior',
+        const TableDeletionBehavior = Table.extend({
             addKeyboardShortcuts() {
+                const parentShortcuts = this.parent?.() ?? {};
                 const getTableType = () => this.editor?.schema?.nodes?.table || null;
                 const getCellTypes = () => ({
                     tableCell: this.editor?.schema?.nodes?.tableCell || null,
@@ -1274,27 +1274,41 @@
                     }
 
                     const tablePos = $from.before(tableDepth);
+                    const { commands } = this.editor;
 
-                    if (this.editor.commands.goToPreviousCell()) {
-                        return true;
+                    if (commands && typeof commands.goToPreviousCell === 'function') {
+                        try {
+                            if (commands.goToPreviousCell()) {
+                                return true;
+                            }
+                        } catch (error) {
+                            console.warn('Failed to move to previous cell before deleting table.', error);
+                        }
                     }
 
                     return deleteTableNode(state, dispatch, tablePos, tableNode);
                 };
 
                 return {
-                    Delete: () => {
+                    ...parentShortcuts,
+                    Delete: (...args) => {
                         if (deleteAdjacentTable('after')) {
                             return true;
                         }
+                        if (parentShortcuts.Delete) {
+                            return parentShortcuts.Delete.apply(this, args);
+                        }
                         return false;
                     },
-                    Backspace: () => {
+                    Backspace: (...args) => {
                         if (focusPreviousEmptyCellOrRemoveTable()) {
                             return true;
                         }
                         if (deleteAdjacentTable('before')) {
                             return true;
+                        }
+                        if (parentShortcuts.Backspace) {
+                            return parentShortcuts.Backspace.apply(this, args);
                         }
                         return false;
                     }
