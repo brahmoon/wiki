@@ -1130,12 +1130,41 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
-        import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
+        import { NodeSelection, Plugin } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
+
+        const LimitedTable = Table.extend({
+            addProseMirrorPlugins() {
+                const plugins = this.parent?.() || [];
+                const limitTableWidthPlugin = new Plugin({
+                    props: {
+                        handleDOMEvents: {
+                            mouseup(view) {
+                                const tables = view.dom.querySelectorAll('table');
+                                tables.forEach(table => {
+                                    const parentElement = table.parentElement;
+                                    if (!parentElement) {
+                                        return;
+                                    }
+                                    const parentWidth = parentElement.offsetWidth;
+                                    const tableWidth = table.offsetWidth;
+                                    if (parentWidth > 0 && tableWidth > parentWidth) {
+                                        table.style.width = '100%';
+                                    }
+                                });
+                                return false;
+                            }
+                        }
+                    }
+                });
+
+                return [...plugins, limitTableWidthPlugin];
+            }
+        });
 
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
@@ -3987,7 +4016,7 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    Table.configure({ resizable: true }),
+                    LimitedTable.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,

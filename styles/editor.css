@@ -107,17 +107,35 @@
     border-collapse: collapse;
     width: 100%;
     margin: 16px 0;
+    max-width: 100%;
+    table-layout: fixed;
 }
 
 .ProseMirror th, .ProseMirror td {
     border: 1px solid #dee2e6;
     padding: 8px 12px;
     text-align: left;
+    position: relative;
 }
 
 .ProseMirror th {
     background-color: #f8f9fa;
     font-weight: bold;
+}
+
+.ProseMirror table .column-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -2px;
+    bottom: 0;
+    width: 4px;
+    background-color: rgba(55, 53, 47, 0.25);
+    transition: background-color 0.2s ease;
+    pointer-events: none;
+}
+
+.ProseMirror.resize-cursor .column-resize-handle {
+    background-color: #2383e2;
 }
 
 .ProseMirror .selectedCell {
