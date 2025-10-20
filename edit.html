@@ -483,6 +483,7 @@
             display: block;
             max-width: 100%;
             height: auto;
+            transition: width 0.2s ease-out, height 0.2s ease-out;
         }
 
         .resizable-image.is-selected img {
@@ -3809,6 +3810,16 @@
             elements.updatedAt.textContent = text || '';
         }
 
+        function waitForNextFrame() {
+            return new Promise(resolve => {
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(() => resolve());
+                } else {
+                    setTimeout(resolve, 0);
+                }
+            });
+        }
+
         async function loadPages(selectId, options = {}) {
             const {
                 prefetchedPage = null,
@@ -3871,6 +3882,7 @@
                 const normalizedContent = normalizePageLinkCards(page.content || '');
                 state.editor.commands.setContent(normalizedContent, false);
                 state.isApplyingContent = false;
+                await waitForNextFrame();
                 hideLinkEditor();
                 hidePageLinkPanel();
                 renderToolbar();
