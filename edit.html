@@ -1130,195 +1130,12 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
-        import { NodeSelection, Plugin, PluginKey } from 'https://esm.sh/@tiptap/pm/state';
-        import { TableMap } from 'https://esm.sh/prosemirror-tables';
+        import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
-
-        // DOMを親幅に正規化し、結果をdocのcolwidth属性へ反映（内部キャッシュもクリア）
-        const limitTableWidthKey = new PluginKey('limitTableWidth')
-
-        const normalizeTableWidths = (view, evt) => {
-          if (!view?.dom) return;
-        
-          // いま操作中のテーブルを優先（無ければ全テーブルを対象）
-          const hit = evt ? evt.target : null;
-          const prefer = [];
-          if (hit instanceof Element) {
-            const t = hit.closest('table');
-            if (t) prefer.push(t);
-          }
-          const tables = prefer.length ? prefer : view.dom.querySelectorAll('table');
-        
-          tables.forEach(table => {
-            const wrapper = table.closest('.tableWrapper') || table.parentElement;
-            if (!wrapper) return;
-        
-            const wrapperWidth = wrapper.offsetWidth || 0;
-            if (!wrapperWidth) return;
-        
-            // まず、テーブル自体に残っている px 指定を除去してから処理
-            // （columnResizing が width:***px を一時的に付けるケースに対処）
-            table.style.removeProperty('width');
-            table.style.maxWidth = '100%';
-        
-            const cols = table.querySelectorAll('colgroup col');
-            const hasColGroup = cols.length > 0;
-        
-            // 現在の列幅(px)をDOMから取得
-            const domColWidths = hasColGroup
-              ? Array.from(cols).map(col => {
-                  const w = parseFloat(col.style.width);
-                  return Number.isFinite(w) ? w : 0;
-                })
-              : Array.from(
-                  table.querySelectorAll('tr:first-child > th, tr:first-child > td')
-                ).map(cell => cell.offsetWidth);
-        
-            const totalWidth = domColWidths.reduce((a, b) => a + b, 0);
-        
-            // 親幅を超えていれば正規化（まずはDOM側）
-            if (totalWidth > wrapperWidth && totalWidth > 0) {
-              const ratio = wrapperWidth / totalWidth;
-              if (hasColGroup) {
-                domColWidths.forEach((w, i) => {
-                  cols[i].style.width = `${w * ratio}px`;
-                });
-              }
-            }
-        
-            // このフレームの columnResizing の更新を待って、次フレームで doc に確定
-            requestAnimationFrame(() => {
-              // ---- doc の colwidth 属性へ反映 ----
-              let tablePos = null, tableNode = null;
-              try {
-                const pos = view.posAtDOM(table, 0);
-                if (typeof pos === 'number') {
-                  const $pos = view.state.doc.resolve(pos);
-                  for (let d = $pos.depth; d >= 0; d--) {
-                    const n = $pos.node(d);
-                    if (n.type && n.type.name === 'table') {
-                      tableNode = n;
-                      tablePos = $pos.before(d); // table の直前
-                      break;
-                    }
-                  }
-                }
-              } catch (_) {}
-              if (!tableNode) return;
-        
-              const map = TableMap.get(tableNode);
-              const minW = 25; // ← Table.configure({ cellMinWidth }) と同じ値に
-        
-              // 最新の DOM 列幅（1フレーム後の状態）を再取得して使う
-              const cols2 = table.querySelectorAll('colgroup col');
-              const hasColGroup2 = cols2.length > 0;
-              const finalized = hasColGroup2
-                ? Array.from(cols2).map(c =>
-                    Math.max(minW, Math.round(parseFloat(c.style.width) || minW))
-                  )
-                : Array.from(
-                    table.querySelectorAll('tr:first-child > th, tr:first-child > td')
-                  ).map(cell => Math.max(minW, Math.round(cell.offsetWidth)));
-        
-              let tr = view.state.tr;
-              let changed = false;
-              for (let col = 0; col < map.width; ) {
-                const cellPosInTable = map.positionAt(0, col, tableNode); // row=0
-                const cell = tableNode.nodeAt(cellPosInTable);
-                const colspan = cell?.attrs?.colspan || 1;
-                const slice = finalized.slice(col, col + colspan);
-                const old = cell?.attrs?.colwidth || null;
-                const same =
-                  Array.isArray(old) &&
-                  old.length === slice.length &&
-                  old.every((v, i) => v === slice[i]);
-                if (!same) {
-                  const absPos = tablePos + 1 + cellPosInTable;
-                  tr = tr.setNodeMarkup(absPos, null, { ...cell.attrs, colwidth: slice });
-                  changed = true;
-                }
-                col += colspan;
-              }
-              if (changed) {
-                const trWithMeta = tr.setMeta(limitTableWidthKey, { normalized: true })
-                view.dispatch(trWithMeta)
-              }
-
-              // さらにもう 1 フレーム後に、columnResizing の内部ドラッグ状態を確実にクリア
-              requestAnimationFrame(() => {
-                const resizePlugin = view.state.plugins.find(p => {
-                  const k = String(p?.key || '');
-                  return k.includes('columnResizing$') || k.includes('tableColumnResizing$');
-                });
-                if (resizePlugin) {
-                  const trWithMeta = view.state.tr
-                    .setMeta(limitTableWidthKey, { normalized: true })
-                    .setMeta(resizePlugin, { activeHandle: null, dragging: null })
-                  view.dispatch(trWithMeta)
-                }
-              });
-            });
-          });
-        };
-
-        const LimitedTable = Table.extend({
-          addProseMirrorPlugins() {
-            const plugins = this.parent?.() || []
-            const limitTableWidthPlugin = new Plugin({
-              key: limitTableWidthKey,
-              state: {
-                init: () => ({ normalized: false }),
-                apply(tr, value) {
-                  const meta = tr.getMeta(limitTableWidthKey)
-                  if (meta && typeof meta === 'object' && meta.normalized) {
-                    return { normalized: true }
-                  }
-                  if (tr.docChanged) {
-                    return { normalized: false }
-                  }
-                  return value
-                },
-              },
-              props: {
-                handleDOMEvents: {
-                  mouseup(view, event) {
-                    requestAnimationFrame(() => normalizeTableWidths(view, event))
-                    return false
-                  },
-                  mousemove(view, event) {
-                    const target = event?.target
-                    if (target instanceof Element && target.closest('.column-resize-handle')) {
-                      requestAnimationFrame(() => normalizeTableWidths(view, event))
-                    }
-                    return false
-                  },
-                  mouseover(view, event) {
-                    const target = event?.target
-                    if (target instanceof Element && target.closest('.column-resize-handle')) {
-                      requestAnimationFrame(() => normalizeTableWidths(view, event))
-                    }
-                    return false
-                  },
-                },
-              },
-              view(editorView) {
-                return {
-                  update(view, prevState) {
-                    if (!prevState || view.state.doc === prevState.doc) return
-                    const pluginState = limitTableWidthKey.getState(view.state)
-                    if (pluginState?.normalized) return
-                    requestAnimationFrame(() => normalizeTableWidths(view))
-                  },
-                }
-              },
-            })
-            return [...plugins, limitTableWidthPlugin]
-          },
-        })
 
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
@@ -4170,7 +3987,7 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    LimitedTable.configure({ resizable: true }),
+                    Table.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,
