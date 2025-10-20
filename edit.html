@@ -3809,7 +3809,11 @@
             elements.updatedAt.textContent = text || '';
         }
 
-        async function loadPages(selectId) {
+        async function loadPages(selectId, options = {}) {
+            const {
+                prefetchedPage = null,
+                updateHistory: shouldUpdateHistory = true
+            } = options;
             try {
                 setStatus('ページ一覧を読み込み中...');
                 beginLoading('ページ一覧を読み込み中...');
@@ -3819,7 +3823,10 @@
                 renderTree();
                 setStatus('ページ一覧を更新しました', 'success');
                 if (selectId) {
-                    await navigateToPage(selectId);
+                    await navigateToPage(selectId, {
+                        prefetchedPage,
+                        updateHistory: shouldUpdateHistory
+                    });
                 } else if (!state.currentPageId && pages.length) {
                     await navigateToPage(pages[0].id);
                 } else {
@@ -3833,7 +3840,7 @@
             }
         }
 
-        async function navigateToPage(id, { updateHistory: shouldUpdateHistory = true } = {}) {
+        async function navigateToPage(id, { updateHistory: shouldUpdateHistory = true, prefetchedPage = null } = {}) {
             if (!id) return;
             if (state.isNewPage && state.currentPageId === id) {
                 renderTree();
@@ -3845,7 +3852,8 @@
             try {
                 setStatus('ページを読み込み中...');
                 beginLoading('ページを読み込み中...');
-                const page = await dataService.getPage(id);
+                const usePrefetchedPage = prefetchedPage && prefetchedPage.id === id;
+                const page = usePrefetchedPage ? prefetchedPage : await dataService.getPage(id);
                 state.currentPageId = page.id;
                 state.currentParentId = getParentId(page.id);
                 state.isNewPage = false;
@@ -4242,6 +4250,22 @@
         }
 
         async function initialize() {
+            const initialPageId = getPageIdFromQuery();
+            let prefetchedPage = null;
+
+            if (initialPageId) {
+                try {
+                    setStatus('ページを読み込み中...');
+                    beginLoading('ページを読み込み中...');
+                    prefetchedPage = await dataService.getPage(initialPageId);
+                } catch (error) {
+                    console.error('初期ページの読み込みに失敗しました。', error);
+                    setStatus('ページの読み込みに失敗しました: ' + error.message, 'error');
+                } finally {
+                    endLoading();
+                }
+            }
+
             try {
                 await loadToolbarPluginConfig();
             } catch (error) {
@@ -4250,11 +4274,10 @@
 
             initEditor();
             attachEventListeners();
-            const initialPageId = getPageIdFromQuery();
             if (initialPageId) {
                 updateHistory(initialPageId);
             }
-            loadPages(initialPageId || undefined);
+            await loadPages(initialPageId || undefined, { prefetchedPage });
         }
 
         initialize().catch(error => {

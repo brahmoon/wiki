@@ -103,6 +103,10 @@
     margin: 4px 0;
 }
 
+.ProseMirror p {
+    margin: 0;
+}
+
 .ProseMirror table {
     border-collapse: collapse;
     width: 100%;
