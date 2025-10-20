@@ -1138,33 +1138,45 @@
         import { WikiDataService } from './scripts/wikiDataService.js';
 
         const LimitedTable = Table.extend({
-            addProseMirrorPlugins() {
-                const plugins = this.parent?.() || [];
-                const limitTableWidthPlugin = new Plugin({
-                    props: {
-                        handleDOMEvents: {
-                            mouseup(view) {
-                                const tables = view.dom.querySelectorAll('table');
-                                tables.forEach(table => {
-                                    const parentElement = table.parentElement;
-                                    if (!parentElement) {
-                                        return;
-                                    }
-                                    const parentWidth = parentElement.offsetWidth;
-                                    const tableWidth = table.offsetWidth;
-                                    if (parentWidth > 0 && tableWidth > parentWidth) {
-                                        table.style.width = '100%';
-                                    }
-                                });
-                                return false;
-                            }
-                        }
-                    }
-                });
-
-                return [...plugins, limitTableWidthPlugin];
-            }
-        });
+          addProseMirrorPlugins() {
+            const plugins = this.parent?.() || []
+            const limitTableWidthPlugin = new Plugin({
+              props: {
+                handleDOMEvents: {
+                  mouseup(view) {
+                    const tables = view.dom.querySelectorAll('table')
+                    tables.forEach(table => {
+                      const parentElement = table.closest('.tableWrapper') || table.parentElement
+                      if (!parentElement) return
+        
+                      const parentWidth = parentElement.offsetWidth
+                      const cols = table.querySelectorAll('colgroup col')
+                      if (!cols.length) return
+        
+                      // 現在の総幅を算出
+                      const totalWidth = Array.from(cols).reduce((sum, col) => {
+                        const w = parseFloat(col.style.width) || 0
+                        return sum + w
+                      }, 0)
+        
+                      // 親より大きければ正規化
+                      if (totalWidth > parentWidth && totalWidth > 0) {
+                        const ratio = parentWidth / totalWidth
+                        cols.forEach(col => {
+                          const w = parseFloat(col.style.width) || 0
+                          col.style.width = `${w * ratio}px`
+                        })
+                        table.style.width = '100%'
+                      }
+                    })
+                    return false
+                  },
+                },
+              },
+            })
+            return [...plugins, limitTableWidthPlugin]
+          },
+        })
 
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
@@ -4091,3 +4103,4 @@
     </script>
 </body>
 </html>
+
