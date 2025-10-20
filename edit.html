@@ -1137,7 +1137,7 @@
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
-        const EnhancedTable = Table.extend({
+        const TableDeletionBehavior = Table.extend({
             addKeyboardShortcuts() {
                 const parentShortcuts = this.parent?.();
 
@@ -4133,7 +4133,7 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    EnhancedTable.configure({ resizable: true }),
+                    TableDeletionBehavior.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,
