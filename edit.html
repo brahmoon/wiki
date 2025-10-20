@@ -1130,7 +1130,7 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
-        import { NodeSelection, Plugin } from 'https://esm.sh/@tiptap/pm/state';
+        import { NodeSelection, Plugin, PluginKey } from 'https://esm.sh/@tiptap/pm/state';
         import { TableMap } from 'https://esm.sh/prosemirror-tables';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
@@ -1139,6 +1139,8 @@
         import { WikiDataService } from './scripts/wikiDataService.js';
 
         // DOMを親幅に正規化し、結果をdocのcolwidth属性へ反映（内部キャッシュもクリア）
+        const limitTableWidthKey = new PluginKey('limitTableWidth')
+
         const normalizeTableWidths = (view, evt) => {
           if (!view?.dom) return;
         
@@ -1241,8 +1243,11 @@
                 }
                 col += colspan;
               }
-              if (changed) view.dispatch(tr);
-        
+              if (changed) {
+                const trWithMeta = tr.setMeta(limitTableWidthKey, { normalized: true })
+                view.dispatch(trWithMeta)
+              }
+
               // さらにもう 1 フレーム後に、columnResizing の内部ドラッグ状態を確実にクリア
               requestAnimationFrame(() => {
                 const resizePlugin = view.state.plugins.find(p => {
@@ -1250,9 +1255,10 @@
                   return k.includes('columnResizing$') || k.includes('tableColumnResizing$');
                 });
                 if (resizePlugin) {
-                  view.dispatch(
-                    view.state.tr.setMeta(resizePlugin, { activeHandle: null, dragging: null })
-                  );
+                  const trWithMeta = view.state.tr
+                    .setMeta(limitTableWidthKey, { normalized: true })
+                    .setMeta(resizePlugin, { activeHandle: null, dragging: null })
+                  view.dispatch(trWithMeta)
                 }
               });
             });
@@ -1263,6 +1269,20 @@
           addProseMirrorPlugins() {
             const plugins = this.parent?.() || []
             const limitTableWidthPlugin = new Plugin({
+              key: limitTableWidthKey,
+              state: {
+                init: () => ({ normalized: false }),
+                apply(tr, value) {
+                  const meta = tr.getMeta(limitTableWidthKey)
+                  if (meta && typeof meta === 'object' && meta.normalized) {
+                    return { normalized: true }
+                  }
+                  if (tr.docChanged) {
+                    return { normalized: false }
+                  }
+                  return value
+                },
+              },
               props: {
                 handleDOMEvents: {
                   mouseup(view, event) {
@@ -1284,6 +1304,16 @@
                     return false
                   },
                 },
+              },
+              view(editorView) {
+                return {
+                  update(view, prevState) {
+                    if (!prevState || view.state.doc === prevState.doc) return
+                    const pluginState = limitTableWidthKey.getState(view.state)
+                    if (pluginState?.normalized) return
+                    requestAnimationFrame(() => normalizeTableWidths(view))
+                  },
+                }
               },
             })
             return [...plugins, limitTableWidthPlugin]
