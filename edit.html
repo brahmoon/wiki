@@ -1122,7 +1122,7 @@
     </div>
 
     <script type="module">
-        import { Editor, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
+        import { Editor, Extension, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core';
         import { StarterKit } from 'https://esm.sh/@tiptap/starter-kit';
         import { Link } from 'https://esm.sh/@tiptap/extension-link';
         import { Placeholder } from 'https://esm.sh/@tiptap/extension-placeholder';
@@ -1130,12 +1130,154 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
-        import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
+        import { NodeSelection, TextSelection } from 'https://esm.sh/@tiptap/pm/state';
+        import { cellAround, findTable, TableMap } from 'https://esm.sh/prosemirror-tables';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
+
+        const isTableNode = (node) => Boolean(node && node.type && node.type.name === 'table');
+
+        const getCellResolvedPos = (selection) => cellAround(selection.$from);
+
+        const getCellTextContent = (doc, cellPos) => {
+            const cellNode = doc.nodeAt(cellPos);
+            if (!cellNode) {
+                return '';
+            }
+            return cellNode.textContent.replace(/\u200b/g, '').trim();
+        };
+
+        const moveSelectionToCell = (editor, absoluteCellPos) => {
+            const { state, view } = editor;
+            const resolved = state.doc.resolve(Math.min(absoluteCellPos + 1, state.doc.content.size));
+            const tr = state.tr.setSelection(TextSelection.near(resolved)).scrollIntoView();
+            view.dispatch(tr);
+            view.focus();
+        };
+
+        const deleteTableAtRange = (editor, from, to) => {
+            const { state, view } = editor;
+            const tr = state.tr.delete(from, to).scrollIntoView();
+            view.dispatch(tr);
+            view.focus();
+        };
+
+        const handleBackspaceInsideTable = (editor, selection, tableInfo) => {
+            const { state } = editor;
+            const $cell = getCellResolvedPos(selection);
+            if (!$cell) {
+                return false;
+            }
+
+            const cellText = getCellTextContent(state.doc, $cell.pos);
+            if (cellText.length > 0) {
+                return false;
+            }
+
+            const map = TableMap.get(tableInfo.node);
+            const relativeCellPos = $cell.pos - tableInfo.start;
+            const cellRect = map.findCell(relativeCellPos);
+
+            if (!cellRect) {
+                return false;
+            }
+
+            if (cellRect.top === 0 && cellRect.left === 0) {
+                deleteTableAtRange(editor, tableInfo.pos, tableInfo.pos + tableInfo.node.nodeSize);
+                return true;
+            }
+
+            let targetRow = cellRect.top;
+            let targetCol = cellRect.left - 1;
+
+            if (targetCol < 0) {
+                targetRow -= 1;
+                targetCol = map.width - 1;
+            }
+
+            while (targetRow >= 0) {
+                if (targetCol < 0) {
+                    targetRow -= 1;
+                    targetCol = map.width - 1;
+                    continue;
+                }
+
+                const relativeTargetPos = map.positionAt(targetRow, targetCol, tableInfo.node);
+
+                if (relativeTargetPos == null) {
+                    targetCol -= 1;
+                    continue;
+                }
+
+                if (relativeTargetPos === relativeCellPos) {
+                    targetCol -= 1;
+                    continue;
+                }
+
+                const absoluteTargetPos = tableInfo.start + relativeTargetPos;
+                moveSelectionToCell(editor, absoluteTargetPos);
+                return true;
+            }
+
+            return false;
+        };
+
+        const TableDeletionBehavior = Extension.create({
+            name: 'tableDeletionBehavior',
+            addKeyboardShortcuts() {
+                return {
+                    Delete: () => {
+                        const { editor } = this;
+                        const { state } = editor;
+                        const { selection } = state;
+
+                        if (!selection.empty) {
+                            return false;
+                        }
+
+                        if (findTable(selection)) {
+                            return false;
+                        }
+
+                        const nodeAfter = selection.$from.nodeAfter;
+                        if (isTableNode(nodeAfter)) {
+                            const from = selection.$from.pos;
+                            deleteTableAtRange(editor, from, from + nodeAfter.nodeSize);
+                            return true;
+                        }
+
+                        return false;
+                    },
+                    Backspace: () => {
+                        const { editor } = this;
+                        const { state } = editor;
+                        const { selection } = state;
+
+                        if (!selection.empty) {
+                            return false;
+                        }
+
+                        const tableInfo = findTable(selection);
+
+                        if (tableInfo) {
+                            return handleBackspaceInsideTable(editor, selection, tableInfo);
+                        }
+
+                        const nodeBefore = selection.$from.nodeBefore;
+                        if (isTableNode(nodeBefore)) {
+                            const to = selection.$from.pos;
+                            deleteTableAtRange(editor, to - nodeBefore.nodeSize, to);
+                            return true;
+                        }
+
+                        return false;
+                    }
+                };
+            }
+        });
 
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
@@ -3991,6 +4133,7 @@
                     TableRow,
                     TableHeader,
                     TableCell,
+                    TableDeletionBehavior,
                     ResizableImage.configure({
                         inline: false,
                         allowBase64: false,
