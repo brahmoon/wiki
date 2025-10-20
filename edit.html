@@ -1132,6 +1132,7 @@
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
         import { NodeSelection, Plugin } from 'https://esm.sh/@tiptap/pm/state';
         import { TableMap } from 'https://esm.sh/prosemirror-tables';
+        import { columnResizingPluginKey } from 'https://esm.sh/prosemirror-tables';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
@@ -1245,7 +1246,19 @@
               }
               col += colspan
             }
-            if (changed) view.dispatch(tr)
+            if (changed) view.dispatch(tr);
+            
+            // 🔽 リサイズキャッシュのリセット
+            const resizePluginState = columnResizingPluginKey.getState(view.state);
+            if (resizePluginState) {
+              const pluginMeta = columnResizingPluginKey.getState(view.state);
+              if (pluginMeta && pluginMeta.activeHandle !== null) {
+                view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { activeHandle: null }));
+              }
+            }
+            // 強制再描画してキャッシュをクリア
+            view.domObserver.flush();
+            view.updateState(view.state);
           })
         }
 
@@ -4205,4 +4218,5 @@
     </script>
 </body>
 </html>
+
 
