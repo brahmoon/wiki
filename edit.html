@@ -1132,135 +1132,118 @@
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
         import { NodeSelection, Plugin } from 'https://esm.sh/@tiptap/pm/state';
         import { TableMap } from 'https://esm.sh/prosemirror-tables';
-        import { columnResizingPluginKey } from 'https://esm.sh/prosemirror-tables';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
-        // DOMを親幅に正規化し、結果をdocのcolwidth属性へ反映
+         // DOMを親幅に正規化し、結果をdocのcolwidth属性へ反映
         const normalizeTableWidths = (view, evt) => {
-          if (!view?.dom) return
-          // イベント座標から“対象テーブル”を優先的に特定（フォールバックで全テーブル）
-          const hit = evt
-            ? view.posAtCoords({ left: evt.clientX, top: evt.clientY })
-            : null
-          const prefer = []
-          if (hit) {
-            let $pos = view.state.doc.resolve(hit.pos)
-            for (let d = $pos.depth; d >= 0; d--) {
-              const node = $pos.node(d)
-              if (node.type && node.type.name === 'table') {
-                // 該当ノードのDOMを拾う（選択→DOMの対応は複数ありうるためclosestで拾う）
-                const maybe = view.dom.querySelector('.tableWrapper table')
-                if (maybe) prefer.push(maybe)
-                break
-              }
-            }
+          if (!view?.dom) return;
+        
+          // イベントから対象テーブルを特定（リサイズ中/ホバー時）
+          const hit = evt ? evt.target : null;
+          const prefer = [];
+          if (hit instanceof Element) {
+            const t = hit.closest('table');
+            if (t) prefer.push(t);
           }
-
-          const tables = prefer.length
-            ? prefer
-            : view.dom.querySelectorAll('table')
-
+          const tables = prefer.length ? prefer : view.dom.querySelectorAll('table');
+        
           tables.forEach(table => {
-            const wrapper = table.closest('.tableWrapper') || table.parentElement
-            if (!wrapper) return
-
-            const wrapperWidth = wrapper.offsetWidth
-            if (!wrapperWidth) return
-
-            const cols = table.querySelectorAll('colgroup col')
-            const hasColGroup = cols.length > 0
-
-            // 現在の列幅（px）をDOMから取得
+            const wrapper = table.closest('.tableWrapper') || table.parentElement;
+            if (!wrapper) return;
+        
+            const wrapperWidth = wrapper.offsetWidth;
+            if (!wrapperWidth) return;
+        
+            const cols = table.querySelectorAll('colgroup col');
+            const hasColGroup = cols.length > 0;
+        
+            // 現在の列幅(px)をDOMから取得
             const domColWidths = hasColGroup
               ? Array.from(cols).map(col => {
-                  const w = parseFloat(col.style.width)
-                  return Number.isFinite(w) ? w : 0
+                  const w = parseFloat(col.style.width);
+                  return Number.isFinite(w) ? w : 0;
                 })
               : Array.from(
                   table.querySelectorAll('tr:first-child > th, tr:first-child > td')
-                ).map(cell => cell.offsetWidth)
-
-            const totalWidth = domColWidths.reduce((a, b) => a + b, 0)
-
+                ).map(cell => cell.offsetWidth);
+        
+            const totalWidth = domColWidths.reduce((a, b) => a + b, 0);
+        
+            // 親幅を超えていれば正規化
             if (totalWidth > wrapperWidth && totalWidth > 0) {
-              const ratio = wrapperWidth / totalWidth
-              // DOM側を正規化
+              const ratio = wrapperWidth / totalWidth;
               if (hasColGroup) {
                 domColWidths.forEach((w, i) => {
-                  cols[i].style.width = `${w * ratio}px`
-                })
+                  cols[i].style.width = `${w * ratio}px`;
+                });
               }
-              // colgroupが無い場合はtable-layout:fixedで後段の属性更新に任せる
-
-              table.style.width = '100%'
+              table.style.width = '100%';
             }
-            // ---- ここから内部のcolwidth属性を doc に書き戻す ----
-            // 対応するテーブルノード位置を探す
-            let tablePos = null, tableNode = null
-            // table 要素から pos を推定
+        
+            // ---- ここから内部 colwidth 属性を doc に反映 ----
+            let tablePos = null, tableNode = null;
             try {
-              const pos = view.posAtDOM(table, 0)
+              const pos = view.posAtDOM(table, 0);
               if (typeof pos === 'number') {
-                const $pos = view.state.doc.resolve(pos)
+                const $pos = view.state.doc.resolve(pos);
                 for (let d = $pos.depth; d >= 0; d--) {
-                  const n = $pos.node(d)
+                  const n = $pos.node(d);
                   if (n.type && n.type.name === 'table') {
-                    tableNode = n
-                    tablePos = $pos.before(d)
-                    break
+                    tableNode = n;
+                    tablePos = $pos.before(d);
+                    break;
                   }
                 }
               }
             } catch (_) {}
-            if (!tableNode) return
-
-            const map = TableMap.get(tableNode)
-            const minW = 25  // cellMinWidth相当。必要ならTable.configureで同期
-
-            // DOM上の最終列幅（px）を取得（オーバー時は正規化済み）
+            if (!tableNode) return;
+        
+            const map = TableMap.get(tableNode);
+            const minW = 25; // cellMinWidth と同値に設定推奨
+        
             const finalWidths = hasColGroup
-              ? Array.from(cols).map(c => Math.max(minW, Math.round(parseFloat(c.style.width) || minW)))
-              : domColWidths.map(w => Math.max(minW, Math.round(w)))
-
-            // 先頭行のセルに対して colwidth 属性を更新
-            let tr = view.state.tr
-            let changed = false
+              ? Array.from(cols).map(c =>
+                  Math.max(minW, Math.round(parseFloat(c.style.width) || minW))
+                )
+              : domColWidths.map(w => Math.max(minW, Math.round(w)));
+        
+            let tr = view.state.tr;
+            let changed = false;
             for (let col = 0; col < map.width; ) {
-              const cellPosInTable = map.positionAt(0, col, tableNode) // row=0
-              const cell = tableNode.nodeAt(cellPosInTable)
-              const colspan = cell?.attrs?.colspan || 1
-              const slice = finalWidths.slice(col, col + colspan)
-              const old = cell?.attrs?.colwidth || null
+              const cellPosInTable = map.positionAt(0, col, tableNode); // row=0
+              const cell = tableNode.nodeAt(cellPosInTable);
+              const colspan = cell?.attrs?.colspan || 1;
+              const slice = finalWidths.slice(col, col + colspan);
+              const old = cell?.attrs?.colwidth || null;
               const same =
                 Array.isArray(old) &&
                 old.length === slice.length &&
-                old.every((v, i) => v === slice[i])
+                old.every((v, i) => v === slice[i]);
               if (!same) {
-                const absPos = tablePos + 1 + cellPosInTable
-                tr = tr.setNodeMarkup(absPos, null, { ...cell.attrs, colwidth: slice })
-                changed = true
+                const absPos = tablePos + 1 + cellPosInTable;
+                tr = tr.setNodeMarkup(absPos, null, { ...cell.attrs, colwidth: slice });
+                changed = true;
               }
-              col += colspan
+              col += colspan;
             }
             if (changed) view.dispatch(tr);
-            
-            // 🔽 リサイズキャッシュのリセット
-            const resizePluginState = columnResizingPluginKey.getState(view.state);
-            if (resizePluginState) {
-              const pluginMeta = columnResizingPluginKey.getState(view.state);
-              if (pluginMeta && pluginMeta.activeHandle !== null) {
-                view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { activeHandle: null }));
-              }
+        
+            // 🔽 リサイズキャッシュのリセット（内部状態を初期化）
+            const resizePlugin = view.state.plugins.find(p => {
+              const k = String(p?.key || '');
+              return k.includes('columnResizing$') || k.includes('tableColumnResizing$');
+            });
+            if (resizePlugin) {
+              view.dispatch(
+                view.state.tr.setMeta(resizePlugin, { activeHandle: null, dragging: null })
+              );
             }
-            // 強制再描画してキャッシュをクリア
-            view.domObserver.flush();
-            view.updateState(view.state);
-          })
-        }
+          });
+        };
 
         const LimitedTable = Table.extend({
           addProseMirrorPlugins() {
@@ -4218,5 +4201,6 @@
     </script>
 </body>
 </html>
+
 
 
