@@ -1130,12 +1130,191 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
-        import { NodeSelection } from 'https://esm.sh/@tiptap/pm/state';
+        import { NodeSelection, TextSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
+
+        const TableDeletionBehavior = Table.extend({
+            addKeyboardShortcuts() {
+                const parentShortcuts = this.parent?.() ?? {};
+                const getTableType = () => this.editor?.schema?.nodes?.table || null;
+                const getCellTypes = () => ({
+                    tableCell: this.editor?.schema?.nodes?.tableCell || null,
+                    tableHeader: this.editor?.schema?.nodes?.tableHeader || null
+                });
+
+                const deleteTableNode = (state, dispatch, tablePos, tableNode) => {
+                    if (!dispatch || !tableNode) {
+                        return false;
+                    }
+
+                    let transaction = state.tr.delete(tablePos, tablePos + tableNode.nodeSize);
+                    if (transaction.doc.content.size > 0) {
+                        const selectionPos = Math.min(
+                            Math.max(0, tablePos - 1),
+                            transaction.doc.content.size
+                        );
+                        try {
+                            transaction = transaction.setSelection(
+                                TextSelection.near(transaction.doc.resolve(selectionPos))
+                            );
+                        } catch (error) {
+                            console.warn('Failed to update selection after table deletion.', error);
+                        }
+                    }
+                    dispatch(transaction.scrollIntoView());
+                    return true;
+                };
+
+                const deleteAdjacentTable = (direction) => {
+                    const tableType = getTableType();
+                    if (!tableType) {
+                        return false;
+                    }
+
+                    const { state, dispatch } = this.editor.view;
+                    const { selection } = state;
+                    if (!selection.empty) {
+                        return false;
+                    }
+
+                    const { $from } = selection;
+                    const parent = $from.parent;
+                    if (!parent || !parent.isTextblock) {
+                        return false;
+                    }
+
+                    if (direction === 'after' && $from.parentOffset !== parent.content.size) {
+                        return false;
+                    }
+
+                    if (direction === 'before' && $from.parentOffset !== 0) {
+                        return false;
+                    }
+
+                    let tableNode = null;
+                    let tablePos = null;
+
+                    if (direction === 'after') {
+                        const afterPos = $from.after();
+                        if (typeof afterPos !== 'number') {
+                            return false;
+                        }
+                        const nodeAfter = state.doc.nodeAt(afterPos);
+                        if (!nodeAfter || nodeAfter.type !== tableType) {
+                            return false;
+                        }
+                        tableNode = nodeAfter;
+                        tablePos = afterPos;
+                    } else {
+                        const nodeBefore = $from.nodeBefore;
+                        if (!nodeBefore || nodeBefore.type !== tableType) {
+                            return false;
+                        }
+                        tableNode = nodeBefore;
+                        tablePos = Math.max(0, $from.pos - nodeBefore.nodeSize);
+                    }
+
+                    return deleteTableNode(state, dispatch, tablePos, tableNode);
+                };
+
+                const focusPreviousEmptyCellOrRemoveTable = () => {
+                    const tableType = getTableType();
+                    if (!tableType) {
+                        return false;
+                    }
+
+                    const { tableCell, tableHeader } = getCellTypes();
+                    if (!tableCell && !tableHeader) {
+                        return false;
+                    }
+
+                    const { state, dispatch } = this.editor.view;
+                    const { selection } = state;
+                    if (!selection.empty) {
+                        return false;
+                    }
+
+                    const { $from } = selection;
+                    let cellDepth = null;
+                    let cellNode = null;
+                    for (let depth = $from.depth; depth > 0; depth -= 1) {
+                        const node = $from.node(depth);
+                        if (node.type === tableCell || node.type === tableHeader) {
+                            cellDepth = depth;
+                            cellNode = node;
+                            break;
+                        }
+                    }
+
+                    if (!cellNode) {
+                        return false;
+                    }
+
+                    if (cellNode.textContent.trim() !== '') {
+                        return false;
+                    }
+
+                    let tableNode = null;
+                    let tableDepth = null;
+                    for (let depth = cellDepth - 1; depth > 0; depth -= 1) {
+                        const node = $from.node(depth);
+                        if (node.type === tableType) {
+                            tableNode = node;
+                            tableDepth = depth;
+                            break;
+                        }
+                    }
+
+                    if (!tableNode || tableDepth == null) {
+                        return false;
+                    }
+
+                    const tablePos = $from.before(tableDepth);
+                    const { commands } = this.editor;
+
+                    if (commands && typeof commands.goToPreviousCell === 'function') {
+                        try {
+                            if (commands.goToPreviousCell()) {
+                                return true;
+                            }
+                        } catch (error) {
+                            console.warn('Failed to move to previous cell before deleting table.', error);
+                        }
+                    }
+
+                    return deleteTableNode(state, dispatch, tablePos, tableNode);
+                };
+
+                return {
+                    ...parentShortcuts,
+                    Delete: (...args) => {
+                        if (deleteAdjacentTable('after')) {
+                            return true;
+                        }
+                        if (parentShortcuts.Delete) {
+                            return parentShortcuts.Delete.apply(this, args);
+                        }
+                        return false;
+                    },
+                    Backspace: (...args) => {
+                        if (focusPreviousEmptyCellOrRemoveTable()) {
+                            return true;
+                        }
+                        if (deleteAdjacentTable('before')) {
+                            return true;
+                        }
+                        if (parentShortcuts.Backspace) {
+                            return parentShortcuts.Backspace.apply(this, args);
+                        }
+                        return false;
+                    }
+                };
+            }
+        });
 
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
@@ -3987,7 +4166,7 @@
                         autolink: true,
                         linkOnPaste: true
                     }),
-                    Table.configure({ resizable: true }),
+                    TableDeletionBehavior.configure({ resizable: true }),
                     TableRow,
                     TableHeader,
                     TableCell,
