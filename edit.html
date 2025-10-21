@@ -1456,70 +1456,81 @@
             localStorage.removeItem(LOGIN_STORAGE_KEY);
         };
 
-        function resolveAdminToken(loginState) {
-            const directToken = (loginState?.adminToken || loginState?.user?.adminToken || '').toString().trim();
-            if (directToken) {
-                return directToken;
-            }
-
-            if (typeof window !== 'undefined' && 'sessionStorage' in window) {
-                const possibleKeys = ['wikiAdminToken', 'wikiAdminSession'];
-                for (const key of possibleKeys) {
-                    let storedValue = null;
-                    try {
-                        storedValue = window.sessionStorage.getItem(key);
-                    } catch (error) {
-                        console.warn('Failed to access sessionStorage for admin token lookup.', error);
-                        break;
-                    }
-
-                    if (!storedValue) {
-                        continue;
-                    }
-
-                    try {
-                        const parsed = JSON.parse(storedValue);
-                        const token = (parsed && (parsed.adminToken || parsed.token)) || '';
-                        if (token) {
-                            return token.toString().trim();
-                        }
-                    } catch (parseError) {
-                        if (typeof storedValue === 'string' && storedValue.trim()) {
-                            return storedValue.trim();
-                        }
-                    }
-                }
-            }
-
-            return '';
-        }
-
-        function resolveUserIdentity() {
+        const buildIdentityPayload = (payload = {}) => {
+            const enriched = { ...payload };
             const loginState = getStoredLoginState();
             const user = loginState?.user || {};
-            const identity = {};
+            const adminSession = loginState?.adminSession || {};
 
-            const email = (user.email || '').toString().trim();
-            const googleEmail = (user.googleEmail || email).toString().trim();
-            const adminToken = resolveAdminToken(loginState);
-
-            if (email) {
-                identity.email = email;
-            }
-            if (googleEmail) {
-                identity.googleEmail = googleEmail;
-            }
-            if (adminToken) {
-                identity.adminToken = adminToken;
+            if (!Object.prototype.hasOwnProperty.call(enriched, 'email')) {
+                enriched.email = user.email || '';
             }
 
-            return identity;
-        }
+            if (!Object.prototype.hasOwnProperty.call(enriched, 'googleEmail')) {
+                enriched.googleEmail = adminSession.googleEmail || user.email || '';
+            }
 
-        function buildUserSettingsRequest(basePayload = {}) {
-            const identity = resolveUserIdentity();
-            return Object.assign({}, basePayload || {}, identity);
-        }
+            if (adminSession.token && !Object.prototype.hasOwnProperty.call(enriched, 'adminToken')) {
+                enriched.adminToken = adminSession.token;
+            }
+
+            return enriched;
+        };
+
+        const mergeAdminSessionFromResult = (result) => {
+            if (!result) {
+                return;
+            }
+
+            let loginState;
+            try {
+                loginState = getStoredLoginState();
+            } catch (error) {
+                return;
+            }
+
+            if (!loginState) {
+                return;
+            }
+
+            let updated = false;
+
+            if (result.requiresReauthentication) {
+                if (loginState.adminSession) {
+                    delete loginState.adminSession;
+                    updated = true;
+                }
+            } else if (
+                result.adminToken ||
+                result.adminTokenIssuedAt ||
+                result.adminTokenExpiresAt ||
+                Object.prototype.hasOwnProperty.call(result, 'adminAuthority') ||
+                result.adminEmail ||
+                result.googleAccountEmail
+            ) {
+                const session = {
+                    token: result.adminToken || loginState.adminSession?.token || '',
+                    tokenIssuedAt: result.adminTokenIssuedAt || loginState.adminSession?.tokenIssuedAt || '',
+                    tokenExpiresAt: result.adminTokenExpiresAt || loginState.adminSession?.tokenExpiresAt || '',
+                    email: result.adminEmail || loginState.adminSession?.email || loginState.user?.email || '',
+                    googleEmail: result.googleAccountEmail || loginState.adminSession?.googleEmail || loginState.user?.email || '',
+                    authority: Object.prototype.hasOwnProperty.call(result, 'adminAuthority')
+                        ? result.adminAuthority
+                        : loginState.adminSession?.authority
+                };
+
+                loginState = { ...loginState, adminSession: session };
+                updated = true;
+            }
+
+            if (updated) {
+                try {
+                    localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(loginState));
+                } catch (error) {
+                    console.warn('ログイン状態の更新に失敗しました。', error);
+                }
+            }
+        };
 
         const callUserSettingsApi = async (payload) => {
             if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
@@ -1539,7 +1550,7 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify(requestPayload),
+                    body: JSON.stringify(buildIdentityPayload(payload)),
                     signal: controller.signal
                 });
 
@@ -1551,6 +1562,12 @@
                 const result = await response.json().catch(() => null);
                 if (!result) {
                     throw new Error('ユーザー設定の応答解析に失敗しました。');
+                }
+
+                mergeAdminSessionFromResult(result);
+
+                if (result.requiresReauthentication) {
+                    throw new Error(result.message || 'セッションの有効期限が切れました。再度ログインしてください。');
                 }
 
                 return result;
@@ -1634,8 +1651,9 @@
         let driveImageExtensionInstance = null;
 
         function getCurrentUserGoogleEmail() {
-            const identity = resolveUserIdentity();
-            return identity.googleEmail || '';
+            const loginState = getStoredLoginState();
+            const email = (loginState?.user?.email || '').trim();
+            return email;
         }
 
         function refreshDriveImageUserPermissions() {
@@ -1734,13 +1752,11 @@
             }
             userSettingsState.isLoading = true;
             try {
-                const result = await callUserSettingsApi(
-                    buildUserSettingsRequest({
-                        action: 'getUserSettings',
-                        playerId: playerId || '',
-                        email: email || ''
-                    })
-                );
+                const result = await callUserSettingsApi({
+                    action: 'getUserSettings',
+                    playerId: playerId || '',
+                    email: email || ''
+                });
 
                 if (!result.success) {
                     throw new Error(result.message || 'ユーザー設定の取得に失敗しました。');

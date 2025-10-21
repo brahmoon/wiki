@@ -342,13 +342,11 @@
             }
 
             setStatus('アカウント登録状況を確認しています...');
-            const payload = buildUserIdentityPayload(
-                {
-                    action: 'getUserSettings',
-                    playerId: ''
-                },
-                user
-            );
+            const payload = {
+                action: 'getUserSettings',
+                playerId: '',
+                email: user.email
+            };
 
             try {
                 const result = await callAppsScript(payload);
@@ -387,6 +385,88 @@
             }
         };
 
+        const buildIdentityPayload = (payload = {}) => {
+            const enriched = { ...payload };
+            let loginState = null;
+            try {
+                const stored = localStorage.getItem(CONFIG.LOGIN_STORAGE_KEY);
+                loginState = stored ? JSON.parse(stored) : null;
+            } catch (error) {
+                loginState = null;
+            }
+
+            const user = loginState?.user || state.user || {};
+            const adminSession = loginState?.adminSession || {};
+
+            if (!Object.prototype.hasOwnProperty.call(enriched, 'email')) {
+                enriched.email = user.email || '';
+            }
+
+            if (!Object.prototype.hasOwnProperty.call(enriched, 'googleEmail')) {
+                enriched.googleEmail = adminSession.googleEmail || user.email || '';
+            }
+
+            if (adminSession.token && !Object.prototype.hasOwnProperty.call(enriched, 'adminToken')) {
+                enriched.adminToken = adminSession.token;
+            }
+
+            return enriched;
+        };
+
+        const mergeAdminSessionFromResult = (result) => {
+            if (!result) {
+                return;
+            }
+
+            let loginState = null;
+            try {
+                const stored = localStorage.getItem(CONFIG.LOGIN_STORAGE_KEY);
+                loginState = stored ? JSON.parse(stored) : null;
+            } catch (error) {
+                loginState = null;
+            }
+
+            if (!loginState) {
+                return;
+            }
+
+            let updated = false;
+
+            if (result.requiresReauthentication) {
+                if (loginState.adminSession) {
+                    delete loginState.adminSession;
+                    updated = true;
+                }
+            } else if (
+                result.adminToken ||
+                result.adminTokenIssuedAt ||
+                result.adminTokenExpiresAt ||
+                Object.prototype.hasOwnProperty.call(result, 'adminAuthority') ||
+                result.adminEmail ||
+                result.googleAccountEmail
+            ) {
+                loginState.adminSession = {
+                    token: result.adminToken || loginState.adminSession?.token || '',
+                    tokenIssuedAt: result.adminTokenIssuedAt || loginState.adminSession?.tokenIssuedAt || '',
+                    tokenExpiresAt: result.adminTokenExpiresAt || loginState.adminSession?.tokenExpiresAt || '',
+                    email: result.adminEmail || loginState.adminSession?.email || loginState.user?.email || '',
+                    googleEmail: result.googleAccountEmail || loginState.adminSession?.googleEmail || loginState.user?.email || '',
+                    authority: Object.prototype.hasOwnProperty.call(result, 'adminAuthority')
+                        ? result.adminAuthority
+                        : loginState.adminSession?.authority
+                };
+                updated = true;
+            }
+
+            if (updated) {
+                try {
+                    localStorage.setItem(CONFIG.LOGIN_STORAGE_KEY, JSON.stringify(loginState));
+                } catch (error) {
+                    console.warn('ログイン状態の更新に失敗しました。', error);
+                }
+            }
+        };
+
         const callAppsScript = async (payload) => {
             if (!CONFIG.APPS_SCRIPT_ENDPOINT_USER_SETTINGS || CONFIG.APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
                 throw new Error('ユーザー登録サービスのURLが設定されていません。管理者にお問い合わせください。');
@@ -403,7 +483,7 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify(buildIdentityPayload(payload)),
                     signal: controller.signal
                 });
 
@@ -415,6 +495,12 @@
                 const result = await response.json().catch(() => null);
                 if (!result) {
                     throw new Error('ユーザー登録サービスからのレスポンス解析に失敗しました。');
+                }
+
+                mergeAdminSessionFromResult(result);
+
+                if (result.requiresReauthentication) {
+                    throw new Error(result.message || 'セッションの有効期限が切れました。再度ログインしてください。');
                 }
 
                 return result;
@@ -504,16 +590,14 @@
                 return;
             }
 
-            const payload = buildUserIdentityPayload(
-                {
-                    action: 'registerUser',
-                    playerId: '',
-                    username,
-                    language: CONFIG.DEFAULT_LANGUAGE,
-                    authority: 1
-                },
-                state.user
-            );
+            const payload = {
+                action: 'registerUser',
+                playerId: '',
+                email: state.user.email,
+                username,
+                language: CONFIG.DEFAULT_LANGUAGE,
+                authority: 1
+            };
 
             state.isProcessing = true;
             setStatus('ユーザーを登録しています...');
