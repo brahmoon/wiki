@@ -1456,6 +1456,71 @@
             localStorage.removeItem(LOGIN_STORAGE_KEY);
         };
 
+        function resolveAdminToken(loginState) {
+            const directToken = (loginState?.adminToken || loginState?.user?.adminToken || '').toString().trim();
+            if (directToken) {
+                return directToken;
+            }
+
+            if (typeof window !== 'undefined' && 'sessionStorage' in window) {
+                const possibleKeys = ['wikiAdminToken', 'wikiAdminSession'];
+                for (const key of possibleKeys) {
+                    let storedValue = null;
+                    try {
+                        storedValue = window.sessionStorage.getItem(key);
+                    } catch (error) {
+                        console.warn('Failed to access sessionStorage for admin token lookup.', error);
+                        break;
+                    }
+
+                    if (!storedValue) {
+                        continue;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(storedValue);
+                        const token = (parsed && (parsed.adminToken || parsed.token)) || '';
+                        if (token) {
+                            return token.toString().trim();
+                        }
+                    } catch (parseError) {
+                        if (typeof storedValue === 'string' && storedValue.trim()) {
+                            return storedValue.trim();
+                        }
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        function resolveUserIdentity() {
+            const loginState = getStoredLoginState();
+            const user = loginState?.user || {};
+            const identity = {};
+
+            const email = (user.email || '').toString().trim();
+            const googleEmail = (user.googleEmail || email).toString().trim();
+            const adminToken = resolveAdminToken(loginState);
+
+            if (email) {
+                identity.email = email;
+            }
+            if (googleEmail) {
+                identity.googleEmail = googleEmail;
+            }
+            if (adminToken) {
+                identity.adminToken = adminToken;
+            }
+
+            return identity;
+        }
+
+        function buildUserSettingsRequest(basePayload = {}) {
+            const identity = resolveUserIdentity();
+            return Object.assign({}, basePayload || {}, identity);
+        }
+
         const callUserSettingsApi = async (payload) => {
             if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
                 throw new Error('ユーザー設定APIのエンドポイントが設定されていません。');
@@ -1463,6 +1528,8 @@
 
             const controller = new AbortController();
             const timeoutId = window.setTimeout(() => controller.abort(), USER_SETTINGS_REQUEST_TIMEOUT);
+
+            const requestPayload = buildUserSettingsRequest(payload);
 
             try {
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
@@ -1472,7 +1539,7 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify(requestPayload),
                     signal: controller.signal
                 });
 
@@ -1567,9 +1634,8 @@
         let driveImageExtensionInstance = null;
 
         function getCurrentUserGoogleEmail() {
-            const loginState = getStoredLoginState();
-            const email = (loginState?.user?.email || '').trim();
-            return email;
+            const identity = resolveUserIdentity();
+            return identity.googleEmail || '';
         }
 
         function refreshDriveImageUserPermissions() {
@@ -1668,11 +1734,13 @@
             }
             userSettingsState.isLoading = true;
             try {
-                const result = await callUserSettingsApi({
-                    action: 'getUserSettings',
-                    playerId: playerId || '',
-                    email: email || ''
-                });
+                const result = await callUserSettingsApi(
+                    buildUserSettingsRequest({
+                        action: 'getUserSettings',
+                        playerId: playerId || '',
+                        email: email || ''
+                    })
+                );
 
                 if (!result.success) {
                     throw new Error(result.message || 'ユーザー設定の取得に失敗しました。');
@@ -1741,14 +1809,14 @@
             setUserSettingsMessage('保存しています...');
 
             try {
-                const payload = {
+                const payload = buildUserSettingsRequest({
                     action: 'updateUserSettings',
                     playerId: user.playerId || '',
                     email: user.email || '',
                     username,
                     kingdom: normalizedKingdom,
                     language
-                };
+                });
 
                 const result = await callUserSettingsApi(payload);
                 if (!result.success) {
