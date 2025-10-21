@@ -1156,6 +1156,75 @@
         let pluginLoadingInProgress = false;
         let pluginSavingInProgress = false;
 
+        const resolveAdminEmails = () => {
+            const loginEmail = currentLoginState?.user?.email || '';
+            const verificationEmail = adminVerificationResult?.email || '';
+            const googleAccountEmail = adminVerificationResult?.googleAccountEmail || '';
+
+            return {
+                email: verificationEmail || loginEmail || googleAccountEmail || '',
+                googleEmail: googleAccountEmail || loginEmail || verificationEmail || ''
+            };
+        };
+
+        const getAdminRequestContext = () => {
+            const { email, googleEmail } = resolveAdminEmails();
+            const context = {
+                email,
+                googleEmail
+            };
+
+            const adminToken = adminVerificationResult?.adminToken;
+            if (adminToken) {
+                context.adminToken = adminToken;
+            }
+
+            return context;
+        };
+
+        const syncAdminSessionFromResult = (result) => {
+            if (!result || typeof result !== 'object') {
+                return;
+            }
+
+            const previous = adminVerificationResult || {};
+            const next = Object.assign({}, previous);
+
+            if (result.success === true) {
+                next.success = true;
+            }
+
+            if (result.adminToken) {
+                next.adminToken = result.adminToken;
+                next.adminTokenExpiresAt = result.adminTokenExpiresAt || previous.adminTokenExpiresAt || null;
+            }
+
+            adminVerificationResult = next;
+        };
+
+        const isAdminAuthorizationFailure = (result) => {
+            if (!result || result.success !== false) {
+                return false;
+            }
+
+            const message = (result.message || '').toString();
+            if (!message) {
+                return false;
+            }
+
+            return ['管理者', '認証', 'トークン'].some((keyword) => message.includes(keyword));
+        };
+
+        const handleAdminAuthorizationFailure = (result) => {
+            const message = (result && result.message) || '管理者権限の確認に失敗しました。';
+            adminVerificationResult = Object.assign({}, adminVerificationResult || {}, {
+                success: false,
+                adminToken: undefined,
+                adminTokenExpiresAt: undefined
+            });
+            showAuthorizationError(message);
+        };
+
         const pluginCheckboxMap = new Map();
         const authorityCheckboxMap = new Map();
         const authorityRoleButtons = authorityRoleToggle
@@ -2493,6 +2562,15 @@
                 return;
             }
 
+            if (!adminVerificationResult || !adminVerificationResult.success) {
+                setPluginStatusMessage('管理者認証が確認できません。ページを再読み込みしてください。', 'error');
+                handleAdminAuthorizationFailure({
+                    message: '管理者認証が確認できませんでした。再度ログインしてください。',
+                    success: false
+                });
+                return;
+            }
+
             if (!APPS_SCRIPT_ENDPOINT_ADMIN_AUTH || APPS_SCRIPT_ENDPOINT_ADMIN_AUTH.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
                 setPluginStatusMessage('プラグイン設定APIのエンドポイントが設定されていません。', 'error');
                 return;
@@ -2502,6 +2580,9 @@
             clearPluginStatus();
 
             try {
+                const payload = Object.assign({}, getAdminRequestContext(), {
+                    action: 'getToolbarPlugins'
+                });
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',
                     mode: 'cors',
@@ -2710,6 +2791,9 @@
             setMemberLoading(true);
 
             try {
+                const payload = Object.assign({}, getAdminRequestContext(), {
+                    action: 'listMembers'
+                });
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
                     method: 'POST',
                     mode: 'cors',
@@ -2809,6 +2893,10 @@
                     action: 'verifyAdminAccess',
                     origin: window.location.origin
                 });
+
+                if (adminVerificationResult?.adminToken) {
+                    payload.adminToken = adminVerificationResult.adminToken;
+                }
 
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',

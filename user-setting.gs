@@ -387,7 +387,7 @@ function handleRegisterUser(sheet, request) {
   if (!email) {
     return {
       success: false,
-      message: 'Googleアカウントのメールアドレスを取得できませんでした。',
+      message: '登録するメールアドレスを入力してください。',
     };
   }
 
@@ -573,16 +573,7 @@ function sanitizeLanguage(value) {
 }
 
 function sanitizeAuthority(value) {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    return null;
-  }
-
-  return number;
+  return parseAuthorityValue(value);
 }
 
 function normalizeId(value) {
@@ -623,7 +614,7 @@ function findAccount(sheet, identifiers) {
         email:
           columns.email && row[columns.email - 1]
             ? row[columns.email - 1]
-            : identifiers.email || '',
+            : safeIdentifiers.email || '',
         kingdom: columns.kingdom ? row[columns.kingdom - 1] || '' : '',
         language: columns.language ? sanitizeLanguage(row[columns.language - 1]) : 'ja',
         authority: columns.authority ? sanitizeAuthority(row[columns.authority - 1]) : null,
@@ -632,6 +623,19 @@ function findAccount(sheet, identifiers) {
   }
 
   return null;
+}
+
+function parseAuthorityValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  return number;
 }
 
 function formatDateValue(value) {

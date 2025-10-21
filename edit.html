@@ -1540,6 +1540,8 @@
             const controller = new AbortController();
             const timeoutId = window.setTimeout(() => controller.abort(), USER_SETTINGS_REQUEST_TIMEOUT);
 
+            const requestPayload = buildUserSettingsRequest(payload);
+
             try {
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
                     method: 'POST',
@@ -1823,14 +1825,14 @@
             setUserSettingsMessage('保存しています...');
 
             try {
-                const payload = {
+                const payload = buildUserSettingsRequest({
                     action: 'updateUserSettings',
                     playerId: user.playerId || '',
                     email: user.email || '',
                     username,
                     kingdom: normalizedKingdom,
                     language
-                };
+                });
 
                 const result = await callUserSettingsApi(payload);
                 if (!result.success) {

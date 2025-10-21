@@ -79,6 +79,10 @@ const DRIVE_IMAGE_ROLES = Array.from(new Set([
   'Editor'
 ]));
 const DRIVE_IMAGE_ROOT_KEY = '__root__';
+const ADMIN_TOKEN_SECRET_PROPERTY_KEY = 'ADMIN_TOKEN_SECRET';
+const ADMIN_TOKEN_TTL_SECONDS = 5 * 60;
+const ADMIN_TOKEN_CLOCK_SKEW_MS = 15 * 1000;
+let ADMIN_TOKEN_SECRET_CACHE = null;
 
 function doGet(e) {
   return createJsonOutput(
@@ -525,6 +529,106 @@ function updateAuthority(sheet, request, adminVerification) {
     updatedAt: updateResult.updatedAt,
     targetPlayerId: updateResult.targetPlayerId
   }, verification);
+}
+
+function validateAdminToken(token) {
+  if (!token || typeof token !== 'string') {
+    return { valid: false };
+  }
+
+  const parts = token.split('.');
+  if (parts.length !== 2) {
+    return { valid: false };
+  }
+
+  const payloadBase64 = parts[0];
+  const signatureBase64 = parts[1];
+
+  try {
+    const expectedSignature = Utilities.computeHmacSha256Signature(
+      payloadBase64,
+      getAdminTokenSecret()
+    );
+    const providedSignature = Utilities.base64DecodeWebSafe(signatureBase64);
+
+    if (!byteArrayEquals(expectedSignature, providedSignature)) {
+      return { valid: false };
+    }
+
+    const payloadJson = Utilities.newBlob(
+      Utilities.base64DecodeWebSafe(payloadBase64)
+    ).getDataAsString();
+
+    if (!payloadJson) {
+      return { valid: false };
+    }
+
+    const payload = JSON.parse(payloadJson);
+    const expiresAtSeconds = Number(payload.exp);
+    if (!Number.isFinite(expiresAtSeconds)) {
+      return { valid: false };
+    }
+
+    const nowMs = Date.now();
+    const expiresAtMs = expiresAtSeconds * 1000;
+    if (expiresAtMs + ADMIN_TOKEN_CLOCK_SKEW_MS < nowMs) {
+      return { valid: false };
+    }
+
+    if (payload.iat) {
+      const notBeforeMs = Number(payload.iat) * 1000 - ADMIN_TOKEN_CLOCK_SKEW_MS;
+      if (Number.isFinite(notBeforeMs) && notBeforeMs > nowMs) {
+        return { valid: false };
+      }
+    }
+
+    return {
+      valid: true,
+      payload,
+      expiresAt: new Date(expiresAtMs).toISOString()
+    };
+  } catch (error) {
+    return { valid: false };
+  }
+}
+
+function getAdminTokenSecret() {
+  if (ADMIN_TOKEN_SECRET_CACHE) {
+    return ADMIN_TOKEN_SECRET_CACHE;
+  }
+
+  let secret = '';
+  if (typeof PropertiesService !== 'undefined' && PropertiesService) {
+    const scriptProperties = PropertiesService.getScriptProperties();
+    if (scriptProperties) {
+      secret = scriptProperties.getProperty(ADMIN_TOKEN_SECRET_PROPERTY_KEY) || '';
+      if (!secret) {
+        secret = `${Utilities.getUuid()}${Utilities.getUuid()}`.replace(/-/g, '');
+        scriptProperties.setProperty(ADMIN_TOKEN_SECRET_PROPERTY_KEY, secret);
+      }
+    }
+  }
+
+  if (!secret) {
+    secret = `${Utilities.getUuid()}${Utilities.getUuid()}`.replace(/-/g, '');
+  }
+
+  ADMIN_TOKEN_SECRET_CACHE = secret;
+  return ADMIN_TOKEN_SECRET_CACHE;
+}
+
+function byteArrayEquals(first, second) {
+  if (!first || !second || first.length !== second.length) {
+    return false;
+  }
+
+  for (let i = 0; i < first.length; i += 1) {
+    if (first[i] !== second[i]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function parseAuthorityValue(value) {
