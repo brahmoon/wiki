@@ -1341,6 +1341,7 @@
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
+        const ADMIN_AUTHORITY_VALUE = 99;
 
         const DRIVE_IMAGE_PERMISSION_DEBUG = true;
 
@@ -1352,23 +1353,15 @@
                 const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
                     .toString()
                     .trim();
-                const playerId = (options?.userPlayerId || '')
-                    .toString()
-                    .trim();
                 const payload = {
                     action: 'getDriveImagePermissions',
                     googleEmail,
                     email: googleEmail
                 };
 
-                if (playerId) {
-                    payload.playerId = playerId;
-                }
-
                 console.debug('[DriveImage][Permissions] Sending request', {
                     endpoint,
                     payload,
-                    playerId,
                     timestamp: new Date().toISOString()
                 });
 
@@ -1376,7 +1369,6 @@
 
                 console.debug('[DriveImage][Permissions] Received response', {
                     result,
-                    playerId,
                     timestamp: new Date().toISOString()
                 });
 
@@ -1580,14 +1572,6 @@
             return email;
         }
 
-        function getCurrentUserPlayerId() {
-            const loginState = getStoredLoginState();
-            const playerId = (loginState?.user?.playerId || '')
-                .toString()
-                .trim();
-            return playerId;
-        }
-
         function refreshDriveImageUserPermissions() {
             const extension = driveImageExtensionInstance;
             if (!extension) {
@@ -1595,17 +1579,14 @@
             }
 
             const googleEmail = getCurrentUserGoogleEmail();
-            const playerId = getCurrentUserPlayerId();
 
             extension.options.userGoogleEmail = googleEmail;
-            extension.options.userPlayerId = playerId;
             extension.options.userAuthority = null;
             extension.options.userRole = '';
 
             if (extension.modal) {
                 if (extension.modal.options) {
                     extension.modal.options.userGoogleEmail = googleEmail;
-                    extension.modal.options.userPlayerId = playerId;
                     extension.modal.options.userAuthority = null;
                     extension.modal.options.userRole = '';
                 }
@@ -1816,8 +1797,8 @@
                 logoutButton.hidden = false;
                 settingsButton.hidden = false;
                 settingsButton.disabled = false;
-                const playerId = (loginState?.user?.playerId || '').trim().toLowerCase();
-                const isAdmin = playerId === 'admin';
+                const authorityValue = parseAuthority(loginState?.user?.authority);
+                const isAdmin = authorityValue !== null && authorityValue >= ADMIN_AUTHORITY_VALUE;
                 if (wikiSettingsButton) {
                     wikiSettingsButton.hidden = !isAdmin;
                     wikiSettingsButton.disabled = !isAdmin;
@@ -4243,8 +4224,7 @@
                         permissionsEndpoint: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION,
                         userAuthority: null,
                         userRole: '',
-                        userGoogleEmail: getCurrentUserGoogleEmail(),
-                        userPlayerId: getCurrentUserPlayerId()
+                        userGoogleEmail: getCurrentUserGoogleEmail()
                     }),
                     YouTubeEmbed
                 ],

@@ -1838,7 +1838,6 @@
 
             const payload = {
                 action: 'getDriveImageAuthorities',
-                playerId: adminVerificationResult?.playerId || currentLoginState?.user?.playerId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -1946,7 +1945,6 @@
             const payload = {
                 action: 'updateDriveImageAuthorities',
                 authorities: buildAuthorityPayload(),
-                playerId: adminVerificationResult?.playerId || currentLoginState?.user?.playerId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -2139,11 +2137,7 @@
 
         const isAdministratorAccount = (member) => {
             const authorityValue = parseAuthorityValue(member?.authority);
-            if (authorityValue !== null && authorityValue === ADMIN_AUTHORITY_VALUE) {
-                return true;
-            }
-            const playerId = normalizeId(member?.playerId);
-            return playerId === 'admin';
+            return authorityValue !== null && authorityValue >= ADMIN_AUTHORITY_VALUE;
         };
 
         const createAuthorityCell = (member, updatedCell) => {
@@ -2279,7 +2273,6 @@
                 action: 'updateAuthority',
                 targetPlayerId,
                 authority,
-                playerId: adminVerificationResult?.playerId || currentLoginState?.user?.playerId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -2381,7 +2374,6 @@
                 action: 'updateToolbarPlugins',
                 toolbarKeys: TOOLBAR_FEATURES.map((feature) => feature.key),
                 toolbarStates: states,
-                playerId: adminVerificationResult?.playerId || currentLoginState?.user?.playerId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -2619,7 +2611,6 @@
             try {
                 const payload = {
                     action: 'verifyAdminAccess',
-                    playerId: loginState?.user?.playerId || '',
                     email: loginState?.user?.email || '',
                     googleEmail: loginState?.user?.email || '',
                     origin: window.location.origin
@@ -2685,12 +2676,17 @@
                 currentLoginState = loginState;
                 adminVerificationResult = verification;
 
+                if (currentLoginState?.user) {
+                    currentLoginState.user.authority = verification.authority ?? currentLoginState.user.authority ?? null;
+                }
+
                 hideAuthorizationError();
 
                 const authorizedUser = {
                     playerId: verification.playerId || user.playerId || '',
                     username: verification.username || user.username || user.name || '',
-                    email: verification.email || user.email || ''
+                    email: verification.email || user.email || '',
+                    authority: verification.authority ?? user.authority ?? null
                 };
 
                 const displayName = (authorizedUser.username || authorizedUser.email || '').trim();

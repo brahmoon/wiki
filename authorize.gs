@@ -12,8 +12,7 @@ const AUTH_CONFIG = {
     'https://brahmoon.github.io',
     'http://localhost:3000',
     'http://localhost:4173'
-  ],
-  DEFAULT_REQUIRED_PLAYER_ID: 'admin'
+  ]
 };
 
 const PLUGIN_CONFIG = {
@@ -57,7 +56,7 @@ const DRIVE_IMAGE_ADMIN_ROLE = typeof ADMINISTRATOR_ROLE !== 'undefined'
 // highest configured authority level so numeric accounts (e.g. authority=3)
 // continue to map to the administrator role instead of falling back to
 // Moderator.
-const DRIVE_IMAGE_ADMIN_AUTHORITY = (function resolveAdminAuthorityBaseline() {
+const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminAuthorityBaseline() {
   if (typeof ADMIN_AUTHORITY_VALUE !== 'undefined') {
     const explicit = parseAuthorityValue(ADMIN_AUTHORITY_VALUE);
     if (explicit !== null) {
@@ -79,6 +78,7 @@ const DRIVE_IMAGE_ADMIN_AUTHORITY = (function resolveAdminAuthorityBaseline() {
 
   return highestConfiguredAuthority !== null ? highestConfiguredAuthority : 99;
 })();
+const DRIVE_IMAGE_ADMIN_AUTHORITY = ADMIN_AUTHORITY_THRESHOLD;
 const DRIVE_IMAGE_ROLES = Array.from(new Set([
   DRIVE_IMAGE_ADMIN_ROLE,
   'Moderator',
@@ -155,11 +155,11 @@ function doOptions(e) {
 }
 
 function verifyAdminAccess(sheet, request) {
-  const normalizedPlayerId = normalizeId(request.playerId);
-  const normalizedEmail = normalizeId(request.email);
   const normalizedGoogleEmail = normalizeId(request.googleEmail);
+  const normalizedEmail = normalizeId(request.email);
+  const lookupEmail = normalizedGoogleEmail || normalizedEmail;
 
-  if (!normalizedPlayerId && !normalizedEmail && !normalizedGoogleEmail) {
+  if (!lookupEmail) {
     return {
       success: false,
       message: '管理者アカウント情報が不足しています。'
@@ -167,7 +167,6 @@ function verifyAdminAccess(sheet, request) {
   }
 
   const account = findAccount(sheet, {
-    playerId: request.playerId,
     email: request.email,
     googleEmail: request.googleEmail
   });
@@ -179,19 +178,21 @@ function verifyAdminAccess(sheet, request) {
     };
   }
 
-  const normalizedAccountPlayerId = normalizeId(account.playerId);
-  const adminPlayerId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_PLAYER_ID);
-
-  if (!adminPlayerId || normalizedAccountPlayerId !== adminPlayerId) {
+  const authorityValue = parseAuthorityValue(account.authority);
+  if (authorityValue === null || authorityValue < ADMIN_AUTHORITY_THRESHOLD) {
     return {
       success: false,
-      message: '管理者権限がありません。'
+      message: '管理者権限がありません。',
+      authority: authorityValue
     };
   }
 
   const normalizedAccountEmail = normalizeId(account.email);
-  const normalizedRequestEmail = normalizedGoogleEmail || normalizedEmail;
-  if (normalizedRequestEmail && normalizedAccountEmail && normalizedRequestEmail !== normalizedAccountEmail) {
+  if (
+    normalizedGoogleEmail &&
+    normalizedAccountEmail &&
+    normalizedGoogleEmail !== normalizedAccountEmail
+  ) {
     return {
       success: false,
       message: '管理者アカウントのメールアドレスが一致しません。'
@@ -204,6 +205,7 @@ function verifyAdminAccess(sheet, request) {
     playerId: account.playerId,
     username: account.username,
     email: account.email,
+    authority: authorityValue,
     googleAccountEmail: request.googleEmail || account.email || ''
   };
 }
@@ -219,14 +221,6 @@ function updateAuthority(sheet, request) {
     return {
       success: false,
       message: '対象ユーザーが指定されていません。'
-    };
-  }
-
-  const adminPlayerId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_PLAYER_ID);
-  if (adminPlayerId && normalizedTargetPlayerId === adminPlayerId) {
-    return {
-      success: false,
-      message: '管理者アカウントの権限は変更できません。'
     };
   }
 
@@ -731,7 +725,7 @@ function getDriveImagePermissions(request) {
     return {
       success: false,
       message: 'Googleアカウント情報が指定されていません。',
-      playerId: request.playerId || ''
+      playerId: ''
     };
   }
 
@@ -740,14 +734,13 @@ function getDriveImagePermissions(request) {
     return {
       success: false,
       message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`,
-      playerId: request.playerId || ''
+      playerId: ''
     };
   }
 
   const account = findAccount(sheet, {
     googleEmail: request.googleEmail,
-    email: request.email,
-    playerId: request.playerId
+    email: request.email
   });
 
   if (!account) {
@@ -757,7 +750,7 @@ function getDriveImagePermissions(request) {
       permissions: {},
       authority: null,
       role: '',
-      playerId: request.playerId || ''
+      playerId: ''
     };
   }
 
@@ -864,53 +857,6 @@ function applyAuthorityUpdate(sheet, normalizedTargetPlayerId, authorityValue) {
     success: false,
     message: '対象ユーザーが見つかりません。'
   };
-}
-
-function buildRequiredPlayerIds(request) {
-  const candidates = [];
-
-  const allowedIdentifiers = []
-    .concat(Array.isArray(request.allowedPlayerIds) ? request.allowedPlayerIds : [])
-    .concat(Array.isArray(request.allowedLoginIds) ? request.allowedLoginIds : []);
-  const hasAllowedPlayerIds = allowedIdentifiers.length > 0;
-
-  allowedIdentifiers.forEach((value) => {
-    const normalized = normalizeId(value);
-    if (normalized) {
-      candidates.push(normalized);
-    }
-  });
-
-  const normalizedRequiredPlayerId = normalizeId(
-    request.requiredPlayerId || request.requiredLoginId
-  );
-  const hasExplicitRequiredPlayerId = Boolean(normalizedRequiredPlayerId);
-  if (normalizedRequiredPlayerId) {
-    candidates.push(normalizedRequiredPlayerId);
-  }
-
-  const normalizedPlayerId = normalizeId(request.playerId);
-  if (normalizedPlayerId) {
-    candidates.push(normalizedPlayerId);
-  }
-
-  if (!hasAllowedPlayerIds && !hasExplicitRequiredPlayerId) {
-    const defaultPlayerId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_PLAYER_ID);
-    if (defaultPlayerId) {
-      candidates.push(defaultPlayerId);
-    }
-  }
-
-  const unique = {};
-  const uniqueList = [];
-  candidates.forEach((value) => {
-    if (value && !unique[value]) {
-      unique[value] = true;
-      uniqueList.push(value);
-    }
-  });
-
-  return uniqueList;
 }
 
 function parseRequest(e) {
