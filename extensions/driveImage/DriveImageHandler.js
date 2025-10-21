@@ -718,7 +718,7 @@ export class DriveImageHandler {
     const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
       .toString()
       .trim();
-    const loginId = (options?.userLoginId || '')
+    const playerId = (options?.userPlayerId || '')
       .toString()
       .trim();
 
@@ -733,8 +733,8 @@ export class DriveImageHandler {
         email: googleEmail
       };
 
-      if (loginId) {
-        payload.loginId = loginId;
+      if (playerId) {
+        payload.playerId = playerId;
       }
 
       const response = await fetch(endpoint, {

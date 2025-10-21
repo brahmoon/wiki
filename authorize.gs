@@ -2,7 +2,7 @@ const AUTH_CONFIG = {
   SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
   SHEET_NAME: 'Accounts',
   HEADER_ROW_INDEX: 1,
-  LOGIN_ID_COLUMN: 1,
+  PLAYER_ID_COLUMN: 1,
   USERNAME_COLUMN: 2,
   EMAIL_COLUMN: 3,
   AUTHORITY_COLUMN: 6,
@@ -13,7 +13,7 @@ const AUTH_CONFIG = {
     'http://localhost:3000',
     'http://localhost:4173'
   ],
-  DEFAULT_REQUIRED_LOGIN_ID: 'admin'
+  DEFAULT_REQUIRED_PLAYER_ID: 'admin'
 };
 
 const PLUGIN_CONFIG = {
@@ -155,11 +155,11 @@ function doOptions(e) {
 }
 
 function verifyAdminAccess(sheet, request) {
-  const normalizedLoginId = normalizeId(request.loginId);
+  const normalizedPlayerId = normalizeId(request.playerId);
   const normalizedEmail = normalizeId(request.email);
   const normalizedGoogleEmail = normalizeId(request.googleEmail);
 
-  if (!normalizedLoginId && !normalizedEmail && !normalizedGoogleEmail) {
+  if (!normalizedPlayerId && !normalizedEmail && !normalizedGoogleEmail) {
     return {
       success: false,
       message: '管理者アカウント情報が不足しています。'
@@ -167,7 +167,7 @@ function verifyAdminAccess(sheet, request) {
   }
 
   const account = findAccount(sheet, {
-    loginId: request.loginId,
+    playerId: request.playerId,
     email: request.email,
     googleEmail: request.googleEmail
   });
@@ -179,10 +179,10 @@ function verifyAdminAccess(sheet, request) {
     };
   }
 
-  const normalizedAccountLoginId = normalizeId(account.loginId);
-  const adminLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
+  const normalizedAccountPlayerId = normalizeId(account.playerId);
+  const adminPlayerId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_PLAYER_ID);
 
-  if (!adminLoginId || normalizedAccountLoginId !== adminLoginId) {
+  if (!adminPlayerId || normalizedAccountPlayerId !== adminPlayerId) {
     return {
       success: false,
       message: '管理者権限がありません。'
@@ -201,7 +201,7 @@ function verifyAdminAccess(sheet, request) {
   return {
     success: true,
     message: '管理者権限が確認されました。',
-    loginId: account.loginId,
+    playerId: account.playerId,
     username: account.username,
     email: account.email,
     googleAccountEmail: request.googleEmail || account.email || ''
@@ -214,16 +214,16 @@ function updateAuthority(sheet, request) {
     return verification;
   }
 
-  const normalizedTargetLoginId = normalizeId(request.targetLoginId);
-  if (!normalizedTargetLoginId) {
+  const normalizedTargetPlayerId = normalizeId(request.targetPlayerId);
+  if (!normalizedTargetPlayerId) {
     return {
       success: false,
       message: '対象ユーザーが指定されていません。'
     };
   }
 
-  const adminLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
-  if (adminLoginId && normalizedTargetLoginId === adminLoginId) {
+  const adminPlayerId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_PLAYER_ID);
+  if (adminPlayerId && normalizedTargetPlayerId === adminPlayerId) {
     return {
       success: false,
       message: '管理者アカウントの権限は変更できません。'
@@ -246,7 +246,7 @@ function updateAuthority(sheet, request) {
     };
   }
 
-  const updateResult = applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue);
+  const updateResult = applyAuthorityUpdate(sheet, normalizedTargetPlayerId, authorityValue);
   if (!updateResult.success) {
     return updateResult;
   }
@@ -256,7 +256,7 @@ function updateAuthority(sheet, request) {
     message: updateResult.message,
     updatedAuthority: authorityValue,
     updatedAt: updateResult.updatedAt,
-    targetLoginId: updateResult.targetLoginId
+    targetPlayerId: updateResult.targetPlayerId
   };
 }
 
@@ -731,7 +731,7 @@ function getDriveImagePermissions(request) {
     return {
       success: false,
       message: 'Googleアカウント情報が指定されていません。',
-      loginId: request.loginId || ''
+      playerId: request.playerId || ''
     };
   }
 
@@ -740,14 +740,14 @@ function getDriveImagePermissions(request) {
     return {
       success: false,
       message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`,
-      loginId: request.loginId || ''
+      playerId: request.playerId || ''
     };
   }
 
   const account = findAccount(sheet, {
     googleEmail: request.googleEmail,
     email: request.email,
-    loginId: request.loginId
+    playerId: request.playerId
   });
 
   if (!account) {
@@ -757,7 +757,7 @@ function getDriveImagePermissions(request) {
       permissions: {},
       authority: null,
       role: '',
-      loginId: request.loginId || ''
+      playerId: request.playerId || ''
     };
   }
 
@@ -805,11 +805,11 @@ function getDriveImagePermissions(request) {
         : null,
     role: role || '',
     email: account.email || '',
-    loginId: account.loginId || ''
+    playerId: account.playerId || ''
   };
 }
 
-function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
+function applyAuthorityUpdate(sheet, normalizedTargetPlayerId, authorityValue) {
   const authorityColumn = AUTH_CONFIG.AUTHORITY_COLUMN;
   if (!authorityColumn) {
     return {
@@ -832,14 +832,14 @@ function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const loginIndex = AUTH_CONFIG.LOGIN_ID_COLUMN - 1;
+  const playerIndex = AUTH_CONFIG.PLAYER_ID_COLUMN - 1;
   const updatedAtColumn = AUTH_CONFIG.UPDATED_AT_COLUMN;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rowLoginId = loginIndex >= 0 ? normalizeId(row[loginIndex]) : '';
+    const rowPlayerId = playerIndex >= 0 ? normalizeId(row[playerIndex]) : '';
 
-    if (rowLoginId === normalizedTargetLoginId) {
+    if (rowPlayerId === normalizedTargetPlayerId) {
       const rowNumber = firstDataRow + i;
       sheet.getRange(rowNumber, authorityColumn).setValue(authorityValue);
 
@@ -853,7 +853,7 @@ function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
       return {
         success: true,
         message: '権限レベルを更新しました。',
-        targetLoginId: row[loginIndex] || '',
+        targetPlayerId: row[playerIndex] || '',
         updatedAuthority: authorityValue,
         updatedAt: updatedAtIso
       };
@@ -866,36 +866,38 @@ function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
   };
 }
 
-function buildRequiredLoginIds(request) {
+function buildRequiredPlayerIds(request) {
   const candidates = [];
 
-  const allowedLoginIds = Array.isArray(request.allowedLoginIds)
-    ? request.allowedLoginIds
-    : [];
-  const hasAllowedLoginIds = allowedLoginIds.length > 0;
+  const allowedIdentifiers = []
+    .concat(Array.isArray(request.allowedPlayerIds) ? request.allowedPlayerIds : [])
+    .concat(Array.isArray(request.allowedLoginIds) ? request.allowedLoginIds : []);
+  const hasAllowedPlayerIds = allowedIdentifiers.length > 0;
 
-  allowedLoginIds.forEach((value) => {
+  allowedIdentifiers.forEach((value) => {
     const normalized = normalizeId(value);
     if (normalized) {
       candidates.push(normalized);
     }
   });
 
-  const normalizedRequiredLoginId = normalizeId(request.requiredLoginId);
-  const hasExplicitRequiredLoginId = Boolean(normalizedRequiredLoginId);
-  if (normalizedRequiredLoginId) {
-    candidates.push(normalizedRequiredLoginId);
+  const normalizedRequiredPlayerId = normalizeId(
+    request.requiredPlayerId || request.requiredLoginId
+  );
+  const hasExplicitRequiredPlayerId = Boolean(normalizedRequiredPlayerId);
+  if (normalizedRequiredPlayerId) {
+    candidates.push(normalizedRequiredPlayerId);
   }
 
-  const normalizedLoginId = normalizeId(request.loginId);
-  if (normalizedLoginId) {
-    candidates.push(normalizedLoginId);
+  const normalizedPlayerId = normalizeId(request.playerId);
+  if (normalizedPlayerId) {
+    candidates.push(normalizedPlayerId);
   }
 
-  if (!hasAllowedLoginIds && !hasExplicitRequiredLoginId) {
-    const defaultLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
-    if (defaultLoginId) {
-      candidates.push(defaultLoginId);
+  if (!hasAllowedPlayerIds && !hasExplicitRequiredPlayerId) {
+    const defaultPlayerId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_PLAYER_ID);
+    if (defaultPlayerId) {
+      candidates.push(defaultPlayerId);
     }
   }
 
@@ -915,12 +917,28 @@ function parseRequest(e) {
   const data = parseRequestData(e);
   return {
     action: data.action,
-    loginId: data.loginId || data.expectedLoginId || '',
+    playerId:
+      data.playerId ||
+      data.loginId ||
+      data.expectedPlayerId ||
+      data.expectedLoginId ||
+      '',
     email: data.email || '',
     googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
-    requiredLoginId: data.requiredLoginId || data.expectedLoginId || '',
+    requiredPlayerId:
+      data.requiredPlayerId ||
+      data.requiredLoginId ||
+      data.expectedPlayerId ||
+      data.expectedLoginId ||
+      '',
+    allowedPlayerIds: Array.isArray(data.allowedPlayerIds) ? data.allowedPlayerIds : [],
     allowedLoginIds: Array.isArray(data.allowedLoginIds) ? data.allowedLoginIds : [],
-    targetLoginId: data.targetLoginId || data.memberLoginId || '',
+    targetPlayerId:
+      data.targetPlayerId ||
+      data.targetLoginId ||
+      data.memberPlayerId ||
+      data.memberLoginId ||
+      '',
     authority: data.authority !== undefined ? data.authority : data.role,
     toolbarStates: data.toolbarStates,
     toolbarKeys: data.toolbarKeys,
@@ -1001,10 +1019,10 @@ function findAccount(sheet, identifiers) {
   const values = range.getValues();
 
   const normalizedGoogleEmail = normalizeId(identifiers.googleEmail);
-  const normalizedLoginId = normalizeId(identifiers.loginId);
+  const normalizedPlayerId = normalizeId(identifiers.playerId);
   const normalizedEmail = normalizeId(identifiers.email);
 
-  const loginIndex = AUTH_CONFIG.LOGIN_ID_COLUMN - 1;
+  const playerIndex = AUTH_CONFIG.PLAYER_ID_COLUMN - 1;
   const usernameIndex = AUTH_CONFIG.USERNAME_COLUMN - 1;
   const emailIndex = AUTH_CONFIG.EMAIL_COLUMN - 1;
 
@@ -1014,21 +1032,21 @@ function findAccount(sheet, identifiers) {
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rowLoginId = loginIndex >= 0 ? normalizeId(row[loginIndex]) : '';
+    const rowPlayerId = playerIndex >= 0 ? normalizeId(row[playerIndex]) : '';
     const rowEmail = emailIndex >= 0 ? normalizeId(row[emailIndex]) : '';
 
     if (normalizedGoogleEmail && rowEmail === normalizedGoogleEmail) {
       return {
-        loginId: row[loginIndex] || '',
+        playerId: row[playerIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
         email: row[emailIndex] || '',
         authority: authorityIndex >= 0 ? row[authorityIndex] : null
       };
     }
 
-    if (normalizedLoginId && rowLoginId === normalizedLoginId) {
+    if (normalizedPlayerId && rowPlayerId === normalizedPlayerId) {
       return {
-        loginId: row[loginIndex] || '',
+        playerId: row[playerIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
         email: row[emailIndex] || '',
         authority: authorityIndex >= 0 ? row[authorityIndex] : null
@@ -1037,7 +1055,7 @@ function findAccount(sheet, identifiers) {
 
     if (normalizedEmail && rowEmail === normalizedEmail) {
       return {
-        loginId: row[loginIndex] || '',
+        playerId: row[playerIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
         email: row[emailIndex] || '',
         authority: authorityIndex >= 0 ? row[authorityIndex] : null
@@ -1055,11 +1073,11 @@ function buildResponse(result, origin) {
   };
 
   const optionalFields = [
-    'loginId',
+    'playerId',
     'username',
     'email',
     'googleAccountEmail',
-    'targetLoginId',
+    'targetPlayerId',
     'updatedAuthority',
     'updatedAt',
     'toolbarConfig',
