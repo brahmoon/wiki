@@ -3,14 +3,14 @@ const CONFIG = {
   SHEET_NAME: 'Accounts',
   HEADER_ROW_INDEX: 1,
   COLUMNS: {
-    loginId: 1,
+    playerId: 1,
     username: 2,
     email: 3,
     kingdom: 4,
     language: 5,
     authority: 6,
   },
-  LOGIN_ID_COLUMN: 1,
+  PLAYER_ID_COLUMN: 1,
   USERNAME_COLUMN: 2,
   EMAIL_COLUMN: 3,
   ALLOWED_ORIGINS: [
@@ -41,10 +41,10 @@ function doPost(e) {
       }, origin);
     }
 
-    if (!requestData.loginId && !requestData.email) {
+    if (!requestData.playerId && !requestData.email) {
       return buildResponse({
         success: false,
-        message: 'ログインIDが指定されていません。',
+        message: 'PlayerIDが指定されていません。',
       }, origin);
     }
 
@@ -57,21 +57,21 @@ function doPost(e) {
     }
 
     const record = findAccount(sheet, {
-      loginId: requestData.loginId,
+      playerId: requestData.playerId,
       email: requestData.email,
     });
 
     if (!record) {
       return buildResponse({
         success: false,
-        message: '指定されたログインIDは登録されていません。',
+        message: '指定されたPlayerIDは登録されていません。',
       }, origin);
     }
 
     return buildResponse({
       success: true,
       message: '認証に成功しました。',
-      loginId: record.loginId,
+      playerId: record.playerId,
       username: record.username,
       email: record.email,
       kingdom: record.kingdom,
@@ -90,7 +90,7 @@ function parseRequest(e) {
   const data = parseRequestData(e);
   return {
     action: data.action,
-    loginId: data.loginId || data.googleEmail || data.email || '',
+    playerId: data.playerId || data.loginId || data.googleEmail || data.email || '',
     email: data.email || data.googleEmail || '',
     name: data.name || data.googleName || '',
   };
@@ -150,10 +150,10 @@ function findAccount(sheet, identifiers) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const normalizedLoginId = normalizeId(identifiers.loginId);
+  const normalizedPlayerId = normalizeId(identifiers.playerId);
   const normalizedEmail = normalizeId(identifiers.email);
   const columns = CONFIG.COLUMNS || {};
-  const loginIndex = (columns.loginId || CONFIG.LOGIN_ID_COLUMN) - 1;
+  const playerIndex = (columns.playerId || CONFIG.PLAYER_ID_COLUMN) - 1;
   const usernameIndex = (columns.username || CONFIG.USERNAME_COLUMN) - 1;
   const emailIndex = (columns.email || CONFIG.EMAIL_COLUMN) - 1;
   const kingdomIndex = typeof columns.kingdom === 'number' ? columns.kingdom - 1 : -1;
@@ -162,12 +162,12 @@ function findAccount(sheet, identifiers) {
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rowLoginId = normalizeId(row[loginIndex]);
+    const rowPlayerId = normalizeId(row[playerIndex]);
     const rowEmail = emailIndex >= 0 ? normalizeId(row[emailIndex]) : '';
 
-    if (normalizedLoginId && rowLoginId && rowLoginId === normalizedLoginId) {
+    if (normalizedPlayerId && rowPlayerId && rowPlayerId === normalizedPlayerId) {
       return {
-        loginId: row[loginIndex],
+        playerId: row[playerIndex],
         username: row[usernameIndex] || '',
         email: emailIndex >= 0 ? row[emailIndex] || '' : identifiers.email || '',
         kingdom: kingdomIndex >= 0 ? row[kingdomIndex] || '' : '',
@@ -178,7 +178,7 @@ function findAccount(sheet, identifiers) {
 
     if (normalizedEmail && rowEmail && rowEmail === normalizedEmail) {
       return {
-        loginId: row[loginIndex] || identifiers.loginId || identifiers.email,
+        playerId: row[playerIndex] || identifiers.playerId || '',
         username: row[usernameIndex] || '',
         email: row[emailIndex] || identifiers.email || '',
         kingdom: kingdomIndex >= 0 ? row[kingdomIndex] || '' : '',
@@ -195,7 +195,7 @@ function buildResponse(result, origin) {
   const output = {
     success: Boolean(result.success),
     message: result.message || '',
-    loginId: result.loginId || null,
+    playerId: result.playerId || null,
     username: result.username || null,
     email: result.email || null,
     kingdom: typeof result.kingdom !== 'undefined' ? result.kingdom : null,

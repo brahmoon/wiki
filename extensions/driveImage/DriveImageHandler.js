@@ -718,9 +718,6 @@ export class DriveImageHandler {
     const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
       .toString()
       .trim();
-    const loginId = (options?.userLoginId || '')
-      .toString()
-      .trim();
 
     if (!endpoint || !googleEmail) {
       return { permissions: {}, authority: null, role: '' };
@@ -732,10 +729,6 @@ export class DriveImageHandler {
         googleEmail,
         email: googleEmail
       };
-
-      if (loginId) {
-        payload.loginId = loginId;
-      }
 
       const response = await fetch(endpoint, {
         method: 'POST',

@@ -37,10 +37,10 @@ The editor runtime requests permissions through the `getDriveImagePermissions` a
 ## Admin Workflow
 
 1. Administrators visit the 権限管理 page (`setting.html?page=authority`).
-2. The UI fetches the current folder catalog (`action=folders`) and existing authorities via the authorization endpoint.
+2. The UI fetches the current folder catalog (`action=folders`) and existing authorities via the authorization endpoint. Each request includes the administrator’s Google account email and the short-lived `adminToken` issued during login (see `docs/admin-auth.md`).
 3. Admins select either the **Editor** or **Moderator** role, then toggle upload/delete checkboxes per folder.
-4. Clicking **保存** sends an `updateDriveImageAuthorities` request. The Apps Script validates admin access, writes the data to the `Authorities` sheet, and returns the normalized record set.
-5. On success, the UI refreshes the in-memory state and displays confirmation.
+4. Clicking **保存** sends an `updateDriveImageAuthorities` request. The Apps Script validates admin access, writes the data to the `Authorities` sheet, and returns the normalized record set alongside a refreshed `adminToken`.
+5. On success, the UI refreshes the in-memory state, persists the updated admin session, and displays confirmation.
 
 ## Editor Experience
 

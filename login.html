@@ -286,7 +286,7 @@
                 : '';
             const displayName = user.username || user.name;
             const googleName = user.username && user.name ? `<div class="profile-username">Google表示名: ${user.name}</div>` : '';
-            const loginIdRow = user.loginId ? `<div class="profile-login-id">ログインID: ${user.loginId}</div>` : '';
+            const playerIdRow = user.playerId ? `<div class="profile-login-id">PlayerID: ${user.playerId}</div>` : '';
             const kingdomRow = user.kingdom ? `<div class="profile-kingdom">所属王国: ${user.kingdom}</div>` : '';
             const languageValue = user.language ? user.language.toUpperCase() : '';
             const languageRow = languageValue ? `<div class="profile-language">言語: ${languageValue}</div>` : '';
@@ -295,7 +295,7 @@
                 <div>
                     <div class="profile-name">${displayName}</div>
                     ${googleName}
-                    ${loginIdRow}
+                    ${playerIdRow}
                     <div class="profile-email">${user.email}</div>
                     ${kingdomRow}
                     ${languageRow}
@@ -350,10 +350,10 @@
             localStorage.setItem(CONFIG.LOGIN_STORAGE_KEY, JSON.stringify(loginState));
         };
 
-        const verifyLoginId = async (user) => {
+        const verifyPlayerId = async (user) => {
             const payload = {
                 action: 'verifyLogin',
-                loginId: user.email,
+                playerId: '',
                 email: user.email,
                 googleEmail: user.email,
                 name: user.name,
@@ -377,7 +377,7 @@
                 : '';
 
             return {
-                loginId: result.loginId || user.email,
+                playerId: result.playerId || '',
                 username: result.username || user.name,
                 email: result.email || user.email,
                 kingdom: kingdomValue,
@@ -415,11 +415,11 @@
                 }
                 const user = await userResponse.json();
                 setStatus('アカウントを確認しています...');
-                const verified = await verifyLoginId(user);
+                const verified = await verifyPlayerId(user);
                 const verifiedUser = {
                     ...user,
                     username: verified.username,
-                    loginId: verified.loginId,
+                    playerId: verified.playerId,
                     email: verified.email,
                     kingdom: verified.kingdom,
                     language: verified.language,

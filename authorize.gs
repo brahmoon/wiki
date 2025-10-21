@@ -2,7 +2,7 @@ const AUTH_CONFIG = {
   SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
   SHEET_NAME: 'Accounts',
   HEADER_ROW_INDEX: 1,
-  LOGIN_ID_COLUMN: 1,
+  PLAYER_ID_COLUMN: 1,
   USERNAME_COLUMN: 2,
   EMAIL_COLUMN: 3,
   AUTHORITY_COLUMN: 6,
@@ -12,8 +12,7 @@ const AUTH_CONFIG = {
     'https://brahmoon.github.io',
     'http://localhost:3000',
     'http://localhost:4173'
-  ],
-  DEFAULT_REQUIRED_LOGIN_ID: 'admin'
+  ]
 };
 
 const PLUGIN_CONFIG = {
@@ -52,12 +51,9 @@ const AUTHORITIES_CONFIG = {
 const DRIVE_IMAGE_ADMIN_ROLE = typeof ADMINISTRATOR_ROLE !== 'undefined'
   ? ADMINISTRATOR_ROLE
   : 'Administrator';
-// Determine the numeric baseline for administrator privileges. If the host
-// project exposes ADMIN_AUTHORITY_VALUE we honour it, otherwise we derive the
-// highest configured authority level so numeric accounts (e.g. authority=3)
-// continue to map to the administrator role instead of falling back to
-// Moderator.
-const DRIVE_IMAGE_ADMIN_AUTHORITY = (function resolveAdminAuthorityBaseline() {
+// Determine the numeric baseline for administrator privileges. Administrators
+// must meet or exceed this threshold before privileged actions are executed.
+const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminAuthorityBaseline() {
   if (typeof ADMIN_AUTHORITY_VALUE !== 'undefined') {
     const explicit = parseAuthorityValue(ADMIN_AUTHORITY_VALUE);
     if (explicit !== null) {
@@ -65,20 +61,18 @@ const DRIVE_IMAGE_ADMIN_AUTHORITY = (function resolveAdminAuthorityBaseline() {
     }
   }
 
-  let highestConfiguredAuthority = null;
-  if (AUTH_CONFIG && Array.isArray(AUTH_CONFIG.ALLOWED_UPDATE_AUTHORITY_VALUES)) {
-    AUTH_CONFIG.ALLOWED_UPDATE_AUTHORITY_VALUES.forEach((value) => {
-      const numeric = parseAuthorityValue(value);
-      if (numeric !== null) {
-        if (highestConfiguredAuthority === null || numeric > highestConfiguredAuthority) {
-          highestConfiguredAuthority = numeric;
-        }
-      }
-    });
-  }
-
-  return highestConfiguredAuthority !== null ? highestConfiguredAuthority : 99;
+  return 99;
 })();
+
+const ADMIN_TOKEN_CONFIG = {
+  EXPIRATION_MS: 5 * 60 * 1000,
+  SECRET_PROPERTY_KEY: 'ADMIN_TOKEN_SECRET',
+  SECRET_CACHE_TTL_MS: 30 * 60 * 1000
+};
+
+let cachedAdminTokenSecret = null;
+let cachedAdminTokenSecretFetchedAt = 0;
+const DRIVE_IMAGE_ADMIN_AUTHORITY = ADMIN_AUTHORITY_THRESHOLD;
 const DRIVE_IMAGE_ROLES = Array.from(new Set([
   DRIVE_IMAGE_ADMIN_ROLE,
   'Moderator',
@@ -114,27 +108,53 @@ function doPost(e) {
       );
     }
 
+    let adminVerification = null;
+    const ADMIN_ACTIONS = {
+      updateAuthority: true,
+      getToolbarPlugins: true,
+      updateToolbarPlugins: true,
+      getDriveImageAuthorities: true,
+      updateDriveImageAuthorities: true
+    };
+
+    if (Object.prototype.hasOwnProperty.call(ADMIN_ACTIONS, action)) {
+      adminVerification = verifyAdminAccess(sheet, request);
+      if (!adminVerification.success) {
+        return buildResponse(adminVerification, origin);
+      }
+      request.__adminVerification = adminVerification;
+    }
+
     let result;
 
-    if (action === 'verifyAdminAccess') {
-      result = verifyAdminAccess(sheet, request);
-    } else if (action === 'updateAuthority') {
-      result = updateAuthority(sheet, request);
-    } else if (action === 'getToolbarPlugins') {
-      result = getToolbarPlugins();
-    } else if (action === 'updateToolbarPlugins') {
-      result = updateToolbarPlugins(sheet, request);
-    } else if (action === 'getDriveImageAuthorities') {
-      result = getDriveImageAuthorities(sheet, request);
-    } else if (action === 'updateDriveImageAuthorities') {
-      result = updateDriveImageAuthorities(sheet, request);
-    } else if (action === 'getDriveImagePermissions') {
-      result = getDriveImagePermissions(request);
-    } else {
-      result = {
-        success: false,
-        message: `Unknown action: ${action}`
-      };
+    switch (action) {
+      case 'verifyAdminAccess':
+        result = adminVerification || verifyAdminAccess(sheet, request);
+        break;
+      case 'updateAuthority':
+        result = updateAuthority(sheet, request, adminVerification);
+        break;
+      case 'getToolbarPlugins':
+        result = getToolbarPlugins(sheet, request, adminVerification);
+        break;
+      case 'updateToolbarPlugins':
+        result = updateToolbarPlugins(sheet, request, adminVerification);
+        break;
+      case 'getDriveImageAuthorities':
+        result = getDriveImageAuthorities(sheet, request, adminVerification);
+        break;
+      case 'updateDriveImageAuthorities':
+        result = updateDriveImageAuthorities(sheet, request, adminVerification);
+        break;
+      case 'getDriveImagePermissions':
+        result = getDriveImagePermissions(request);
+        break;
+      default:
+        result = {
+          success: false,
+          message: `Unknown action: ${action}`
+        };
+        break;
     }
 
     return buildResponse(result, origin);
@@ -155,78 +175,325 @@ function doOptions(e) {
 }
 
 function verifyAdminAccess(sheet, request) {
-  const normalizedLoginId = normalizeId(request.loginId);
-  const normalizedEmail = normalizeId(request.email);
   const normalizedGoogleEmail = normalizeId(request.googleEmail);
+  const normalizedEmail = normalizeId(request.email);
+  let lookupEmail = request.email || request.googleEmail || '';
 
-  if (!normalizedLoginId && !normalizedEmail && !normalizedGoogleEmail) {
+  const tokenStatus = validateAdminToken(
+    request.adminToken,
+    {
+      googleEmail: normalizedGoogleEmail,
+      email: normalizedEmail
+    }
+  );
+  request.__adminTokenStatus = tokenStatus;
+
+  if (tokenStatus.success && tokenStatus.email) {
+    lookupEmail = tokenStatus.email;
+  }
+
+  if (!normalizedGoogleEmail && !normalizeId(lookupEmail)) {
     return {
       success: false,
-      message: '管理者アカウント情報が不足しています。'
+      message: '管理者アカウント情報が不足しています。',
+      requiresReauthentication: true
     };
   }
 
   const account = findAccount(sheet, {
-    loginId: request.loginId,
-    email: request.email,
-    googleEmail: request.googleEmail
+    email: lookupEmail,
+    googleEmail: lookupEmail,
+    playerId: request.playerId
   });
 
   if (!account) {
     return {
       success: false,
-      message: '管理者アカウントが登録されていません。'
+      message: '管理者アカウントが登録されていません。',
+      requiresReauthentication: true
     };
   }
 
-  const normalizedAccountLoginId = normalizeId(account.loginId);
-  const adminLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
-
-  if (!adminLoginId || normalizedAccountLoginId !== adminLoginId) {
+  const authorityValue = parseAuthorityValue(account.authority);
+  if (authorityValue === null || authorityValue < ADMIN_AUTHORITY_THRESHOLD) {
     return {
       success: false,
-      message: '管理者権限がありません。'
+      message: '管理者権限がありません。',
+      authority: authorityValue
     };
   }
 
   const normalizedAccountEmail = normalizeId(account.email);
-  const normalizedRequestEmail = normalizedGoogleEmail || normalizedEmail;
-  if (normalizedRequestEmail && normalizedAccountEmail && normalizedRequestEmail !== normalizedAccountEmail) {
+  if (
+    normalizedGoogleEmail &&
+    normalizedAccountEmail &&
+    normalizedGoogleEmail !== normalizedAccountEmail
+  ) {
     return {
       success: false,
-      message: '管理者アカウントのメールアドレスが一致しません。'
+      message: '管理者アカウントのメールアドレスが一致しません。',
+      requiresReauthentication: true
+    };
+  }
+
+  const session = mintAdminSessionToken(account, authorityValue);
+
+  const result = {
+    success: true,
+    message: '管理者権限が確認されました。',
+    playerId: account.playerId,
+    username: account.username,
+    email: account.email,
+    authority: authorityValue,
+    googleAccountEmail: request.googleEmail || account.email || '',
+    adminAuthority: authorityValue,
+    adminEmail: account.email || ''
+  };
+
+  if (session) {
+    result.adminToken = session.token;
+    result.adminTokenIssuedAt = session.issuedAt;
+    result.adminTokenExpiresAt = session.expiresAt;
+  }
+
+  return result;
+}
+
+function withAdminVerification(result, verification) {
+  if (!result || !verification || !verification.success) {
+    return result;
+  }
+
+  if (verification.adminToken) {
+    result.adminToken = verification.adminToken;
+  }
+  if (verification.adminTokenIssuedAt) {
+    result.adminTokenIssuedAt = verification.adminTokenIssuedAt;
+  }
+  if (verification.adminTokenExpiresAt) {
+    result.adminTokenExpiresAt = verification.adminTokenExpiresAt;
+  }
+  if (Object.prototype.hasOwnProperty.call(verification, 'adminAuthority')) {
+    result.adminAuthority = verification.adminAuthority;
+  }
+  if (verification.adminEmail) {
+    result.adminEmail = verification.adminEmail;
+  }
+
+  return result;
+}
+
+function mintAdminSessionToken(account, authorityValue) {
+  if (!account) {
+    return null;
+  }
+
+  const normalizedEmail = normalizeId(account.email);
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const secret = getAdminTokenSecret();
+  if (!secret) {
+    return null;
+  }
+
+  const issuedAt = Date.now();
+  const expiresAt = issuedAt + ADMIN_TOKEN_CONFIG.EXPIRATION_MS;
+
+  const claims = {
+    email: account.email || '',
+    normalizedEmail,
+    playerId: account.playerId || '',
+    username: account.username || '',
+    authority: authorityValue,
+    issuedAt,
+    expiresAt
+  };
+
+  const signature = computeAdminTokenSignature(claims, secret);
+  const payload = Object.assign({}, claims, { signature });
+
+  const token = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
+
+  return {
+    token,
+    issuedAt: new Date(issuedAt).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString()
+  };
+}
+
+function validateAdminToken(token, expectedEmails) {
+  if (!token) {
+    return { success: false, reason: 'missing' };
+  }
+
+  let decoded;
+  try {
+    decoded = Utilities.base64DecodeWebSafe(token);
+  } catch (error) {
+    return { success: false, reason: 'invalid' };
+  }
+
+  let json;
+  try {
+    json = Utilities.newBlob(decoded).getDataAsString('utf-8');
+  } catch (error) {
+    return { success: false, reason: 'invalid' };
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(json);
+  } catch (error) {
+    return { success: false, reason: 'invalid' };
+  }
+
+  const normalizedEmail = normalizeId(payload.normalizedEmail || payload.email);
+  if (!normalizedEmail) {
+    return { success: false, reason: 'invalid' };
+  }
+
+  const issuedAt = Number(payload.issuedAt);
+  const expiresAt = Number(payload.expiresAt);
+  const authorityValue = parseAuthorityValue(payload.authority);
+
+  if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
+    return {
+      success: false,
+      reason: 'expired',
+      email: payload.email || '',
+      normalizedEmail,
+      issuedAt,
+      expiresAt,
+      authority: authorityValue
+    };
+  }
+
+  const secret = getAdminTokenSecret();
+  if (!secret) {
+    return { success: false, reason: 'invalid' };
+  }
+
+  const claims = {
+    email: payload.email || '',
+    normalizedEmail,
+    playerId: payload.playerId || '',
+    username: payload.username || '',
+    authority: authorityValue,
+    issuedAt,
+    expiresAt
+  };
+
+  const expectedSignature = computeAdminTokenSignature(claims, secret);
+  if (!payload.signature || payload.signature !== expectedSignature) {
+    return { success: false, reason: 'invalid' };
+  }
+
+  const expectedEmailCandidate = expectedEmails && typeof expectedEmails === 'object'
+    ? expectedEmails.googleEmail || expectedEmails.email || ''
+    : expectedEmails;
+  const normalizedExpected = normalizeId(expectedEmailCandidate);
+
+  if (normalizedExpected && normalizedEmail !== normalizedExpected) {
+    return {
+      success: false,
+      reason: 'mismatch',
+      email: payload.email || '',
+      normalizedEmail,
+      issuedAt,
+      expiresAt,
+      authority: authorityValue
     };
   }
 
   return {
     success: true,
-    message: '管理者権限が確認されました。',
-    loginId: account.loginId,
-    username: account.username,
-    email: account.email,
-    googleAccountEmail: request.googleEmail || account.email || ''
+    email: payload.email || '',
+    normalizedEmail,
+    issuedAt,
+    expiresAt,
+    authority: authorityValue
   };
 }
 
-function updateAuthority(sheet, request) {
-  const verification = verifyAdminAccess(sheet, request);
+function computeAdminTokenSignature(claims, secret) {
+  const normalizedEmail = normalizeId(claims.normalizedEmail || claims.email);
+  const parts = [
+    normalizedEmail,
+    (claims.playerId || '').toString(),
+    (claims.username || '').toString(),
+    claims.authority === null || claims.authority === undefined
+      ? ''
+      : claims.authority.toString(),
+    claims.issuedAt === undefined || claims.issuedAt === null
+      ? ''
+      : claims.issuedAt.toString(),
+    claims.expiresAt === undefined || claims.expiresAt === null
+      ? ''
+      : claims.expiresAt.toString()
+  ];
+
+  const payload = parts.join(':');
+  const signatureBytes = Utilities.computeHmacSha256Signature(payload, secret);
+  return Utilities.base64EncodeWebSafe(signatureBytes);
+}
+
+function getAdminTokenSecret() {
+  const now = Date.now();
+  if (
+    cachedAdminTokenSecret &&
+    now - cachedAdminTokenSecretFetchedAt < ADMIN_TOKEN_CONFIG.SECRET_CACHE_TTL_MS
+  ) {
+    return cachedAdminTokenSecret;
+  }
+
+  if (typeof Utilities === 'undefined') {
+    return null;
+  }
+
+  if (typeof PropertiesService === 'undefined') {
+    cachedAdminTokenSecret = Utilities.getUuid();
+    cachedAdminTokenSecretFetchedAt = now;
+    return cachedAdminTokenSecret;
+  }
+
+  const properties = PropertiesService.getScriptProperties();
+  let secret = properties ? properties.getProperty(ADMIN_TOKEN_CONFIG.SECRET_PROPERTY_KEY) : null;
+
+  if (!secret) {
+    secret = generateAdminTokenSecret();
+    if (properties) {
+      properties.setProperty(ADMIN_TOKEN_CONFIG.SECRET_PROPERTY_KEY, secret);
+    }
+  }
+
+  cachedAdminTokenSecret = secret;
+  cachedAdminTokenSecretFetchedAt = now;
+  return cachedAdminTokenSecret;
+}
+
+function generateAdminTokenSecret() {
+  const uuid = Utilities.getUuid();
+  const timestamp = Date.now().toString();
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    uuid + ':' + timestamp
+  );
+  return Utilities.base64EncodeWebSafe(digest);
+}
+
+function updateAuthority(sheet, request, adminVerification) {
+  const verification = adminVerification || verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
 
-  const normalizedTargetLoginId = normalizeId(request.targetLoginId);
-  if (!normalizedTargetLoginId) {
+  const normalizedTargetPlayerId = normalizeId(request.targetPlayerId);
+  if (!normalizedTargetPlayerId) {
     return {
       success: false,
       message: '対象ユーザーが指定されていません。'
-    };
-  }
-
-  const adminLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
-  if (adminLoginId && normalizedTargetLoginId === adminLoginId) {
-    return {
-      success: false,
-      message: '管理者アカウントの権限は変更できません。'
     };
   }
 
@@ -246,18 +513,18 @@ function updateAuthority(sheet, request) {
     };
   }
 
-  const updateResult = applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue);
+  const updateResult = applyAuthorityUpdate(sheet, normalizedTargetPlayerId, authorityValue);
   if (!updateResult.success) {
     return updateResult;
   }
 
-  return {
+  return withAdminVerification({
     success: true,
     message: updateResult.message,
     updatedAuthority: authorityValue,
     updatedAt: updateResult.updatedAt,
-    targetLoginId: updateResult.targetLoginId
-  };
+    targetPlayerId: updateResult.targetPlayerId
+  }, verification);
 }
 
 function parseAuthorityValue(value) {
@@ -281,17 +548,22 @@ function parseAuthorityValue(value) {
   return null;
 }
 
-function getToolbarPlugins() {
+function getToolbarPlugins(sheet, request, adminVerification) {
+  const verification = adminVerification || verifyAdminAccess(sheet, request);
+  if (!verification.success) {
+    return verification;
+  }
+
   const states = loadToolbarStates();
-  return {
+  return withAdminVerification({
     success: true,
     message: 'Toolbar plugin states retrieved.',
     toolbarConfig: buildToolbarConfigResponse(states)
-  };
+  }, verification);
 }
 
-function updateToolbarPlugins(sheet, request) {
-  const verification = verifyAdminAccess(sheet, request);
+function updateToolbarPlugins(sheet, request, adminVerification) {
+  const verification = adminVerification || verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
@@ -306,11 +578,11 @@ function updateToolbarPlugins(sheet, request) {
 
   const savedStates = saveToolbarStates(states);
 
-  return {
+  return withAdminVerification({
     success: true,
     message: 'TipTapツールバーの設定を保存しました。',
     toolbarConfig: buildToolbarConfigResponse(savedStates)
-  };
+  }, verification);
 }
 
 function getAuthoritiesSheet(createIfMissing) {
@@ -687,23 +959,23 @@ function initializeDriveImageAuthoritiesSheet() {
   }
 }
 
-function getDriveImageAuthorities(sheet, request) {
-  const verification = verifyAdminAccess(sheet, request);
+function getDriveImageAuthorities(sheet, request, adminVerification) {
+  const verification = adminVerification || verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
 
   const authorities = readDriveImageAuthorities();
 
-  return {
+  return withAdminVerification({
     success: true,
     message: 'Drive画像の権限を取得しました。',
     authorities
-  };
+  }, verification);
 }
 
-function updateDriveImageAuthorities(sheet, request) {
-  const verification = verifyAdminAccess(sheet, request);
+function updateDriveImageAuthorities(sheet, request, adminVerification) {
+  const verification = adminVerification || verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
@@ -718,11 +990,11 @@ function updateDriveImageAuthorities(sheet, request) {
   writeDriveImageAuthorities(request.authorities);
   const updated = readDriveImageAuthorities();
 
-  return {
+  return withAdminVerification({
     success: true,
     message: 'Drive画像の権限を保存しました。',
     authorities: updated
-  };
+  }, verification);
 }
 
 function getDriveImagePermissions(request) {
@@ -731,7 +1003,7 @@ function getDriveImagePermissions(request) {
     return {
       success: false,
       message: 'Googleアカウント情報が指定されていません。',
-      loginId: request.loginId || ''
+      playerId: ''
     };
   }
 
@@ -740,14 +1012,13 @@ function getDriveImagePermissions(request) {
     return {
       success: false,
       message: `シート「${AUTH_CONFIG.SHEET_NAME}」が見つかりません。`,
-      loginId: request.loginId || ''
+      playerId: ''
     };
   }
 
   const account = findAccount(sheet, {
     googleEmail: request.googleEmail,
-    email: request.email,
-    loginId: request.loginId
+    email: request.email
   });
 
   if (!account) {
@@ -757,7 +1028,7 @@ function getDriveImagePermissions(request) {
       permissions: {},
       authority: null,
       role: '',
-      loginId: request.loginId || ''
+      playerId: ''
     };
   }
 
@@ -805,11 +1076,11 @@ function getDriveImagePermissions(request) {
         : null,
     role: role || '',
     email: account.email || '',
-    loginId: account.loginId || ''
+    playerId: account.playerId || ''
   };
 }
 
-function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
+function applyAuthorityUpdate(sheet, normalizedTargetPlayerId, authorityValue) {
   const authorityColumn = AUTH_CONFIG.AUTHORITY_COLUMN;
   if (!authorityColumn) {
     return {
@@ -832,14 +1103,14 @@ function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const loginIndex = AUTH_CONFIG.LOGIN_ID_COLUMN - 1;
+  const playerIndex = AUTH_CONFIG.PLAYER_ID_COLUMN - 1;
   const updatedAtColumn = AUTH_CONFIG.UPDATED_AT_COLUMN;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rowLoginId = loginIndex >= 0 ? normalizeId(row[loginIndex]) : '';
+    const rowPlayerId = playerIndex >= 0 ? normalizeId(row[playerIndex]) : '';
 
-    if (rowLoginId === normalizedTargetLoginId) {
+    if (rowPlayerId === normalizedTargetPlayerId) {
       const rowNumber = firstDataRow + i;
       sheet.getRange(rowNumber, authorityColumn).setValue(authorityValue);
 
@@ -853,7 +1124,7 @@ function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
       return {
         success: true,
         message: '権限レベルを更新しました。',
-        targetLoginId: row[loginIndex] || '',
+        targetPlayerId: row[playerIndex] || '',
         updatedAuthority: authorityValue,
         updatedAt: updatedAtIso
       };
@@ -866,61 +1137,32 @@ function applyAuthorityUpdate(sheet, normalizedTargetLoginId, authorityValue) {
   };
 }
 
-function buildRequiredLoginIds(request) {
-  const candidates = [];
-
-  const allowedLoginIds = Array.isArray(request.allowedLoginIds)
-    ? request.allowedLoginIds
-    : [];
-  const hasAllowedLoginIds = allowedLoginIds.length > 0;
-
-  allowedLoginIds.forEach((value) => {
-    const normalized = normalizeId(value);
-    if (normalized) {
-      candidates.push(normalized);
-    }
-  });
-
-  const normalizedRequiredLoginId = normalizeId(request.requiredLoginId);
-  const hasExplicitRequiredLoginId = Boolean(normalizedRequiredLoginId);
-  if (normalizedRequiredLoginId) {
-    candidates.push(normalizedRequiredLoginId);
-  }
-
-  const normalizedLoginId = normalizeId(request.loginId);
-  if (normalizedLoginId) {
-    candidates.push(normalizedLoginId);
-  }
-
-  if (!hasAllowedLoginIds && !hasExplicitRequiredLoginId) {
-    const defaultLoginId = normalizeId(AUTH_CONFIG.DEFAULT_REQUIRED_LOGIN_ID);
-    if (defaultLoginId) {
-      candidates.push(defaultLoginId);
-    }
-  }
-
-  const unique = {};
-  const uniqueList = [];
-  candidates.forEach((value) => {
-    if (value && !unique[value]) {
-      unique[value] = true;
-      uniqueList.push(value);
-    }
-  });
-
-  return uniqueList;
-}
-
 function parseRequest(e) {
   const data = parseRequestData(e);
   return {
     action: data.action,
-    loginId: data.loginId || data.expectedLoginId || '',
+    playerId:
+      data.playerId ||
+      data.loginId ||
+      data.expectedPlayerId ||
+      data.expectedLoginId ||
+      '',
     email: data.email || '',
     googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
-    requiredLoginId: data.requiredLoginId || data.expectedLoginId || '',
+    requiredPlayerId:
+      data.requiredPlayerId ||
+      data.requiredLoginId ||
+      data.expectedPlayerId ||
+      data.expectedLoginId ||
+      '',
+    allowedPlayerIds: Array.isArray(data.allowedPlayerIds) ? data.allowedPlayerIds : [],
     allowedLoginIds: Array.isArray(data.allowedLoginIds) ? data.allowedLoginIds : [],
-    targetLoginId: data.targetLoginId || data.memberLoginId || '',
+    targetPlayerId:
+      data.targetPlayerId ||
+      data.targetLoginId ||
+      data.memberPlayerId ||
+      data.memberLoginId ||
+      '',
     authority: data.authority !== undefined ? data.authority : data.role,
     toolbarStates: data.toolbarStates,
     toolbarKeys: data.toolbarKeys,
@@ -928,7 +1170,8 @@ function parseRequest(e) {
     role: data.role || data.targetRole || '',
     authorities: data.authorities,
     resourceType: data.resourceType || data.type || '',
-    authorityLevel: data.authorityLevel || data.authority
+    authorityLevel: data.authorityLevel || data.authority,
+    adminToken: data.adminToken || data.adminSessionToken || data.token || ''
   };
 }
 
@@ -1001,10 +1244,10 @@ function findAccount(sheet, identifiers) {
   const values = range.getValues();
 
   const normalizedGoogleEmail = normalizeId(identifiers.googleEmail);
-  const normalizedLoginId = normalizeId(identifiers.loginId);
+  const normalizedPlayerId = normalizeId(identifiers.playerId);
   const normalizedEmail = normalizeId(identifiers.email);
 
-  const loginIndex = AUTH_CONFIG.LOGIN_ID_COLUMN - 1;
+  const playerIndex = AUTH_CONFIG.PLAYER_ID_COLUMN - 1;
   const usernameIndex = AUTH_CONFIG.USERNAME_COLUMN - 1;
   const emailIndex = AUTH_CONFIG.EMAIL_COLUMN - 1;
 
@@ -1014,21 +1257,21 @@ function findAccount(sheet, identifiers) {
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rowLoginId = loginIndex >= 0 ? normalizeId(row[loginIndex]) : '';
+    const rowPlayerId = playerIndex >= 0 ? normalizeId(row[playerIndex]) : '';
     const rowEmail = emailIndex >= 0 ? normalizeId(row[emailIndex]) : '';
 
     if (normalizedGoogleEmail && rowEmail === normalizedGoogleEmail) {
       return {
-        loginId: row[loginIndex] || '',
+        playerId: row[playerIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
         email: row[emailIndex] || '',
         authority: authorityIndex >= 0 ? row[authorityIndex] : null
       };
     }
 
-    if (normalizedLoginId && rowLoginId === normalizedLoginId) {
+    if (normalizedPlayerId && rowPlayerId === normalizedPlayerId) {
       return {
-        loginId: row[loginIndex] || '',
+        playerId: row[playerIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
         email: row[emailIndex] || '',
         authority: authorityIndex >= 0 ? row[authorityIndex] : null
@@ -1037,7 +1280,7 @@ function findAccount(sheet, identifiers) {
 
     if (normalizedEmail && rowEmail === normalizedEmail) {
       return {
-        loginId: row[loginIndex] || '',
+        playerId: row[playerIndex] || '',
         username: usernameIndex >= 0 ? row[usernameIndex] || '' : '',
         email: row[emailIndex] || '',
         authority: authorityIndex >= 0 ? row[authorityIndex] : null
@@ -1055,18 +1298,24 @@ function buildResponse(result, origin) {
   };
 
   const optionalFields = [
-    'loginId',
+    'playerId',
     'username',
     'email',
     'googleAccountEmail',
-    'targetLoginId',
+    'targetPlayerId',
     'updatedAuthority',
     'updatedAt',
     'toolbarConfig',
     'authorities',
     'permissions',
     'authority',
-    'role'
+    'role',
+    'adminToken',
+    'adminTokenIssuedAt',
+    'adminTokenExpiresAt',
+    'adminAuthority',
+    'adminEmail',
+    'requiresReauthentication'
   ];
 
   optionalFields.forEach(function(field) {
