@@ -18,6 +18,17 @@ const CONFIG = {
   ],
 };
 
+const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminAuthorityBaseline() {
+  if (typeof ADMIN_AUTHORITY_VALUE !== 'undefined') {
+    const explicit = parseAuthorityValue(ADMIN_AUTHORITY_VALUE);
+    if (explicit !== null) {
+      return explicit;
+    }
+  }
+
+  return 99;
+})();
+
 function doGet(e) {
   return createJsonOutput(
     {
@@ -79,7 +90,53 @@ function doOptions(e) {
   return createPreflightResponse(getRequestOrigin(e));
 }
 
+function requireAdminAuthority(sheet, request) {
+  const safeRequest = request || {};
+  const normalizedGoogleEmail = normalizeId(safeRequest.googleEmail);
+  const normalizedEmail = normalizeId(safeRequest.email);
+  const lookupEmail = normalizedGoogleEmail || normalizedEmail;
+
+  if (!lookupEmail) {
+    return {
+      success: false,
+      message: '管理者アカウント情報が不足しています。',
+    };
+  }
+
+  const account = findAccount(sheet, {
+    email: safeRequest.email || safeRequest.googleEmail || '',
+    googleEmail: safeRequest.googleEmail || safeRequest.email || '',
+  });
+
+  if (!account) {
+    return {
+      success: false,
+      message: '管理者アカウントが登録されていません。',
+    };
+  }
+
+  const authorityValue = parseAuthorityValue(account.authority);
+  if (authorityValue === null || authorityValue < ADMIN_AUTHORITY_THRESHOLD) {
+    return {
+      success: false,
+      message: '管理者権限がありません。',
+      authority: authorityValue,
+    };
+  }
+
+  return {
+    success: true,
+    authority: authorityValue,
+    account,
+  };
+}
+
 function handleListMembers(sheet, request) {
+  const adminVerification = requireAdminAuthority(sheet, request);
+  if (!adminVerification.success) {
+    return adminVerification;
+  }
+
   const firstDataRow = CONFIG.HEADER_ROW_INDEX + 1;
   const lastRow = sheet.getLastRow();
 
@@ -322,7 +379,10 @@ function parseRequest(e) {
     limit: parsePositiveInteger(data.limit),
     offset: parsePositiveInteger(data.offset),
     playerId: data.playerId || data.loginId || data.email || '',
-    email: data.email || '',
+    email: data.email ? data.email.toString().trim() : '',
+    googleEmail: normalizeId(
+      data.googleEmail || data.googleAccountEmail || data.email || ''
+    ),
     username: data.username || data.name || '',
     kingdom: data.kingdom,
     language: data.language,
@@ -405,16 +465,7 @@ function sanitizeLanguage(value) {
 }
 
 function sanitizeAuthority(value) {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    return null;
-  }
-
-  return number;
+  return parseAuthorityValue(value);
 }
 
 function normalizeId(value) {
@@ -434,8 +485,10 @@ function findAccount(sheet, identifiers) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const normalizedPlayerId = normalizeId(identifiers.playerId);
-  const normalizedEmail = normalizeId(identifiers.email);
+  const safeIdentifiers = identifiers || {};
+  const normalizedPlayerId = normalizeId(safeIdentifiers.playerId);
+  const normalizedEmail = normalizeId(safeIdentifiers.email);
+  const normalizedGoogleEmail = normalizeId(safeIdentifiers.googleEmail);
   const columns = CONFIG.COLUMNS;
 
   for (let i = 0; i < values.length; i++) {
@@ -444,18 +497,20 @@ function findAccount(sheet, identifiers) {
     const rowEmail = columns.email ? normalizeId(row[columns.email - 1]) : '';
 
     const playerMatch = normalizedPlayerId && rowPlayerId && rowPlayerId === normalizedPlayerId;
-    const emailMatch = normalizedEmail && rowEmail && rowEmail === normalizedEmail;
+    const emailMatch =
+      (normalizedEmail && rowEmail && rowEmail === normalizedEmail) ||
+      (normalizedGoogleEmail && rowEmail && rowEmail === normalizedGoogleEmail);
 
     if (playerMatch || emailMatch) {
       return {
         rowNumber: firstDataRow + i,
         values: row,
-        playerId: columns.playerId ? row[columns.playerId - 1] : identifiers.playerId || '',
+        playerId: columns.playerId ? row[columns.playerId - 1] : safeIdentifiers.playerId || '',
         username: columns.username ? row[columns.username - 1] || '' : '',
         email:
           columns.email && row[columns.email - 1]
             ? row[columns.email - 1]
-            : identifiers.email || '',
+            : safeIdentifiers.email || '',
         kingdom: columns.kingdom ? row[columns.kingdom - 1] || '' : '',
         language: columns.language ? sanitizeLanguage(row[columns.language - 1]) : 'ja',
         authority: columns.authority ? sanitizeAuthority(row[columns.authority - 1]) : null,
@@ -464,6 +519,19 @@ function findAccount(sheet, identifiers) {
   }
 
   return null;
+}
+
+function parseAuthorityValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  return number;
 }
 
 function formatDateValue(value) {
