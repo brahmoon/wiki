@@ -3,7 +3,7 @@ const CONFIG = {
   SHEET_NAME: 'Accounts',
   HEADER_ROW_INDEX: 1,
   COLUMNS: {
-    loginId: 1,
+    playerId: 1,
     username: 2,
     email: 3,
     kingdom: 4,
@@ -105,7 +105,7 @@ function handleListMembers(sheet, request) {
 
   values.forEach((row) => {
     const record = {
-      loginId: getColumnValue(row, columns.loginId),
+      playerId: getColumnValue(row, columns.playerId),
       username: getColumnValue(row, columns.username),
       email: getColumnValue(row, columns.email),
       kingdom: sanitizeKingdom(getColumnValue(row, columns.kingdom)),
@@ -119,7 +119,7 @@ function handleListMembers(sheet, request) {
       return;
     }
 
-    const haystacks = [record.loginId, record.username, record.email]
+    const haystacks = [record.playerId, record.username, record.email]
       .map(function (value) {
         return (value || '').toString().trim().toLowerCase();
       })
@@ -149,10 +149,10 @@ function handleListMembers(sheet, request) {
 }
 
 function handleGetUserSettings(sheet, request) {
-  if (!request.loginId && !request.email) {
+  if (!request.playerId && !request.email) {
     return {
       success: false,
-      message: 'ログインIDまたはメールアドレスを指定してください。',
+      message: 'PlayerIDまたはメールアドレスを指定してください。',
     };
   }
 
@@ -167,7 +167,7 @@ function handleGetUserSettings(sheet, request) {
   return {
     success: true,
     message: 'ユーザー設定を取得しました。',
-    loginId: record.loginId,
+    playerId: record.playerId,
     username: record.username,
     email: record.email,
     kingdom: record.kingdom,
@@ -177,10 +177,10 @@ function handleGetUserSettings(sheet, request) {
 }
 
 function handleUpdateUserSettings(sheet, request) {
-  if (!request.loginId && !request.email) {
+  if (!request.playerId && !request.email) {
     return {
       success: false,
-      message: 'ログインIDまたはメールアドレスを指定してください。',
+      message: 'PlayerIDまたはメールアドレスを指定してください。',
     };
   }
 
@@ -228,7 +228,7 @@ function handleUpdateUserSettings(sheet, request) {
   return {
     success: true,
     message: 'ユーザー設定を更新しました。',
-    loginId: updatedValues[columns.loginId - 1] || record.loginId,
+    playerId: updatedValues[columns.playerId - 1] || record.playerId,
     username: updatedValues[columns.username - 1] || normalizedUsername,
     email: columns.email ? updatedValues[columns.email - 1] || record.email : record.email,
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
@@ -254,10 +254,10 @@ function handleRegisterUser(sheet, request) {
     };
   }
 
-  const loginId = (request.loginId || email).toString().trim() || email;
+  const playerId = (request.playerId || '').toString().trim();
 
   const existingAccount = findAccount(sheet, {
-    loginId: loginId,
+    playerId: playerId,
     email: email,
   });
 
@@ -265,7 +265,7 @@ function handleRegisterUser(sheet, request) {
     return {
       success: false,
       message: 'このメールアドレスはすでに登録されています。',
-      loginId: existingAccount.loginId,
+      playerId: existingAccount.playerId,
       username: existingAccount.username,
       email: existingAccount.email,
       authority: existingAccount.authority,
@@ -278,8 +278,8 @@ function handleRegisterUser(sheet, request) {
   const lastColumn = sheet.getLastColumn();
   const newRowValues = new Array(Math.max(lastColumn, 1)).fill('');
 
-  if (columns.loginId) {
-    newRowValues[columns.loginId - 1] = loginId;
+  if (columns.playerId) {
+    newRowValues[columns.playerId - 1] = playerId;
   }
   if (columns.username) {
     newRowValues[columns.username - 1] = normalizedUsername;
@@ -305,7 +305,7 @@ function handleRegisterUser(sheet, request) {
   return {
     success: true,
     message: 'ユーザーを登録しました。',
-    loginId: columns.loginId ? newRowValues[columns.loginId - 1] : loginId,
+    playerId: columns.playerId ? newRowValues[columns.playerId - 1] : playerId,
     username: normalizedUsername,
     email: email,
     kingdom: kingdomValue,
@@ -321,7 +321,7 @@ function parseRequest(e) {
     search: data.search || data.query || '',
     limit: parsePositiveInteger(data.limit),
     offset: parsePositiveInteger(data.offset),
-    loginId: data.loginId || data.email || '',
+    playerId: data.playerId || data.loginId || data.email || '',
     email: data.email || '',
     username: data.username || data.name || '',
     kingdom: data.kingdom,
@@ -434,23 +434,23 @@ function findAccount(sheet, identifiers) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const normalizedLoginId = normalizeId(identifiers.loginId);
+  const normalizedPlayerId = normalizeId(identifiers.playerId);
   const normalizedEmail = normalizeId(identifiers.email);
   const columns = CONFIG.COLUMNS;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rowLoginId = normalizeId(columns.loginId ? row[columns.loginId - 1] : '');
+    const rowPlayerId = normalizeId(columns.playerId ? row[columns.playerId - 1] : '');
     const rowEmail = columns.email ? normalizeId(row[columns.email - 1]) : '';
 
-    const loginMatch = normalizedLoginId && rowLoginId && rowLoginId === normalizedLoginId;
+    const playerMatch = normalizedPlayerId && rowPlayerId && rowPlayerId === normalizedPlayerId;
     const emailMatch = normalizedEmail && rowEmail && rowEmail === normalizedEmail;
 
-    if (loginMatch || emailMatch) {
+    if (playerMatch || emailMatch) {
       return {
         rowNumber: firstDataRow + i,
         values: row,
-        loginId: columns.loginId ? row[columns.loginId - 1] : identifiers.loginId || identifiers.email || '',
+        playerId: columns.playerId ? row[columns.playerId - 1] : identifiers.playerId || '',
         username: columns.username ? row[columns.username - 1] || '' : '',
         email:
           columns.email && row[columns.email - 1]
@@ -516,8 +516,8 @@ function buildResponse(result, origin) {
     payload.offset = typeof result.offset === 'number' ? result.offset : 0;
   }
 
-  if (Object.prototype.hasOwnProperty.call(result, 'loginId')) {
-    payload.loginId = result.loginId || null;
+  if (Object.prototype.hasOwnProperty.call(result, 'playerId')) {
+    payload.playerId = result.playerId || null;
   }
   if (Object.prototype.hasOwnProperty.call(result, 'username')) {
     payload.username = result.username || null;

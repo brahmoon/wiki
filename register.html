@@ -283,13 +283,14 @@
                 ? `<img src="${user.picture}" alt="${user.name || user.email}のプロフィール写真">`
                 : '';
             const displayName = user.name || user.email;
-            const loginIdRow = `<div class="profile-login-id">ログインID: ${user.email}</div>`;
+            const playerIdDisplay = user.playerId ? user.playerId : '未設定';
+            const playerIdRow = `<div class="profile-login-id">PlayerID: ${playerIdDisplay}</div>`;
             elements.profile.innerHTML = `
                 ${image}
                 <div>
                     <div class="profile-name">${displayName}</div>
                     <div class="profile-email">${user.email}</div>
-                    ${loginIdRow}
+                    ${playerIdRow}
                 </div>
             `;
             elements.profile.style.display = 'flex';
@@ -327,7 +328,7 @@
             setStatus('アカウント登録状況を確認しています...');
             const payload = {
                 action: 'getUserSettings',
-                loginId: user.email,
+                playerId: '',
                 email: user.email
             };
 
@@ -487,7 +488,7 @@
 
             const payload = {
                 action: 'registerUser',
-                loginId: state.user.email,
+                playerId: '',
                 email: state.user.email,
                 username,
                 language: CONFIG.DEFAULT_LANGUAGE,

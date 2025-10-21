@@ -1341,6 +1341,7 @@
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
+        const ADMIN_AUTHORITY_VALUE = 99;
 
         const DRIVE_IMAGE_PERMISSION_DEBUG = true;
 
@@ -1352,23 +1353,15 @@
                 const googleEmail = (options?.userGoogleEmail || options?.userEmail || '')
                     .toString()
                     .trim();
-                const loginId = (options?.userLoginId || '')
-                    .toString()
-                    .trim();
                 const payload = {
                     action: 'getDriveImagePermissions',
                     googleEmail,
                     email: googleEmail
                 };
 
-                if (loginId) {
-                    payload.loginId = loginId;
-                }
-
                 console.debug('[DriveImage][Permissions] Sending request', {
                     endpoint,
                     payload,
-                    loginId,
                     timestamp: new Date().toISOString()
                 });
 
@@ -1376,7 +1369,6 @@
 
                 console.debug('[DriveImage][Permissions] Received response', {
                     result,
-                    loginId,
                     timestamp: new Date().toISOString()
                 });
 
@@ -1442,7 +1434,7 @@
             isSaving: false,
             isLoading: false,
             data: null,
-            loginId: null
+            playerId: null
         };
 
         let lastLoginIdentifier = null;
@@ -1580,14 +1572,6 @@
             return email;
         }
 
-        function getCurrentUserLoginId() {
-            const loginState = getStoredLoginState();
-            const loginId = (loginState?.user?.loginId || '')
-                .toString()
-                .trim();
-            return loginId;
-        }
-
         function refreshDriveImageUserPermissions() {
             const extension = driveImageExtensionInstance;
             if (!extension) {
@@ -1595,17 +1579,14 @@
             }
 
             const googleEmail = getCurrentUserGoogleEmail();
-            const loginId = getCurrentUserLoginId();
 
             extension.options.userGoogleEmail = googleEmail;
-            extension.options.userLoginId = loginId;
             extension.options.userAuthority = null;
             extension.options.userRole = '';
 
             if (extension.modal) {
                 if (extension.modal.options) {
                     extension.modal.options.userGoogleEmail = googleEmail;
-                    extension.modal.options.userLoginId = loginId;
                     extension.modal.options.userAuthority = null;
                     extension.modal.options.userRole = '';
                 }
@@ -1681,16 +1662,16 @@
             }
         }
 
-        async function fetchAndApplyUserSettings(loginId, email, fallbackName) {
-            if (!loginId) {
+        async function fetchAndApplyUserSettings(playerId, email, fallbackName) {
+            if (!playerId && !email) {
                 return;
             }
             userSettingsState.isLoading = true;
             try {
                 const result = await callUserSettingsApi({
                     action: 'getUserSettings',
-                    loginId,
-                    email
+                    playerId: playerId || '',
+                    email: email || ''
                 });
 
                 if (!result.success) {
@@ -1698,7 +1679,7 @@
                 }
 
                 const settings = {
-                    loginId: result.loginId || loginId,
+                    playerId: result.playerId || playerId || '',
                     username: result.username || fallbackName || '',
                     email: result.email || email,
                     kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : '',
@@ -1707,13 +1688,13 @@
                 };
 
                 userSettingsState.data = settings;
-                userSettingsState.loginId = settings.loginId;
+                userSettingsState.playerId = settings.playerId;
                 if (!userSettingsState.isOpen) {
                     fillUserSettingsForm(settings);
                 }
                 updateStoredLoginStateUser({
                     username: settings.username,
-                    loginId: settings.loginId,
+                    playerId: settings.playerId,
                     email: settings.email,
                     kingdom: settings.kingdom,
                     language: settings.language,
@@ -1762,7 +1743,7 @@
             try {
                 const payload = {
                     action: 'updateUserSettings',
-                    loginId: user.loginId || user.email || '',
+                    playerId: user.playerId || '',
                     email: user.email || '',
                     username,
                     kingdom: normalizedKingdom,
@@ -1775,7 +1756,7 @@
                 }
 
                 const updatedSettings = {
-                    loginId: result.loginId || payload.loginId,
+                    playerId: result.playerId || payload.playerId,
                     username: result.username || username,
                     email: result.email || payload.email,
                     kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : normalizedKingdom,
@@ -1784,11 +1765,11 @@
                 };
 
                 userSettingsState.data = updatedSettings;
-                userSettingsState.loginId = updatedSettings.loginId;
+                userSettingsState.playerId = updatedSettings.playerId;
                 fillUserSettingsForm(updatedSettings);
                 updateStoredLoginStateUser({
                     username: updatedSettings.username,
-                    loginId: updatedSettings.loginId,
+                    playerId: updatedSettings.playerId,
                     email: updatedSettings.email,
                     language: updatedSettings.language,
                     kingdom: updatedSettings.kingdom,
@@ -1816,8 +1797,8 @@
                 logoutButton.hidden = false;
                 settingsButton.hidden = false;
                 settingsButton.disabled = false;
-                const loginId = (loginState?.user?.loginId || '').trim().toLowerCase();
-                const isAdmin = loginId === 'admin';
+                const authorityValue = parseAuthority(loginState?.user?.authority);
+                const isAdmin = authorityValue !== null && authorityValue >= ADMIN_AUTHORITY_VALUE;
                 if (wikiSettingsButton) {
                     wikiSettingsButton.hidden = !isAdmin;
                     wikiSettingsButton.disabled = !isAdmin;
@@ -1833,17 +1814,18 @@
                     wikiSettingsButton.disabled = true;
                 }
                 userSettingsState.data = null;
-                userSettingsState.loginId = null;
+                userSettingsState.playerId = null;
                 if (userSettingsState.isOpen) {
                     closeUserSettingsDialog();
                 }
             }
 
-            const loginIdentifier = loginState?.user ? (loginState.user.loginId || loginState.user.email || '') : '';
-            if (loginIdentifier && loginIdentifier !== lastLoginIdentifier) {
-                lastLoginIdentifier = loginIdentifier;
-                fetchAndApplyUserSettings(loginIdentifier, loginState?.user?.email || '', displayName);
-            } else if (!loginIdentifier && lastLoginIdentifier) {
+            const currentPlayerId = loginState?.user?.playerId || '';
+            const playerIdentifier = currentPlayerId || loginState?.user?.email || '';
+            if (playerIdentifier && playerIdentifier !== lastLoginIdentifier) {
+                lastLoginIdentifier = playerIdentifier;
+                fetchAndApplyUserSettings(currentPlayerId, loginState?.user?.email || '', displayName);
+            } else if (!playerIdentifier && lastLoginIdentifier) {
                 lastLoginIdentifier = null;
             }
         };
@@ -1869,7 +1851,7 @@
             clearStoredLoginState();
             refreshDriveImageUserPermissions();
             userSettingsState.data = null;
-            userSettingsState.loginId = null;
+            userSettingsState.playerId = null;
             lastLoginIdentifier = null;
             updateLoginUI();
             const targetPage = state.currentPageId || initialPageIdFromQuery || '';
@@ -4242,8 +4224,7 @@
                         permissionsEndpoint: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION,
                         userAuthority: null,
                         userRole: '',
-                        userGoogleEmail: getCurrentUserGoogleEmail(),
-                        userLoginId: getCurrentUserLoginId()
+                        userGoogleEmail: getCurrentUserGoogleEmail()
                     }),
                     YouTubeEmbed
                 ],

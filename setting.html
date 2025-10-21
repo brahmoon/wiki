@@ -1838,7 +1838,6 @@
 
             const payload = {
                 action: 'getDriveImageAuthorities',
-                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -1946,7 +1945,6 @@
             const payload = {
                 action: 'updateDriveImageAuthorities',
                 authorities: buildAuthorityPayload(),
-                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -2139,11 +2137,7 @@
 
         const isAdministratorAccount = (member) => {
             const authorityValue = parseAuthorityValue(member?.authority);
-            if (authorityValue !== null && authorityValue === ADMIN_AUTHORITY_VALUE) {
-                return true;
-            }
-            const loginId = normalizeId(member?.loginId);
-            return loginId === 'admin';
+            return authorityValue !== null && authorityValue >= ADMIN_AUTHORITY_VALUE;
         };
 
         const createAuthorityCell = (member, updatedCell) => {
@@ -2168,7 +2162,7 @@
             select.className = 'member-authority-select';
             const displayName = normalizeCellValue(member?.username) !== '-'
                 ? member?.username
-                : member?.loginId;
+                : member?.playerId;
             select.setAttribute('aria-label', `${displayName || 'ユーザー'}の権限レベル`);
 
             AUTHORITY_OPTIONS.forEach((option) => {
@@ -2212,13 +2206,13 @@
         };
 
         const handleAuthorityUpdate = async (member, select, button, status, updatedCell) => {
-            const targetLoginId = (member?.loginId || '').toString().trim();
+            const targetPlayerId = (member?.playerId || '').toString().trim();
             const selectedAuthority = parseAuthorityValue(select.value);
 
             status.textContent = '';
             status.classList.remove('is-error', 'is-success');
 
-            if (!targetLoginId) {
+            if (!targetPlayerId) {
                 status.textContent = '対象ユーザーが不明です。';
                 status.classList.add('is-error');
                 return;
@@ -2236,7 +2230,7 @@
 
             try {
                 const result = await requestAuthorityUpdate({
-                    targetLoginId,
+                    targetPlayerId,
                     authority: selectedAuthority
                 });
 
@@ -2266,7 +2260,7 @@
             }
         };
 
-        const requestAuthorityUpdate = async ({ targetLoginId, authority }) => {
+        const requestAuthorityUpdate = async ({ targetPlayerId, authority }) => {
             if (!adminVerificationResult || !adminVerificationResult.success) {
                 throw new Error('管理者認証が確認できません。ページを再読み込みしてください。');
             }
@@ -2277,9 +2271,8 @@
 
             const payload = {
                 action: 'updateAuthority',
-                targetLoginId,
+                targetPlayerId,
                 authority,
-                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -2381,7 +2374,6 @@
                 action: 'updateToolbarPlugins',
                 toolbarKeys: TOOLBAR_FEATURES.map((feature) => feature.key),
                 toolbarStates: states,
-                loginId: adminVerificationResult?.loginId || currentLoginState?.user?.loginId || '',
                 email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
                 googleEmail: currentLoginState?.user?.email || ''
             };
@@ -2461,7 +2453,7 @@
                 const row = document.createElement('tr');
 
                 const loginCell = document.createElement('td');
-                loginCell.textContent = normalizeCellValue(member?.loginId);
+                loginCell.textContent = normalizeCellValue(member?.playerId);
                 row.appendChild(loginCell);
 
                 const usernameCell = document.createElement('td');
@@ -2619,7 +2611,6 @@
             try {
                 const payload = {
                     action: 'verifyAdminAccess',
-                    loginId: loginState?.user?.loginId || '',
                     email: loginState?.user?.email || '',
                     googleEmail: loginState?.user?.email || '',
                     origin: window.location.origin
@@ -2685,12 +2676,17 @@
                 currentLoginState = loginState;
                 adminVerificationResult = verification;
 
+                if (currentLoginState?.user) {
+                    currentLoginState.user.authority = verification.authority ?? currentLoginState.user.authority ?? null;
+                }
+
                 hideAuthorizationError();
 
                 const authorizedUser = {
-                    loginId: verification.loginId || user.loginId || '',
+                    playerId: verification.playerId || user.playerId || '',
                     username: verification.username || user.username || user.name || '',
-                    email: verification.email || user.email || ''
+                    email: verification.email || user.email || '',
+                    authority: verification.authority ?? user.authority ?? null
                 };
 
                 const displayName = (authorizedUser.username || authorizedUser.email || '').trim();
