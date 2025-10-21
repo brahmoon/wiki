@@ -18,13 +18,14 @@ const CONFIG = {
   ],
 };
 
-const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminThreshold() {
+const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminAuthorityBaseline() {
   if (typeof ADMIN_AUTHORITY_VALUE !== 'undefined') {
-    const numeric = Number(ADMIN_AUTHORITY_VALUE);
-    if (Number.isFinite(numeric)) {
-      return numeric;
+    const explicit = parseAuthorityValue(ADMIN_AUTHORITY_VALUE);
+    if (explicit !== null) {
+      return explicit;
     }
   }
+
   return 99;
 })();
 
@@ -90,108 +91,77 @@ function doOptions(e) {
 }
 
 function requireAdminAuthority(sheet, request) {
-  if (typeof verifyAdminAccess !== 'function') {
+  const safeRequest = request || {};
+  const normalizedGoogleEmail = normalizeId(safeRequest.googleEmail);
+  const normalizedEmail = normalizeId(safeRequest.email);
+  const lookupEmail = normalizedGoogleEmail || normalizedEmail;
+
+  if (!lookupEmail) {
     return {
       success: false,
-      message: '管理者権限の検証機能が利用できません。'
+      message: '管理者アカウント情報が不足しています。',
     };
   }
 
-  const verification = verifyAdminAccess(sheet, request);
-  if (verification && verification.success) {
-    request.__adminVerification = verification;
+  const account = findAccount(sheet, {
+    email: safeRequest.email || safeRequest.googleEmail || '',
+    googleEmail: safeRequest.googleEmail || safeRequest.email || '',
+  });
+
+  if (!account) {
+    return {
+      success: false,
+      message: '管理者アカウントが登録されていません。',
+    };
   }
-  return verification;
+
+  const authorityValue = parseAuthorityValue(account.authority);
+  if (authorityValue === null || authorityValue < ADMIN_AUTHORITY_THRESHOLD) {
+    return {
+      success: false,
+      message: '管理者権限がありません。',
+      authority: authorityValue,
+    };
+  }
+
+  return {
+    success: true,
+    authority: authorityValue,
+    account,
+  };
 }
 
-function resolveAdminVerification(sheet, request) {
-  if (request && request.__adminVerification && request.__adminVerification.success) {
-    return request.__adminVerification;
-  }
-
-  if (!request || !request.adminToken) {
-    return null;
-  }
-
-  if (typeof verifyAdminAccess !== 'function') {
+function verifyRequestAccessToEmail(sheet, request, targetEmail) {
+  const adminVerification = requireAdminAuthority(sheet, request);
+  if (adminVerification && adminVerification.success) {
     return {
-      success: false,
-      message: '管理者権限の検証機能が利用できません。'
+      success: true,
+      isAdmin: true,
+      admin: adminVerification.account,
     };
   }
 
-  const verification = verifyAdminAccess(sheet, request);
-  if (verification.success) {
-    request.__adminVerification = verification;
-  }
-  return verification;
-}
-
-function verifyRequestAccessToEmail(request, account) {
-  if (!request) {
+  const normalizedGoogleEmail = normalizeId(request && request.googleEmail);
+  if (!normalizedGoogleEmail) {
     return {
       success: false,
-      message: 'リクエスト情報が不足しています。',
-      requiresReauthentication: true
+      message: 'Googleアカウントの認証情報が確認できませんでした。再度ログインしてください。',
     };
   }
 
-  if (request.__adminVerification && request.__adminVerification.success) {
-    return { success: true };
-  }
-
-  const normalizedAccountEmail = normalizeId(account && account.email);
-  const normalizedRequestEmail = normalizeId(request.googleEmail || request.email);
-
-  if (!normalizedRequestEmail) {
+  const normalizedTargetEmail = normalizeId(targetEmail);
+  if (normalizedTargetEmail && normalizedTargetEmail === normalizedGoogleEmail) {
     return {
-      success: false,
-      message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
-      requiresReauthentication: true
+      success: true,
+      isAdmin: false,
     };
-  }
-
-  if (normalizedAccountEmail && normalizedAccountEmail === normalizedRequestEmail) {
-    return { success: true };
   }
 
   return {
     success: false,
-    message: '他のユーザーのデータを操作することはできません。',
-    requiresReauthentication: true
+    message:
+      'ログイン中のGoogleアカウントと対象ユーザーのメールアドレスが一致しません。再度ログインしてください。',
   };
-}
-
-function appendAdminVerification(result, verification) {
-  if (!result) {
-    return result;
-  }
-
-  const context = verification && verification.success
-    ? verification
-    : null;
-
-  if (!context) {
-    return result;
-  }
-
-  if (context.adminToken) {
-    result.adminToken = context.adminToken;
-  }
-  if (context.adminTokenIssuedAt) {
-    result.adminTokenIssuedAt = context.adminTokenIssuedAt;
-  }
-  if (context.adminTokenExpiresAt) {
-    result.adminTokenExpiresAt = context.adminTokenExpiresAt;
-  }
-  if (Object.prototype.hasOwnProperty.call(context, 'adminAuthority')) {
-    result.adminAuthority = context.adminAuthority;
-  }
-  if (context.adminEmail) {
-    result.adminEmail = context.adminEmail;
-  }
-
-  return result;
 }
 
 function handleListMembers(sheet, request) {
@@ -204,14 +174,14 @@ function handleListMembers(sheet, request) {
   const lastRow = sheet.getLastRow();
 
   if (lastRow < firstDataRow) {
-    return appendAdminVerification({
+    return {
       success: true,
       message: 'メンバーが見つかりませんでした。',
       members: [],
       total: 0,
       limit: request.limit,
       offset: request.offset,
-    }, adminVerification);
+    };
   }
 
   const totalRows = lastRow - CONFIG.HEADER_ROW_INDEX;
@@ -258,22 +228,17 @@ function handleListMembers(sheet, request) {
   const limit = request.limit || matches.length;
   const paged = matches.slice(start, start + limit);
 
-  return appendAdminVerification({
+  return {
     success: true,
     message: 'メンバー一覧を取得しました。',
     members: paged,
     total: matches.length,
     limit: limit,
     offset: start,
-  }, adminVerification);
+  };
 }
 
 function handleGetUserSettings(sheet, request) {
-  const adminVerification = resolveAdminVerification(sheet, request);
-  if (adminVerification && !adminVerification.success) {
-    return adminVerification;
-  }
-
   if (!request.playerId && !request.email) {
     return {
       success: false,
@@ -289,12 +254,12 @@ function handleGetUserSettings(sheet, request) {
     };
   }
 
-  const accessCheck = verifyRequestAccessToEmail(request, record);
+  const accessCheck = verifyRequestAccessToEmail(sheet, request, record.email);
   if (!accessCheck.success) {
     return accessCheck;
   }
 
-  return appendAdminVerification({
+  return {
     success: true,
     message: 'ユーザー設定を取得しました。',
     playerId: record.playerId,
@@ -303,15 +268,10 @@ function handleGetUserSettings(sheet, request) {
     kingdom: record.kingdom,
     language: record.language,
     authority: record.authority,
-  }, request.__adminVerification || adminVerification);
+  };
 }
 
 function handleUpdateUserSettings(sheet, request) {
-  const adminVerification = resolveAdminVerification(sheet, request);
-  if (adminVerification && !adminVerification.success) {
-    return adminVerification;
-  }
-
   if (!request.playerId && !request.email) {
     return {
       success: false,
@@ -335,7 +295,7 @@ function handleUpdateUserSettings(sheet, request) {
     };
   }
 
-  const accessCheck = verifyRequestAccessToEmail(request, record);
+  const accessCheck = verifyRequestAccessToEmail(sheet, request, record.email);
   if (!accessCheck.success) {
     return accessCheck;
   }
@@ -365,7 +325,7 @@ function handleUpdateUserSettings(sheet, request) {
   const rowRange = sheet.getRange(record.rowNumber, 1, 1, sheet.getLastColumn());
   rowRange.setValues([updatedValues]);
 
-  return appendAdminVerification({
+  return {
     success: true,
     message: 'ユーザー設定を更新しました。',
     playerId: updatedValues[columns.playerId - 1] || record.playerId,
@@ -374,15 +334,10 @@ function handleUpdateUserSettings(sheet, request) {
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
     language: columns.language ? updatedValues[columns.language - 1] || '' : '',
     authority: record.authority,
-  }, request.__adminVerification || adminVerification);
+  };
 }
 
 function handleRegisterUser(sheet, request) {
-  const adminVerification = resolveAdminVerification(sheet, request);
-  if (adminVerification && !adminVerification.success) {
-    return adminVerification;
-  }
-
   const email = (request.email || '').toString().trim();
   if (!email) {
     return {
@@ -391,33 +346,17 @@ function handleRegisterUser(sheet, request) {
     };
   }
 
-  const normalizedGoogleEmail = normalizeId(request.googleEmail);
-  const normalizedEmail = normalizeId(email);
-
-  if (!(adminVerification && adminVerification.success)) {
-    if (!normalizedGoogleEmail) {
-      return {
-        success: false,
-        message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
-        requiresReauthentication: true,
-      };
-    }
-
-    if (normalizedEmail && normalizedGoogleEmail && normalizedEmail !== normalizedGoogleEmail) {
-      return {
-        success: false,
-        message: 'Googleアカウントと異なるメールアドレスは登録できません。',
-        requiresReauthentication: true,
-      };
-    }
-  }
-
   const normalizedUsername = (request.username || '').toString().trim();
   if (!normalizedUsername) {
     return {
       success: false,
       message: 'ユーザーネームを入力してください。',
     };
+  }
+
+  const accessCheck = verifyRequestAccessToEmail(sheet, request, email);
+  if (!accessCheck.success) {
+    return accessCheck;
   }
 
   const playerId = (request.playerId || '').toString().trim();
@@ -468,7 +407,7 @@ function handleRegisterUser(sheet, request) {
 
   sheet.appendRow(newRowValues);
 
-  return appendAdminVerification({
+  return {
     success: true,
     message: 'ユーザーを登録しました。',
     playerId: columns.playerId ? newRowValues[columns.playerId - 1] : playerId,
@@ -477,7 +416,7 @@ function handleRegisterUser(sheet, request) {
     kingdom: kingdomValue,
     language: languageValue,
     authority: 1,
-  }, request.__adminVerification || adminVerification);
+  };
 }
 
 function parseRequest(e) {
@@ -488,9 +427,10 @@ function parseRequest(e) {
     limit: parsePositiveInteger(data.limit),
     offset: parsePositiveInteger(data.offset),
     playerId: data.playerId || data.loginId || data.email || '',
-    email: data.email || '',
-    googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
-    adminToken: data.adminToken || data.adminSessionToken || data.token || '',
+    email: data.email ? data.email.toString().trim() : '',
+    googleEmail: normalizeId(
+      data.googleEmail || data.googleAccountEmail || data.email || ''
+    ),
     username: data.username || data.name || '',
     kingdom: data.kingdom,
     language: data.language,
@@ -593,8 +533,10 @@ function findAccount(sheet, identifiers) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const normalizedPlayerId = normalizeId(identifiers.playerId);
-  const normalizedEmail = normalizeId(identifiers.email);
+  const safeIdentifiers = identifiers || {};
+  const normalizedPlayerId = normalizeId(safeIdentifiers.playerId);
+  const normalizedEmail = normalizeId(safeIdentifiers.email);
+  const normalizedGoogleEmail = normalizeId(safeIdentifiers.googleEmail);
   const columns = CONFIG.COLUMNS;
 
   for (let i = 0; i < values.length; i++) {
@@ -603,13 +545,15 @@ function findAccount(sheet, identifiers) {
     const rowEmail = columns.email ? normalizeId(row[columns.email - 1]) : '';
 
     const playerMatch = normalizedPlayerId && rowPlayerId && rowPlayerId === normalizedPlayerId;
-    const emailMatch = normalizedEmail && rowEmail && rowEmail === normalizedEmail;
+    const emailMatch =
+      (normalizedEmail && rowEmail && rowEmail === normalizedEmail) ||
+      (normalizedGoogleEmail && rowEmail && rowEmail === normalizedGoogleEmail);
 
     if (playerMatch || emailMatch) {
       return {
         rowNumber: firstDataRow + i,
         values: row,
-        playerId: columns.playerId ? row[columns.playerId - 1] : identifiers.playerId || '',
+        playerId: columns.playerId ? row[columns.playerId - 1] : safeIdentifiers.playerId || '',
         username: columns.username ? row[columns.username - 1] || '' : '',
         email:
           columns.email && row[columns.email - 1]
@@ -705,24 +649,6 @@ function buildResponse(result, origin) {
   }
   if (Object.prototype.hasOwnProperty.call(result, 'authority')) {
     payload.authority = result.authority;
-  }
-  if (Object.prototype.hasOwnProperty.call(result, 'adminToken')) {
-    payload.adminToken = result.adminToken || '';
-  }
-  if (Object.prototype.hasOwnProperty.call(result, 'adminTokenIssuedAt')) {
-    payload.adminTokenIssuedAt = result.adminTokenIssuedAt || '';
-  }
-  if (Object.prototype.hasOwnProperty.call(result, 'adminTokenExpiresAt')) {
-    payload.adminTokenExpiresAt = result.adminTokenExpiresAt || '';
-  }
-  if (Object.prototype.hasOwnProperty.call(result, 'adminAuthority')) {
-    payload.adminAuthority = result.adminAuthority;
-  }
-  if (Object.prototype.hasOwnProperty.call(result, 'adminEmail')) {
-    payload.adminEmail = result.adminEmail || '';
-  }
-  if (Object.prototype.hasOwnProperty.call(result, 'requiresReauthentication')) {
-    payload.requiresReauthentication = Boolean(result.requiresReauthentication);
   }
 
   return createJsonOutput(payload, origin);

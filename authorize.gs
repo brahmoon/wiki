@@ -51,8 +51,11 @@ const AUTHORITIES_CONFIG = {
 const DRIVE_IMAGE_ADMIN_ROLE = typeof ADMINISTRATOR_ROLE !== 'undefined'
   ? ADMINISTRATOR_ROLE
   : 'Administrator';
-// Determine the numeric baseline for administrator privileges. Administrators
-// must meet or exceed this threshold before privileged actions are executed.
+// Determine the numeric baseline for administrator privileges. If the host
+// project exposes ADMIN_AUTHORITY_VALUE we honour it, otherwise we derive the
+// highest configured authority level so numeric accounts (e.g. authority=3)
+// continue to map to the administrator role instead of falling back to
+// Moderator.
 const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminAuthorityBaseline() {
   if (typeof ADMIN_AUTHORITY_VALUE !== 'undefined') {
     const explicit = parseAuthorityValue(ADMIN_AUTHORITY_VALUE);
@@ -63,15 +66,6 @@ const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminAuthorityBaseline() {
 
   return 99;
 })();
-
-const ADMIN_TOKEN_CONFIG = {
-  EXPIRATION_MS: 5 * 60 * 1000,
-  SECRET_PROPERTY_KEY: 'ADMIN_TOKEN_SECRET',
-  SECRET_CACHE_TTL_MS: 30 * 60 * 1000
-};
-
-let cachedAdminTokenSecret = null;
-let cachedAdminTokenSecretFetchedAt = 0;
 const DRIVE_IMAGE_ADMIN_AUTHORITY = ADMIN_AUTHORITY_THRESHOLD;
 const DRIVE_IMAGE_ROLES = Array.from(new Set([
   DRIVE_IMAGE_ADMIN_ROLE,
@@ -112,53 +106,36 @@ function doPost(e) {
       );
     }
 
-    let adminVerification = null;
-    const ADMIN_ACTIONS = {
-      updateAuthority: true,
-      getToolbarPlugins: true,
-      updateToolbarPlugins: true,
-      getDriveImageAuthorities: true,
-      updateDriveImageAuthorities: true
-    };
-
-    if (Object.prototype.hasOwnProperty.call(ADMIN_ACTIONS, action)) {
-      adminVerification = verifyAdminAccess(sheet, request);
-      if (!adminVerification.success) {
-        return buildResponse(adminVerification, origin);
-      }
-      request.__adminVerification = adminVerification;
-    }
-
     let result;
 
-    switch (action) {
-      case 'verifyAdminAccess':
-        result = adminVerification || verifyAdminAccess(sheet, request);
-        break;
-      case 'updateAuthority':
-        result = updateAuthority(sheet, request, adminVerification);
-        break;
-      case 'getToolbarPlugins':
-        result = getToolbarPlugins(sheet, request, adminVerification);
-        break;
-      case 'updateToolbarPlugins':
-        result = updateToolbarPlugins(sheet, request, adminVerification);
-        break;
-      case 'getDriveImageAuthorities':
-        result = getDriveImageAuthorities(sheet, request, adminVerification);
-        break;
-      case 'updateDriveImageAuthorities':
-        result = updateDriveImageAuthorities(sheet, request, adminVerification);
-        break;
-      case 'getDriveImagePermissions':
-        result = getDriveImagePermissions(request);
-        break;
-      default:
+    if (action === 'verifyAdminAccess') {
+      result = verifyAdminAccess(sheet, request);
+    } else if (action === 'getDriveImagePermissions') {
+      result = getDriveImagePermissions(request);
+    } else {
+      const verification = verifyAdminAccess(sheet, request);
+      if (!verification.success) {
+        return buildResponse(verification, origin);
+      }
+
+      if (action === 'updateAuthority') {
+        result = updateAuthority(sheet, request, verification);
+      } else if (action === 'getToolbarPlugins') {
+        result = getToolbarPlugins(verification);
+      } else if (action === 'updateToolbarPlugins') {
+        result = updateToolbarPlugins(sheet, request, verification);
+      } else if (action === 'getDriveImageAuthorities') {
+        result = getDriveImageAuthorities(sheet, request, verification);
+      } else if (action === 'updateDriveImageAuthorities') {
+        result = updateDriveImageAuthorities(sheet, request, verification);
+      } else {
         result = {
           success: false,
           message: `Unknown action: ${action}`
         };
-        break;
+      }
+
+      result = extendWithAdminToken(result, verification);
     }
 
     return buildResponse(result, origin);
@@ -179,42 +156,36 @@ function doOptions(e) {
 }
 
 function verifyAdminAccess(sheet, request) {
-  const normalizedGoogleEmail = normalizeId(request.googleEmail);
-  const normalizedEmail = normalizeId(request.email);
-  let lookupEmail = request.email || request.googleEmail || '';
+  const safeRequest = request || {};
+  const tokenInfo = validateAdminToken(safeRequest.adminToken);
+  const tokenPayload = tokenInfo && tokenInfo.valid ? tokenInfo.payload : null;
+  const fallbackGoogleEmail = tokenPayload
+    ? tokenPayload.googleAccountEmail || tokenPayload.email || ''
+    : '';
+  const fallbackEmail = tokenPayload ? tokenPayload.email || '' : '';
 
-  const tokenStatus = validateAdminToken(
-    request.adminToken,
-    {
-      googleEmail: normalizedGoogleEmail,
-      email: normalizedEmail
-    }
+  const normalizedGoogleEmail = normalizeId(
+    safeRequest.googleEmail || fallbackGoogleEmail
   );
-  request.__adminTokenStatus = tokenStatus;
+  const normalizedEmail = normalizeId(safeRequest.email || fallbackEmail);
+  const lookupEmail = normalizedGoogleEmail || normalizedEmail;
 
-  if (tokenStatus.success && tokenStatus.email) {
-    lookupEmail = tokenStatus.email;
-  }
-
-  if (!normalizedGoogleEmail && !normalizeId(lookupEmail)) {
+  if (!lookupEmail) {
     return {
       success: false,
-      message: '管理者アカウント情報が不足しています。',
-      requiresReauthentication: true
+      message: '管理者アカウント情報が不足しています。'
     };
   }
 
   const account = findAccount(sheet, {
-    email: lookupEmail,
-    googleEmail: lookupEmail,
-    playerId: request.playerId
+    email: safeRequest.email || fallbackEmail,
+    googleEmail: safeRequest.googleEmail || fallbackGoogleEmail
   });
 
   if (!account) {
     return {
       success: false,
-      message: '管理者アカウントが登録されていません。',
-      requiresReauthentication: true
+      message: '管理者アカウントが登録されていません。'
     };
   }
 
@@ -235,260 +206,49 @@ function verifyAdminAccess(sheet, request) {
   ) {
     return {
       success: false,
-      message: '管理者アカウントのメールアドレスが一致しません。',
-      requiresReauthentication: true
+      message: '管理者アカウントのメールアドレスが一致しません。'
     };
   }
 
-  const session = mintAdminSessionToken(account, authorityValue);
+  if (tokenPayload) {
+    const normalizedTokenEmail = normalizeId(tokenPayload.email);
+    if (
+      normalizedTokenEmail &&
+      normalizedAccountEmail &&
+      normalizedTokenEmail !== normalizedAccountEmail
+    ) {
+      return {
+        success: false,
+        message: '管理者トークンのアカウント情報が一致しません。'
+      };
+    }
+  }
 
-  const result = {
+  const googleAccountEmail =
+    safeRequest.googleEmail || fallbackGoogleEmail || account.email || '';
+  const token = issueAdminAccessToken(account, {
+    googleAccountEmail,
+    email: account.email || fallbackEmail || ''
+  });
+
+  return {
     success: true,
     message: '管理者権限が確認されました。',
     playerId: account.playerId,
     username: account.username,
     email: account.email,
     authority: authorityValue,
-    googleAccountEmail: request.googleEmail || account.email || '',
-    adminAuthority: authorityValue,
-    adminEmail: account.email || ''
+    googleAccountEmail,
+    adminToken: token.token,
+    adminTokenExpiresAt: token.expiresAt
   };
-
-  if (session) {
-    result.adminToken = session.token;
-    result.adminTokenIssuedAt = session.issuedAt;
-    result.adminTokenExpiresAt = session.expiresAt;
-  }
-
-  return result;
-}
-
-function withAdminVerification(result, verification) {
-  if (!result || !verification || !verification.success) {
-    return result;
-  }
-
-  if (verification.adminToken) {
-    result.adminToken = verification.adminToken;
-  }
-  if (verification.adminTokenIssuedAt) {
-    result.adminTokenIssuedAt = verification.adminTokenIssuedAt;
-  }
-  if (verification.adminTokenExpiresAt) {
-    result.adminTokenExpiresAt = verification.adminTokenExpiresAt;
-  }
-  if (Object.prototype.hasOwnProperty.call(verification, 'adminAuthority')) {
-    result.adminAuthority = verification.adminAuthority;
-  }
-  if (verification.adminEmail) {
-    result.adminEmail = verification.adminEmail;
-  }
-
-  return result;
-}
-
-function mintAdminSessionToken(account, authorityValue) {
-  if (!account) {
-    return null;
-  }
-
-  const normalizedEmail = normalizeId(account.email);
-  if (!normalizedEmail) {
-    return null;
-  }
-
-  const secret = getAdminTokenSecret();
-  if (!secret) {
-    return null;
-  }
-
-  const issuedAt = Date.now();
-  const expiresAt = issuedAt + ADMIN_TOKEN_CONFIG.EXPIRATION_MS;
-
-  const claims = {
-    email: account.email || '',
-    normalizedEmail,
-    playerId: account.playerId || '',
-    username: account.username || '',
-    authority: authorityValue,
-    issuedAt,
-    expiresAt
-  };
-
-  const signature = computeAdminTokenSignature(claims, secret);
-  const payload = Object.assign({}, claims, { signature });
-
-  const token = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
-
-  return {
-    token,
-    issuedAt: new Date(issuedAt).toISOString(),
-    expiresAt: new Date(expiresAt).toISOString()
-  };
-}
-
-function validateAdminToken(token, expectedEmails) {
-  if (!token) {
-    return { success: false, reason: 'missing' };
-  }
-
-  let decoded;
-  try {
-    decoded = Utilities.base64DecodeWebSafe(token);
-  } catch (error) {
-    return { success: false, reason: 'invalid' };
-  }
-
-  let json;
-  try {
-    json = Utilities.newBlob(decoded).getDataAsString('utf-8');
-  } catch (error) {
-    return { success: false, reason: 'invalid' };
-  }
-
-  let payload;
-  try {
-    payload = JSON.parse(json);
-  } catch (error) {
-    return { success: false, reason: 'invalid' };
-  }
-
-  const normalizedEmail = normalizeId(payload.normalizedEmail || payload.email);
-  if (!normalizedEmail) {
-    return { success: false, reason: 'invalid' };
-  }
-
-  const issuedAt = Number(payload.issuedAt);
-  const expiresAt = Number(payload.expiresAt);
-  const authorityValue = parseAuthorityValue(payload.authority);
-
-  if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
-    return {
-      success: false,
-      reason: 'expired',
-      email: payload.email || '',
-      normalizedEmail,
-      issuedAt,
-      expiresAt,
-      authority: authorityValue
-    };
-  }
-
-  const secret = getAdminTokenSecret();
-  if (!secret) {
-    return { success: false, reason: 'invalid' };
-  }
-
-  const claims = {
-    email: payload.email || '',
-    normalizedEmail,
-    playerId: payload.playerId || '',
-    username: payload.username || '',
-    authority: authorityValue,
-    issuedAt,
-    expiresAt
-  };
-
-  const expectedSignature = computeAdminTokenSignature(claims, secret);
-  if (!payload.signature || payload.signature !== expectedSignature) {
-    return { success: false, reason: 'invalid' };
-  }
-
-  const expectedEmailCandidate = expectedEmails && typeof expectedEmails === 'object'
-    ? expectedEmails.googleEmail || expectedEmails.email || ''
-    : expectedEmails;
-  const normalizedExpected = normalizeId(expectedEmailCandidate);
-
-  if (normalizedExpected && normalizedEmail !== normalizedExpected) {
-    return {
-      success: false,
-      reason: 'mismatch',
-      email: payload.email || '',
-      normalizedEmail,
-      issuedAt,
-      expiresAt,
-      authority: authorityValue
-    };
-  }
-
-  return {
-    success: true,
-    email: payload.email || '',
-    normalizedEmail,
-    issuedAt,
-    expiresAt,
-    authority: authorityValue
-  };
-}
-
-function computeAdminTokenSignature(claims, secret) {
-  const normalizedEmail = normalizeId(claims.normalizedEmail || claims.email);
-  const parts = [
-    normalizedEmail,
-    (claims.playerId || '').toString(),
-    (claims.username || '').toString(),
-    claims.authority === null || claims.authority === undefined
-      ? ''
-      : claims.authority.toString(),
-    claims.issuedAt === undefined || claims.issuedAt === null
-      ? ''
-      : claims.issuedAt.toString(),
-    claims.expiresAt === undefined || claims.expiresAt === null
-      ? ''
-      : claims.expiresAt.toString()
-  ];
-
-  const payload = parts.join(':');
-  const signatureBytes = Utilities.computeHmacSha256Signature(payload, secret);
-  return Utilities.base64EncodeWebSafe(signatureBytes);
-}
-
-function getAdminTokenSecret() {
-  const now = Date.now();
-  if (
-    cachedAdminTokenSecret &&
-    now - cachedAdminTokenSecretFetchedAt < ADMIN_TOKEN_CONFIG.SECRET_CACHE_TTL_MS
-  ) {
-    return cachedAdminTokenSecret;
-  }
-
-  if (typeof Utilities === 'undefined') {
-    return null;
-  }
-
-  if (typeof PropertiesService === 'undefined') {
-    cachedAdminTokenSecret = Utilities.getUuid();
-    cachedAdminTokenSecretFetchedAt = now;
-    return cachedAdminTokenSecret;
-  }
-
-  const properties = PropertiesService.getScriptProperties();
-  let secret = properties ? properties.getProperty(ADMIN_TOKEN_CONFIG.SECRET_PROPERTY_KEY) : null;
-
-  if (!secret) {
-    secret = generateAdminTokenSecret();
-    if (properties) {
-      properties.setProperty(ADMIN_TOKEN_CONFIG.SECRET_PROPERTY_KEY, secret);
-    }
-  }
-
-  cachedAdminTokenSecret = secret;
-  cachedAdminTokenSecretFetchedAt = now;
-  return cachedAdminTokenSecret;
-}
-
-function generateAdminTokenSecret() {
-  const uuid = Utilities.getUuid();
-  const timestamp = Date.now().toString();
-  const digest = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    uuid + ':' + timestamp
-  );
-  return Utilities.base64EncodeWebSafe(digest);
 }
 
 function updateAuthority(sheet, request, adminVerification) {
-  const verification = adminVerification || verifyAdminAccess(sheet, request);
+  const verification =
+    adminVerification && adminVerification.success
+      ? adminVerification
+      : verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
@@ -522,13 +282,65 @@ function updateAuthority(sheet, request, adminVerification) {
     return updateResult;
   }
 
-  return withAdminVerification({
-    success: true,
-    message: updateResult.message,
-    updatedAuthority: authorityValue,
-    updatedAt: updateResult.updatedAt,
-    targetPlayerId: updateResult.targetPlayerId
-  }, verification);
+  return extendWithAdminToken(
+    {
+      success: true,
+      message: updateResult.message,
+      updatedAuthority: authorityValue,
+      updatedAt: updateResult.updatedAt,
+      targetPlayerId: updateResult.targetPlayerId
+    },
+    verification
+  );
+}
+
+function extendWithAdminToken(result, adminVerification) {
+  if (!adminVerification || !adminVerification.success) {
+    return result;
+  }
+
+  const token = adminVerification.adminToken;
+  if (!token) {
+    return result;
+  }
+
+  if (!result || typeof result !== 'object') {
+    return result;
+  }
+
+  const extended = Object.assign({}, result);
+  extended.adminToken = token;
+  extended.adminTokenExpiresAt = adminVerification.adminTokenExpiresAt;
+  return extended;
+}
+
+function issueAdminAccessToken(account, identity) {
+  const now = new Date();
+  const issuedAtSeconds = Math.floor(now.getTime() / 1000);
+  const expiresAtMs = now.getTime() + ADMIN_TOKEN_TTL_SECONDS * 1000;
+  const payload = {
+    email: account.email || (identity && identity.email) || '',
+    googleAccountEmail:
+      (identity && identity.googleAccountEmail) || account.email || '',
+    playerId: account.playerId || '',
+    authority: account.authority,
+    iat: issuedAtSeconds,
+    exp: Math.floor(expiresAtMs / 1000)
+  };
+
+  const payloadJson = JSON.stringify(payload);
+  const payloadBase64 = Utilities.base64EncodeWebSafe(payloadJson);
+  const signatureBytes = Utilities.computeHmacSha256Signature(
+    payloadBase64,
+    getAdminTokenSecret()
+  );
+  const signatureBase64 = Utilities.base64EncodeWebSafe(signatureBytes);
+
+  return {
+    token: `${payloadBase64}.${signatureBase64}`,
+    expiresAt: new Date(expiresAtMs).toISOString(),
+    payload
+  };
 }
 
 function validateAdminToken(token) {
@@ -652,22 +464,23 @@ function parseAuthorityValue(value) {
   return null;
 }
 
-function getToolbarPlugins(sheet, request, adminVerification) {
-  const verification = adminVerification || verifyAdminAccess(sheet, request);
-  if (!verification.success) {
-    return verification;
-  }
-
+function getToolbarPlugins(adminVerification) {
   const states = loadToolbarStates();
-  return withAdminVerification({
-    success: true,
-    message: 'Toolbar plugin states retrieved.',
-    toolbarConfig: buildToolbarConfigResponse(states)
-  }, verification);
+  return extendWithAdminToken(
+    {
+      success: true,
+      message: 'Toolbar plugin states retrieved.',
+      toolbarConfig: buildToolbarConfigResponse(states)
+    },
+    adminVerification
+  );
 }
 
 function updateToolbarPlugins(sheet, request, adminVerification) {
-  const verification = adminVerification || verifyAdminAccess(sheet, request);
+  const verification =
+    adminVerification && adminVerification.success
+      ? adminVerification
+      : verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
@@ -682,11 +495,14 @@ function updateToolbarPlugins(sheet, request, adminVerification) {
 
   const savedStates = saveToolbarStates(states);
 
-  return withAdminVerification({
-    success: true,
-    message: 'TipTapツールバーの設定を保存しました。',
-    toolbarConfig: buildToolbarConfigResponse(savedStates)
-  }, verification);
+  return extendWithAdminToken(
+    {
+      success: true,
+      message: 'TipTapツールバーの設定を保存しました。',
+      toolbarConfig: buildToolbarConfigResponse(savedStates)
+    },
+    verification
+  );
 }
 
 function getAuthoritiesSheet(createIfMissing) {
@@ -1064,22 +880,31 @@ function initializeDriveImageAuthoritiesSheet() {
 }
 
 function getDriveImageAuthorities(sheet, request, adminVerification) {
-  const verification = adminVerification || verifyAdminAccess(sheet, request);
+  const verification =
+    adminVerification && adminVerification.success
+      ? adminVerification
+      : verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
 
   const authorities = readDriveImageAuthorities();
 
-  return withAdminVerification({
-    success: true,
-    message: 'Drive画像の権限を取得しました。',
-    authorities
-  }, verification);
+  return extendWithAdminToken(
+    {
+      success: true,
+      message: 'Drive画像の権限を取得しました。',
+      authorities
+    },
+    verification
+  );
 }
 
 function updateDriveImageAuthorities(sheet, request, adminVerification) {
-  const verification = adminVerification || verifyAdminAccess(sheet, request);
+  const verification =
+    adminVerification && adminVerification.success
+      ? adminVerification
+      : verifyAdminAccess(sheet, request);
   if (!verification.success) {
     return verification;
   }
@@ -1094,11 +919,14 @@ function updateDriveImageAuthorities(sheet, request, adminVerification) {
   writeDriveImageAuthorities(request.authorities);
   const updated = readDriveImageAuthorities();
 
-  return withAdminVerification({
-    success: true,
-    message: 'Drive画像の権限を保存しました。',
-    authorities: updated
-  }, verification);
+  return extendWithAdminToken(
+    {
+      success: true,
+      message: 'Drive画像の権限を保存しました。',
+      authorities: updated
+    },
+    verification
+  );
 }
 
 function getDriveImagePermissions(request) {
@@ -1274,8 +1102,7 @@ function parseRequest(e) {
     role: data.role || data.targetRole || '',
     authorities: data.authorities,
     resourceType: data.resourceType || data.type || '',
-    authorityLevel: data.authorityLevel || data.authority,
-    adminToken: data.adminToken || data.adminSessionToken || data.token || ''
+    authorityLevel: data.authorityLevel || data.authority
   };
 }
 
@@ -1413,13 +1240,7 @@ function buildResponse(result, origin) {
     'authorities',
     'permissions',
     'authority',
-    'role',
-    'adminToken',
-    'adminTokenIssuedAt',
-    'adminTokenExpiresAt',
-    'adminAuthority',
-    'adminEmail',
-    'requiresReauthentication'
+    'role'
   ];
 
   optionalFields.forEach(function(field) {
