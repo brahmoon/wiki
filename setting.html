@@ -1244,195 +1244,6 @@
             }
         };
 
-        const adminSession = {
-            email: '',
-            googleEmail: '',
-            token: '',
-            issuedAt: '',
-            expiresAt: '',
-            authority: null
-        };
-
-        const persistLoginState = (state) => {
-            if (!state) {
-                return;
-            }
-            try {
-                localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(state));
-            } catch (error) {
-                console.warn('ログイン状態の保存に失敗しました。', error);
-            }
-        };
-
-        const loadAdminSessionFromState = (state) => {
-            if (!state || !state.adminSession) {
-                return;
-            }
-            const storedSession = state.adminSession;
-            adminSession.email = storedSession.email || '';
-            adminSession.googleEmail = storedSession.googleEmail || state.user?.email || '';
-            adminSession.token = storedSession.token || '';
-            adminSession.issuedAt = storedSession.tokenIssuedAt || storedSession.issuedAt || '';
-            adminSession.expiresAt = storedSession.tokenExpiresAt || storedSession.expiresAt || '';
-            adminSession.authority = typeof storedSession.authority === 'number' ? storedSession.authority : null;
-        };
-
-        const updateAdminSessionFromVerification = (verification) => {
-            if (!verification || !verification.success) {
-                return;
-            }
-
-            const merged = {
-                success: true,
-                playerId: verification.playerId ?? adminVerificationResult?.playerId ?? currentLoginState?.user?.playerId ?? '',
-                username: verification.username ?? adminVerificationResult?.username ?? currentLoginState?.user?.username ?? currentLoginState?.user?.name ?? '',
-                email: verification.email ?? verification.adminEmail ?? adminVerificationResult?.email ?? adminSession.email || currentLoginState?.user?.email || '',
-                googleAccountEmail: verification.googleAccountEmail ?? adminVerificationResult?.googleAccountEmail ?? adminSession.googleEmail || currentLoginState?.user?.email || '',
-                authority: typeof verification.authority === 'number'
-                    ? verification.authority
-                    : (typeof adminVerificationResult?.authority === 'number' ? adminVerificationResult.authority : adminSession.authority),
-                adminAuthority: typeof verification.adminAuthority === 'number'
-                    ? verification.adminAuthority
-                    : (typeof verification.authority === 'number'
-                        ? verification.authority
-                        : (typeof adminVerificationResult?.adminAuthority === 'number'
-                            ? adminVerificationResult.adminAuthority
-                            : adminSession.authority)),
-                adminToken: verification.adminToken || adminSession.token || '',
-                adminTokenIssuedAt: verification.adminTokenIssuedAt || adminSession.issuedAt || '',
-                adminTokenExpiresAt: verification.adminTokenExpiresAt || adminSession.expiresAt || '',
-                adminEmail: verification.adminEmail || verification.email || adminVerificationResult?.adminEmail || adminSession.email || currentLoginState?.user?.email || ''
-            };
-
-            adminSession.email = merged.adminEmail;
-            adminSession.googleEmail = merged.googleAccountEmail || merged.email;
-            adminSession.token = merged.adminToken;
-            adminSession.issuedAt = merged.adminTokenIssuedAt;
-            adminSession.expiresAt = merged.adminTokenExpiresAt;
-            adminSession.authority = merged.adminAuthority;
-
-            adminVerificationResult = merged;
-
-            const baseState = currentLoginState || getStoredLoginState() || {};
-            const nextState = {
-                ...baseState,
-                user: baseState.user ? { ...baseState.user } : { ...(currentLoginState?.user || {}) }
-            };
-
-            if (nextState.user) {
-                if (merged.playerId) {
-                    nextState.user.playerId = merged.playerId;
-                }
-                if (merged.username) {
-                    nextState.user.username = merged.username;
-                }
-                if (merged.email) {
-                    nextState.user.email = merged.email;
-                }
-                if (typeof merged.authority === 'number') {
-                    nextState.user.authority = merged.authority;
-                }
-            }
-
-            nextState.adminSession = {
-                token: adminSession.token,
-                tokenIssuedAt: adminSession.issuedAt,
-                tokenExpiresAt: adminSession.expiresAt,
-                email: adminSession.email,
-                googleEmail: adminSession.googleEmail,
-                authority: adminSession.authority
-            };
-
-            currentLoginState = nextState;
-            persistLoginState(nextState);
-        };
-
-        const clearAdminSession = () => {
-            adminSession.email = '';
-            adminSession.googleEmail = '';
-            adminSession.token = '';
-            adminSession.issuedAt = '';
-            adminSession.expiresAt = '';
-            adminSession.authority = null;
-            adminVerificationResult = null;
-
-            if (!currentLoginState) {
-                currentLoginState = getStoredLoginState() || null;
-            }
-
-            if (currentLoginState) {
-                const nextState = { ...currentLoginState };
-                if (nextState.adminSession) {
-                    delete nextState.adminSession;
-                }
-                currentLoginState = nextState;
-                persistLoginState(nextState);
-            }
-        };
-
-        const refreshAdminSessionFromResponse = (result) => {
-            if (!result) {
-                return;
-            }
-            if (result.requiresReauthentication) {
-                clearAdminSession();
-                return;
-            }
-            if (
-                result.adminToken ||
-                result.adminTokenIssuedAt ||
-                result.adminTokenExpiresAt ||
-                Object.prototype.hasOwnProperty.call(result, 'adminAuthority') ||
-                Object.prototype.hasOwnProperty.call(result, 'authority') ||
-                result.adminEmail ||
-                result.googleAccountEmail ||
-                result.email
-            ) {
-                updateAdminSessionFromVerification({
-                    success: true,
-                    adminToken: result.adminToken,
-                    adminTokenIssuedAt: result.adminTokenIssuedAt,
-                    adminTokenExpiresAt: result.adminTokenExpiresAt,
-                    adminAuthority: result.adminAuthority,
-                    authority: result.authority,
-                    adminEmail: result.adminEmail,
-                    email: result.email,
-                    googleAccountEmail: result.googleAccountEmail
-                });
-            }
-        };
-
-        const buildAdminRequestPayload = (payload = {}) => {
-            const base = { ...payload };
-            if (!Object.prototype.hasOwnProperty.call(base, 'email')) {
-                base.email = adminSession.email || currentLoginState?.user?.email || '';
-            }
-            if (!Object.prototype.hasOwnProperty.call(base, 'googleEmail')) {
-                base.googleEmail = adminSession.googleEmail || currentLoginState?.user?.email || '';
-            }
-            if (!Object.prototype.hasOwnProperty.call(base, 'adminToken')) {
-                base.adminToken = adminSession.token || '';
-            }
-            return base;
-        };
-
-        const processAdminResult = (result, defaultMessage) => {
-            if (!result) {
-                throw new Error(defaultMessage || '管理者操作に失敗しました。');
-            }
-            if (!result.success) {
-                if (result.requiresReauthentication) {
-                    clearAdminSession();
-                    const error = new Error(result.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    error.requiresReauthentication = true;
-                    throw error;
-                }
-                throw new Error(result.message || defaultMessage || '管理者操作に失敗しました。');
-            }
-            refreshAdminSessionFromResponse(result);
-            return result;
-        };
-
         const getStoredLoginState = () => {
             try {
                 const value = localStorage.getItem(LOGIN_STORAGE_KEY);
@@ -2094,9 +1905,9 @@
                 throw new Error('権限管理APIのエンドポイントが設定されていません。');
             }
 
-            const payload = {
+            const payload = Object.assign({}, getAdminRequestContext(), {
                 action: 'getDriveImageAuthorities'
-            };
+            });
 
             const response = await fetch(APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION, {
                 method: 'POST',
@@ -2105,7 +1916,7 @@
                 headers: {
                     'Content-Type': 'text/plain'
                 },
-                body: JSON.stringify(buildAdminRequestPayload(payload))
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -2114,9 +1925,15 @@
             }
 
             const result = await response.json().catch(() => null);
-            const processed = processAdminResult(result, '権限設定の取得に失敗しました。');
+            syncAdminSessionFromResult(result);
+            if (!result || !result.success) {
+                if (isAdminAuthorizationFailure(result)) {
+                    handleAdminAuthorizationFailure(result);
+                }
+                throw new Error((result && result.message) || '権限設定の取得に失敗しました。');
+            }
 
-            return processed.authorities || {};
+            return result.authorities || {};
         };
 
         const buildAuthorityPayload = () => {
@@ -2174,10 +1991,6 @@
                 }
             } catch (error) {
                 console.error('Drive画像権限の取得に失敗しました。', error);
-                if (error && error.requiresReauthentication) {
-                    showAuthorizationError(error.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    return;
-                }
                 driveImageAuthorityState.loaded = false;
                 showAuthorityError(error && error.message ? error.message : '権限設定の取得に失敗しました。');
             } finally {
@@ -2200,7 +2013,7 @@
                 return;
             }
 
-            const payload = buildAdminRequestPayload({
+            const payload = Object.assign({}, getAdminRequestContext(), {
                 action: 'updateDriveImageAuthorities',
                 authorities: buildAuthorityPayload()
             });
@@ -2225,17 +2038,19 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                const processed = processAdminResult(result, '権限設定の保存に失敗しました。');
+                syncAdminSessionFromResult(result);
+                if (!result || !result.success) {
+                    if (isAdminAuthorizationFailure(result)) {
+                        handleAdminAuthorizationFailure(result);
+                    }
+                    throw new Error((result && result.message) || '権限設定の保存に失敗しました。');
+                }
 
-                mergeAuthorityData(processed.authorities || {});
+                mergeAuthorityData(result.authorities || {});
                 setAuthorityDirty(false);
                 setAuthorityStatus('権限設定を保存しました。', 'success');
             } catch (error) {
                 console.error('Drive画像権限の保存に失敗しました。', error);
-                if (error && error.requiresReauthentication) {
-                    showAuthorizationError(error.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    return;
-                }
                 setAuthorityStatus(error && error.message ? error.message : '権限設定の保存に失敗しました。', 'error');
             } finally {
                 setAuthoritySaving(false);
@@ -2509,10 +2324,6 @@
                 member.authority = latestAuthority;
             } catch (error) {
                 console.error('権限の更新に失敗しました。', error);
-                if (error && error.requiresReauthentication) {
-                    showAuthorizationError(error.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    return;
-                }
                 status.textContent = error && error.message ? error.message : '権限の更新に失敗しました。';
                 status.classList.add('is-error');
             } finally {
@@ -2531,7 +2342,7 @@
                 throw new Error('管理者認証APIのエンドポイントが設定されていません。');
             }
 
-            const payload = buildAdminRequestPayload({
+            const payload = Object.assign({}, getAdminRequestContext(), {
                 action: 'updateAuthority',
                 targetPlayerId,
                 authority
@@ -2553,8 +2364,15 @@
             }
 
             const result = await response.json().catch(() => null);
-            const processed = processAdminResult(result, '権限の更新に失敗しました。');
-            return processed;
+            syncAdminSessionFromResult(result);
+            if (!result || !result.success) {
+                if (isAdminAuthorizationFailure(result)) {
+                    handleAdminAuthorizationFailure(result);
+                }
+                throw new Error((result && result.message) || '権限の更新に失敗しました。');
+            }
+
+            return result;
         };
 
         const loadToolbarPluginSettings = async () => {
@@ -2590,11 +2408,7 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify(
-                        buildAdminRequestPayload({
-                            action: 'getToolbarPlugins'
-                        })
-                    )
+                    body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
@@ -2603,18 +2417,20 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                const processed = processAdminResult(result, 'プラグイン設定の取得に失敗しました。');
+                syncAdminSessionFromResult(result);
+                if (!result || !result.success) {
+                    if (isAdminAuthorizationFailure(result)) {
+                        handleAdminAuthorizationFailure(result);
+                    }
+                    throw new Error((result && result.message) || 'プラグイン設定の取得に失敗しました。');
+                }
 
-                applyToolbarStatesToUI(processed.toolbarConfig?.states);
+                applyToolbarStatesToUI(result.toolbarConfig?.states);
                 pluginSettingsLoaded = true;
                 setPluginDirtyState(false);
                 setPluginStatusMessage('最新の設定を読み込みました。', 'success');
             } catch (error) {
                 console.error('プラグイン設定の取得に失敗しました。', error);
-                if (error && error.requiresReauthentication) {
-                    showAuthorizationError(error.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    return;
-                }
                 pluginSettingsLoaded = false;
                 setPluginStatusMessage(error && error.message ? error.message : 'プラグイン設定の取得に失敗しました。', 'error');
             } finally {
@@ -2643,7 +2459,7 @@
             }
 
             const states = getCurrentToolbarStates();
-            const payload = buildAdminRequestPayload({
+            const payload = Object.assign({}, getAdminRequestContext(), {
                 action: 'updateToolbarPlugins',
                 toolbarKeys: TOOLBAR_FEATURES.map((feature) => feature.key),
                 toolbarStates: states
@@ -2672,18 +2488,20 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                const processed = processAdminResult(result, 'プラグイン設定の保存に失敗しました。');
+                syncAdminSessionFromResult(result);
+                if (!result || !result.success) {
+                    if (isAdminAuthorizationFailure(result)) {
+                        handleAdminAuthorizationFailure(result);
+                    }
+                    throw new Error((result && result.message) || 'プラグイン設定の保存に失敗しました。');
+                }
 
-                applyToolbarStatesToUI(processed.toolbarConfig?.states);
+                applyToolbarStatesToUI(result.toolbarConfig?.states);
                 pluginSettingsLoaded = true;
                 setPluginDirtyState(false);
                 setPluginStatusMessage('TipTapツールバーの設定を保存しました。', 'success');
             } catch (error) {
                 console.error('プラグイン設定の保存に失敗しました。', error);
-                if (error && error.requiresReauthentication) {
-                    showAuthorizationError(error.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    return;
-                }
                 setPluginStatusMessage(error && error.message ? error.message : 'プラグイン設定の保存に失敗しました。', 'error');
             } finally {
                 if (pluginSaveButton) {
@@ -2801,11 +2619,7 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify(
-                        buildAdminRequestPayload({
-                            action: 'listMembers'
-                        })
-                    )
+                    body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
@@ -2814,17 +2628,19 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                const processed = processAdminResult(result, 'ユーザー情報を取得できませんでした。');
+                syncAdminSessionFromResult(result);
+                if (!result || !result.success) {
+                    if (isAdminAuthorizationFailure(result)) {
+                        handleAdminAuthorizationFailure(result);
+                    }
+                    throw new Error((result && result.message) || 'ユーザー情報を取得できませんでした。');
+                }
 
-                const members = Array.isArray(processed.members) ? processed.members : [];
+                const members = Array.isArray(result.members) ? result.members : [];
                 renderMemberTable(members);
                 memberDataLoaded = true;
             } catch (error) {
                 console.error('ユーザー情報の取得に失敗しました。', error);
-                if (error && error.requiresReauthentication) {
-                    showAuthorizationError(error.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    return;
-                }
                 showMemberError(error && error.message ? error.message : 'ユーザー情報の取得に失敗しました。');
             } finally {
                 setMemberLoading(false);
@@ -2889,10 +2705,12 @@
             const timeoutId = window.setTimeout(() => controller.abort(), ADMIN_AUTH_TIMEOUT);
 
             try {
-                const payload = buildAdminRequestPayload({
+                const payload = {
                     action: 'verifyAdminAccess',
+                    email: loginState?.user?.email || '',
+                    googleEmail: loginState?.user?.email || '',
                     origin: window.location.origin
-                });
+                };
 
                 if (adminVerificationResult?.adminToken) {
                     payload.adminToken = adminVerificationResult.adminToken;
@@ -2915,11 +2733,12 @@
                 }
 
                 const result = await response.json().catch(() => null);
+
                 if (!result) {
                     throw new Error('管理者認証の結果を取得できませんでした。');
                 }
 
-                return processAdminResult(result, '管理者認証に失敗しました。');
+                return result;
             } catch (error) {
                 if (error.name === 'AbortError') {
                     throw new Error('管理者認証のリクエストがタイムアウトしました。');
@@ -2947,19 +2766,27 @@
                 return;
             }
 
-            currentLoginState = loginState;
-            loadAdminSessionFromState(loginState);
-
             try {
                 const verification = await callAdminAuthorizationApi(loginState);
-                updateAdminSessionFromVerification(verification);
+                if (!verification.success) {
+                    showAuthorizationError(verification.message || '管理者権限が確認できませんでした。');
+                    return;
+                }
+
+                currentLoginState = loginState;
+                adminVerificationResult = verification;
+
+                if (currentLoginState?.user) {
+                    currentLoginState.user.authority = verification.authority ?? currentLoginState.user.authority ?? null;
+                }
+
                 hideAuthorizationError();
 
                 const authorizedUser = {
-                    playerId: adminVerificationResult?.playerId || user.playerId || '',
-                    username: adminVerificationResult?.username || user.username || user.name || '',
-                    email: adminVerificationResult?.email || user.email || '',
-                    authority: adminVerificationResult?.authority ?? user.authority ?? null
+                    playerId: verification.playerId || user.playerId || '',
+                    username: verification.username || user.username || user.name || '',
+                    email: verification.email || user.email || '',
+                    authority: verification.authority ?? user.authority ?? null
                 };
 
                 const displayName = (authorizedUser.username || authorizedUser.email || '').trim();
@@ -3004,10 +2831,6 @@
                 });
             } catch (error) {
                 console.error('管理者認証中にエラーが発生しました。', error);
-                if (error && error.requiresReauthentication) {
-                    showAuthorizationError(error.message || '管理者セッションが無効になりました。再度ログインしてください。');
-                    return;
-                }
                 showAuthorizationError(error.message || '管理者認証中にエラーが発生しました。');
             }
         };
