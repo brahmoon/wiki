@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NodeFlow</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <h1 class="sidebar__title">NodeFlow</h1>
+        <button id="addNodeButton" class="sidebar__action" type="button">ノード追加</button>
+      </div>
+      <nav class="sidebar__tree" id="tree" aria-label="ノード一覧"></nav>
+      <div class="sidebar__status" id="sidebarStatus">
+        <button class="sidebar__config" id="sidebarConfigButton" type="button" aria-label="設定">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm9-3.5c0-.51-.04-1.01-.11-1.5l2.02-1.57a1 1 0 0 0 .24-1.3l-1.92-3.32a1 1 0 0 0-1.23-.44l-2.38.96a8.1 8.1 0 0 0-1.3-.75l-.36-2.54A1 1 0 0 0 14 1h-4a1 1 0 0 0-.99.84l-.36 2.54c-.45.2-.88.44-1.3.72l-2.38-.95a1 1 0 0 0-1.23.44L1.82 7.91a1 1 0 0 0 .24 1.3l2.02 1.57A9 9 0 0 0 4 12c0 .51.04 1.01.11 1.5l-2.02 1.57a1 1 0 0 0-.24 1.3l1.92 3.32a1 1 0 0 0 1.23.44l2.38-.96c.42.3.85.55 1.3.75l.36 2.54c.07.5.5.88.99.84h4c.5.04.93-.34 1-.84l.36-2.54c.45-.2.88-.44 1.3-.72l2.38.95c.46.18.99-.02 1.23-.44l1.92-3.32a1 1 0 0 0-.24-1.3l-2.02-1.57c.07-.49.11-.99.11-1.5Z"/></svg>
+        </button>
+        <div class="sidebar__settings" id="sidebarSettings" role="dialog" aria-hidden="true">
+          <div class="sidebar__settings-header">
+            <h2>設定</h2>
+            <button type="button" class="sidebar__settings-close" id="sidebarSettingsClose" aria-label="設定を閉じる">×</button>
+          </div>
+          <label class="theme-toggle">
+            <span>テーマ</span>
+            <input type="checkbox" id="themeToggle" />
+            <span class="theme-toggle__slider" aria-hidden="true"></span>
+            <span class="theme-toggle__label" data-light="ライト" data-dark="ダーク"></span>
+          </label>
+        </div>
+      </div>
+    </aside>
+    <main class="workspace" id="workspace" aria-live="polite">
+      <h2 id="workspaceTitle">ノードを選択してください</h2>
+      <div id="workspaceDetails" class="workspace__details"></div>
+    </main>
+    <div class="context-menu" id="contextMenu" role="menu" aria-hidden="true"></div>
+  </div>
+  <script type="module" src="./script.js"></script>
+</body>
+</html>
