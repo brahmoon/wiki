@@ -11,7 +11,7 @@ body {
     margin:30px;
 }
 
-/* --- カード枠 --- */
+/* --- カード --- */
 .card {
     background:#2b3040;
     padding:20px;
@@ -20,17 +20,18 @@ body {
     width: fit-content;
 }
 
-/* スロット配置 */
-.wrapper {
+/* 行（1行が1人の英雄＋スキルセット） */
+.row {
     display:flex;
     align-items:center;
     gap:20px;
+    margin-bottom:10px;
 }
 
-/* 英雄スロット（サイズそのまま） */
+/* --- 英雄スロット --- */
 .hero-slot {
-    width:90px;
-    height:90px;
+    width:60px;
+    height:60px;
     border:2px dashed #888;
     border-radius:10px;
     display:flex;
@@ -38,17 +39,18 @@ body {
     justify-content:center;
     background:#2a2f3d;
     cursor:pointer;
+    position:relative;
 }
 .hero-slot img {
-    width:100%;
-    height:100%;
+    width:60px !important;    /* ←★ 60px表示 */
+    height:60px !important;
     border-radius:10px;
 }
 
-/* ⭐ スキルスロット（50%に縮小） */
+/* スキルスロット（50%サイズ） */
 .skill-slot {
-    width:45px !important;
-    height:45px !important;
+    width:45px;
+    height:45px;
     border:2px dashed #888;
     border-radius:6px;
     display:flex;
@@ -56,6 +58,7 @@ body {
     justify-content:center;
     background:#2a2f3d;
     cursor:pointer;
+    position:relative;
 }
 .skill-slot img {
     width:100%;
@@ -67,8 +70,10 @@ body {
 .plus {
     font-size:22px;
     opacity:0.4;
+    pointer-events:none;
 }
 
+/* ボタン */
 #editToggle {
     position:fixed;
     top:20px;
@@ -80,8 +85,8 @@ body {
     cursor:pointer;
 }
 
-/* --- スキル説明ポップアップ --- */
-.skill-popup {
+/* --- 情報ポップアップ（英雄＆スキル共通） --- */
+.info-popup {
     position:absolute;
     background:white;
     color:black;
@@ -93,7 +98,7 @@ body {
     width:260px;
     box-shadow:0 0 5px rgba(0,0,0,0.4);
 }
-.skill-popup-close {
+.info-popup-close {
     position:absolute;
     top:4px;
     right:4px;
@@ -107,12 +112,12 @@ body {
     cursor:pointer;
     border-radius:3px;
 }
-.skill-popup button {
+.info-popup button {
     margin-top:10px;
     width:100%;
 }
 
-/* 選択ポップアップ */
+/* --- 選択ポップアップ --- */
 .popup-bg {
     position:fixed;
     inset:0;
@@ -131,6 +136,7 @@ body {
     overflow:auto;
     border-radius:10px;
 }
+.popup h2 { margin-top:0; }
 .icon-list {
     display:flex;
     flex-wrap:wrap;
@@ -146,37 +152,68 @@ body {
 .icon-list img:hover {
     border-color:#3c6;
 }
+
+/* --- 斜線アイコン --- */
+.empty-img {
+    width:70%;
+    height:70%;
+    opacity:0.7;
+}
+
+/* ←★ padding 削除済み */
+.empty-list-icon {
+    width:70px;
+    height:70px;
+    background:white;
+    border:2px solid #555;
+    border-radius:10px;
+    cursor:pointer;
+}
+
 </style>
 </head>
 <body>
 
 <button id="editToggle">編集</button>
 
-<h2>英雄スキル構成プロトタイプ</h2>
+<h2>英雄スキル構成プロトタイプ（2人分）</h2>
 
-<!-- ⭐ カードで全体を囲む -->
 <div class="card">
-    <div class="wrapper">
-        <div id="heroSlot" class="hero-slot" data-type="hero">
+
+    <!-- 1人目 -->
+    <div class="row">
+        <div id="hero_row1" class="hero-slot" data-row="row1">
             <span class="plus">+</span>
         </div>
-
-        <!-- スキルスロットは50% サイズ -->
-        <div id="skill1" class="skill-slot fixed-skill"></div>
-        <div id="skill2" class="skill-slot editable"><span class="plus">+</span></div>
-        <div id="skill3" class="skill-slot editable"><span class="plus">+</span></div>
-        <div id="skill4" class="skill-slot fixed-skill"></div>
+        <div id="row1_skill1" class="skill-slot fixed-skill"></div>
+        <div id="row1_skill2" class="skill-slot editable"><span class="plus">+</span></div>
+        <div id="row1_skill3" class="skill-slot editable"><span class="plus">+</span></div>
+        <div id="row1_skill4" class="skill-slot fixed-skill"></div>
     </div>
+
+    <!-- 2人目 -->
+    <div class="row">
+        <div id="hero_row2" class="hero-slot" data-row="row2">
+            <span class="plus">+</span>
+        </div>
+        <div id="row2_skill1" class="skill-slot fixed-skill"></div>
+        <div id="row2_skill2" class="skill-slot editable"><span class="plus">+</span></div>
+        <div id="row2_skill3" class="skill-slot editable"><span class="plus">+</span></div>
+        <div id="row2_skill4" class="skill-slot fixed-skill"></div>
+    </div>
+
 </div>
 
-<!-- スキル説明ポップアップ -->
-<div id="skillPopup" class="skill-popup">
-    <div class="skill-popup-close" onclick="skillPopup.style.display='none'">×</div>
-    <div id="skillDesc"></div>
+
+<!-- 英雄/スキル説明ポップアップ -->
+<div id="infoPopup" class="info-popup">
+    <div class="info-popup-close" onclick="infoPopup.style.display='none'">×</div>
+    <div id="infoContent"></div>
     <button id="openDetail">詳細表示</button>
 </div>
 
-<!-- 英雄/スキル選択ポップアップ -->
+
+<!-- 選択ポップアップ -->
 <div id="selectPopup" class="popup-bg">
     <div class="popup">
         <h2 id="popupTitle"></h2>
@@ -184,181 +221,396 @@ body {
     </div>
 </div>
 
+
 <script>
 // ---------------------------------------------------------
-// JSON（サンプルデータ）
+// 斜線 SVG（決定状態で使う）
+// ---------------------------------------------------------
+const EMPTY_ICON_SRC =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(`
+    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
+      <rect width='64' height='64' fill='none'/>
+      <line x1='8' y1='56' x2='56' y2='8'
+        stroke='#666' stroke-width='2' stroke-linecap='round'/>
+    </svg>
+  `);
+
+// ---------------------------------------------------------
+// JSON データ
 // ---------------------------------------------------------
 const heroes = [
-    { id:1, name:"Hero-A", icon:"img/heroA.png",
-      skills:[
-        { id:"h1", icon:"img/skillA1.png", desc:"Hero A Skill 1 説明", url:"https://example.com" },
-        { id:"h2", icon:"img/skillA2.png", desc:"Hero A Skill 2 説明", url:"https://example.com" },
-        { id:"h3", icon:"img/skillA3.png", desc:"Hero A Skill 3 説明", url:"https://example.com" },
-      ]
+    {
+        id:1, name:"Hero-A", icon:"img/heroA.png",
+        desc:"Hero A の説明テキストです。",
+        url:"#",
+        skills:[
+            { id:"h1", name:"HeroA Skill1", icon:"img/skillA1.png", desc:"Hero A Skill 1 説明", url:"#"},
+            { id:"h2", name:"HeroA Skill2", icon:"img/skillA2.png", desc:"Hero A Skill 2 説明", url:"#"},
+            { id:"h3", name:"HeroA Skill3", icon:"img/skillA3.png", desc:"Hero A Skill 3 説明", url:"#"}
+        ]
     },
-    { id:2, name:"Hero-B", icon:"img/heroB.png",
-      skills:[
-        { id:"h4", icon:"img/skillB1.png", desc:"Hero B Skill 1 説明", url:"https://example.com" },
-        { id:"h5", icon:"img/skillB2.png", desc:"Hero B Skill 2 説明", url:"https://example.com" },
-        { id:"h6", icon:"img/skillB3.png", desc:"Hero B Skill 3 説明", url:"https://example.com" },
-      ]
+    {
+        id:2, name:"Hero-B", icon:"img/heroB.png",
+        desc:"Hero B の説明テキストです。",
+        url:"#",
+        skills:[
+            { id:"h4", name:"HeroB Skill1", icon:"img/skillB1.png", desc:"Hero B Skill 1 説明", url:"#"},
+            { id:"h5", name:"HeroB Skill2", icon:"img/skillB2.png", desc:"Hero B Skill 2 説明", url:"#"},
+            { id:"h6", name:"HeroB Skill3", icon:"img/skillB3.png", desc:"Hero B Skill 3 説明", url:"#"}
+        ]
     }
 ];
 
 const allSkills = [
-    { id:"s1", icon:"img/skill1.png", desc:"スキル1 説明", url:"https://example.com/skill1" },
-    { id:"s2", icon:"img/skill2.png", desc:"スキル2 説明", url:"https://example.com/skill2" },
-    { id:"s3", icon:"img/skill3.png", desc:"スキル3 説明", url:"https://example.com/skill3" },
+    { id:"s1", name:"汎用スキル1", icon:"img/skill1.png", desc:"スキル1 説明", url:"#"},
+    { id:"s2", name:"汎用スキル2", icon:"img/skill2.png", desc:"スキル2 説明", url:"#"},
+    { id:"s3", name:"汎用スキル3", icon:"img/skill3.png", desc:"スキル3 説明", url:"#"}
 ];
 
-let selectedHero = null;
-let selectedSkills = { skill2:null, skill3:null };
+
+// ---------------------------------------------------------
+// 状態管理
+// ---------------------------------------------------------
 let editing = false;
 
-const heroSlot = document.getElementById("heroSlot");
-const slots = {
-    skill1: document.getElementById("skill1"),
-    skill2: document.getElementById("skill2"),
-    skill3: document.getElementById("skill3"),
-    skill4: document.getElementById("skill4"),
+const selectedHeroes = { row1:null, row2:null };
+
+const selectedUserSkills = {
+    "row1_skill2":null,
+    "row1_skill3":null,
+    "row2_skill2":null,
+    "row2_skill3":null
 };
 
-const popupBG = document.getElementById("selectPopup");
-const popupList = document.getElementById("popupList");
-const popupTitle = document.getElementById("popupTitle");
 
-const skillPopup = document.getElementById("skillPopup");
-const skillDesc = document.getElementById("skillDesc");
+// ---------------------------------------------------------
+// DOM 取得
+// ---------------------------------------------------------
+const heroSlots = {
+    row1: document.getElementById("hero_row1"),
+    row2: document.getElementById("hero_row2")
+};
+
+const skillSlots = {
+    row1: {
+        skill1: document.getElementById("row1_skill1"),
+        skill2: document.getElementById("row1_skill2"),
+        skill3: document.getElementById("row1_skill3"),
+        skill4: document.getElementById("row1_skill4")
+    },
+    row2: {
+        skill1: document.getElementById("row2_skill1"),
+        skill2: document.getElementById("row2_skill2"),
+        skill3: document.getElementById("row2_skill3"),
+        skill4: document.getElementById("row2_skill4")
+    }
+};
+
+const popupBG   = document.getElementById("selectPopup");
+const popupList = document.getElementById("popupList");
+const popupTitle= document.getElementById("popupTitle");
+
+const infoPopup  = document.getElementById("infoPopup");
+const infoContent= document.getElementById("infoContent");
 const openDetail = document.getElementById("openDetail");
 
 
 // ---------------------------------------------------------
-// 編集/決定
+// スロット表示更新（決定→斜線 / 編集→＋）
 // ---------------------------------------------------------
-document.getElementById("editToggle").onclick = ()=>{
+function updateSlotVisualState() {
+    document.querySelectorAll(".hero-slot, .skill-slot").forEach(slot => {
+
+        const isHero    = slot.classList.contains("hero-slot");
+        const isEditable= slot.classList.contains("editable");
+
+        const plusEl = slot.querySelector(".plus");
+        const realImg = slot.querySelector("img:not([data-empty='true'])");
+        const emptyImg = slot.querySelector("img[data-empty='true']");
+
+        // 編集モード
+        if (editing) {
+            slot.style.borderStyle = "dashed";
+
+            // 斜線は消す
+            if (emptyImg) emptyImg.remove();
+
+            if (!realImg && (isHero || isEditable)) {
+                if (plusEl) plusEl.style.display = "block";
+            } else {
+                if (plusEl) plusEl.style.display = "none";
+            }
+            return;
+        }
+
+        // 決定モード
+        slot.style.borderStyle = "solid";
+        if (plusEl) plusEl.style.display = "none";
+
+        if (!realImg) {
+            // 空スロット → 斜線アイコン
+            if (!emptyImg) {
+                const img = document.createElement("img");
+                img.src = EMPTY_ICON_SRC;
+                img.className = "empty-img";
+                img.dataset.empty = "true";
+                slot.appendChild(img);
+            }
+        } else {
+            if (emptyImg) emptyImg.remove();
+        }
+    });
+}
+
+// 初期反映
+updateSlotVisualState();
+
+
+// ---------------------------------------------------------
+// 編集 / 決定 トグル
+// ---------------------------------------------------------
+document.getElementById("editToggle").onclick = () => {
     editing = !editing;
-    document.getElementById("editToggle").textContent = editing ? "決定" : "編集";
+    document.getElementById("editToggle").textContent =
+        editing ? "決定" : "編集";
+
+    if (!editing) {
+        console.log("保存された構成:", {
+            heroes:selectedHeroes,
+            skills:selectedUserSkills
+        });
+    }
+
+    updateSlotVisualState();
 };
 
 
 // ---------------------------------------------------------
-// スキルアイコンクリック → 説明ポップアップ
+// スロットクリック（編集時→選択 / 決定時→説明）
 // ---------------------------------------------------------
-document.querySelectorAll(".skill-slot, .hero-slot").forEach(slot => {
+document.querySelectorAll(".hero-slot, .skill-slot").forEach(slot => {
     slot.addEventListener("click", (e) => {
 
-        if (editing) return;
+        if (editing) {
+            e.stopPropagation();
+
+            if (slot.classList.contains("hero-slot")) {
+                openHeroSelectPopup(slot.dataset.row);
+            }
+            else if (slot.classList.contains("editable")) {
+                openSkillSelectPopup(slot.id);
+            }
+            return;
+        }
+
+        // 閲覧モード：説明表示
+        const desc = slot.dataset.desc;
+        const url = slot.dataset.url;
+        const name = slot.dataset.name;
+        if (!desc) return;
 
         e.stopPropagation();
 
-        const desc = slot.dataset.desc;
-        const url  = slot.dataset.url;
-
-        if (!desc) return;
-
-        skillDesc.textContent = desc;
-        openDetail.onclick = () => window.open(url, "_blank");
+        infoContent.innerHTML = `<strong>${name}</strong><br>${desc}`;
+        openDetail.onclick = () => url ? window.open(url,"_blank") : null;
 
         const rect = slot.getBoundingClientRect();
-        skillPopup.style.left = rect.left + "px";
-        skillPopup.style.top  = rect.bottom + "px";
-        skillPopup.style.display = "block";
+        infoPopup.style.left = rect.left+"px";
+        infoPopup.style.top  = rect.bottom+"px";
+        infoPopup.style.display = "block";
     });
 });
 
-// ポップアップ内部クリック → 閉じない
-skillPopup.addEventListener("click", (e) => {
-    e.stopPropagation();
-});
+// 説明ポップアップ内クリックで閉じない
+infoPopup.addEventListener("click", e=>e.stopPropagation());
 
-// ポップアップ外クリック → 閉じる
-document.addEventListener("click", (e) => {
-    if (skillPopup.style.display === "block" && !skillPopup.contains(e.target)) {
-        skillPopup.style.display = "none";
+// 外側クリックで閉じる
+document.addEventListener("click", e=>{
+    if(infoPopup.style.display==="block" && !infoPopup.contains(e.target)){
+        infoPopup.style.display="none";
     }
 });
 
 
-
 // ---------------------------------------------------------
-// 英雄・スキル選択処理
+// 英雄選択ポップアップ
 // ---------------------------------------------------------
-function openPopup(title, list, targetSlot){
-    popupTitle.textContent = title;
+function openHeroSelectPopup(row) {
+    popupTitle.textContent = "英雄選択";
     popupList.innerHTML = "";
 
-    list.forEach(item => {
+    // 他行の英雄ID
+    const otherRow = row === "row1" ? "row2":"row1";
+    const otherHeroId = selectedHeroes[otherRow]?.id || null;
 
-        // ★ 他のスロットで選択されているスキルを排除
-        const alreadySelected = Object.keys(selectedSkills)
-            .filter(k => k !== targetSlot)           // 自分以外の slot
-            .map(k => selectedSkills[k]?.id)
-            .includes(item.id);
+    // ★ その行に既に英雄が入っていれば解除アイコンを表示
+    if (selectedHeroes[row]) {
+        const clear = document.createElement("img");
+        clear.src = EMPTY_ICON_SRC;
+        clear.className = "empty-list-icon";
+        clear.title = "選択解除";
+        clear.onclick = () => {
+            clearHero(row);
+            popupBG.style.display = "none";
+        };
+        popupList.appendChild(clear);
+    }
 
-        if (alreadySelected) return;  // 表示しない（選択不可）
+    heroes.forEach(hero => {
+        if (hero.id === otherHeroId) return;
 
         const img = document.createElement("img");
-        img.src = item.icon;
-        img.onclick = () => selectItem(targetSlot, item);
+        img.src = hero.icon;
+        img.title = hero.name;
+        img.onclick = () => selectHero(row,hero);
         popupList.appendChild(img);
     });
 
-    popupBG.style.display="flex";
+    popupBG.style.display = "flex";
 }
 
 
-popupBG.addEventListener("click", (e)=>{
-    if (e.target === popupBG) popupBG.style.display="none";
-});
+// ---------------------------------------------------------
+// 英雄確定
+// ---------------------------------------------------------
+function selectHero(row, hero) {
+    popupBG.style.display = "none";
+    selectedHeroes[row] = hero;
+
+    const slot = heroSlots[row];
+
+    slot.innerHTML = `<img src="${hero.icon}" title="${hero.name}">`;
+    slot.dataset.desc = hero.desc;
+    slot.dataset.url  = hero.url;
+    slot.dataset.name = hero.name;
+
+    // 固定スキル
+    const f1 = hero.skills[0];
+    const f4 = hero.skills[2];
+
+    const slot1 = skillSlots[row].skill1;
+    slot1.innerHTML = `<img src="${f1.icon}" title="${f1.name}">`;
+    slot1.dataset.desc = f1.desc;
+    slot1.dataset.url = f1.url;
+    slot1.dataset.name= f1.name;
+
+    const slot4 = skillSlots[row].skill4;
+    slot4.innerHTML = `<img src="${f4.icon}" title="${f4.name}">`;
+    slot4.dataset.desc = f4.desc;
+    slot4.dataset.url  = f4.url;
+    slot4.dataset.name = f4.name;
+
+    updateSlotVisualState();
+}
 
 
-function selectItem(slotId, item){
-    popupBG.style.display="none";
+// ---------------------------------------------------------
+// 英雄解除（＋表示状態に戻す）
+// ---------------------------------------------------------
+function clearHero(row) {
+    selectedHeroes[row] = null;
 
-    // 英雄選択
-    if (slotId === "hero") {
-        selectedHero = item;
+    const heroSlot = heroSlots[row];
+    heroSlot.innerHTML = `<span class="plus">+</span>`;
+    delete heroSlot.dataset.desc;
+    delete heroSlot.dataset.url;
+    delete heroSlot.dataset.name;
 
-        heroSlot.innerHTML = `<img src="${item.icon}">`;
+    // 固定スキル2個も初期化
+    const s1 = skillSlots[row].skill1;
+    const s4 = skillSlots[row].skill4;
 
-        const fixed1 = item.skills[0];
-        const fixed4 = item.skills[2];
+    [s1,s4].forEach(s=>{
+        s.innerHTML = "";
+        delete s.dataset.desc;
+        delete s.dataset.url;
+        delete s.dataset.name;
+    });
 
-        slots.skill1.innerHTML = `<img src="${fixed1.icon}">`;
-        slots.skill1.dataset.desc = fixed1.desc;
-        slots.skill1.dataset.url  = fixed1.url;
+    updateSlotVisualState();
+}
 
-        slots.skill4.innerHTML = `<img src="${fixed4.icon}">`;
-        slots.skill4.dataset.desc = fixed4.desc;
-        slots.skill4.dataset.url  = fixed4.url;
 
-        return;
+// ---------------------------------------------------------
+// スキル選択ポップアップ
+// ---------------------------------------------------------
+function openSkillSelectPopup(slotId) {
+    popupTitle.textContent = "スキル選択";
+    popupList.innerHTML = "";
+
+    // 他の3スロットで使ってるスキルを除外
+    const usedIds = Object.entries(selectedUserSkills)
+      .filter(([id,val])=>id!==slotId && val)
+      .map(([id,val])=>val.id);
+
+    // ★ 現スロットにスキルが入っているときだけ解除アイコン
+    if (selectedUserSkills[slotId]) {
+        const clear = document.createElement("img");
+        clear.src = EMPTY_ICON_SRC;
+        clear.className = "empty-list-icon";
+        clear.title = "選択解除";
+        clear.onclick = () => {
+            clearUserSkill(slotId);
+            popupBG.style.display = "none";
+        };
+        popupList.appendChild(clear);
     }
 
-    // 任意スキル
-    selectedSkills[slotId] = item;
-    const slot = slots[slotId];
+    allSkills.forEach(skill => {
+        if (usedIds.includes(skill.id)) return;
 
-    slot.innerHTML = `<img src="${item.icon}">`;
-    slot.dataset.desc = item.desc;
-    slot.dataset.url  = item.url;
+        const img = document.createElement("img");
+        img.src = skill.icon;
+        img.title = skill.name;
+        img.onclick = () => selectUserSkill(slotId,skill);
+        popupList.appendChild(img);
+    });
+
+    popupBG.style.display = "flex";
 }
 
 
 // ---------------------------------------------------------
-// 編集モード時のスロットクリック
+// スキル確定
 // ---------------------------------------------------------
-document.querySelectorAll(".hero-slot, .skill-slot").forEach(slot=>{
-    slot.addEventListener("click", ()=>{
-        if (!editing) return;
+function selectUserSkill(slotId, skill) {
+    popupBG.style.display = "none";
+    selectedUserSkills[slotId] = skill;
 
-        if (slot.classList.contains("hero-slot")) {
-            openPopup("英雄選択", heroes, "hero");
-        } else if (slot.classList.contains("editable")) {
-            openPopup("スキル選択", allSkills, slot.id);
-        }
-    });
+    const slot = document.getElementById(slotId);
+    slot.innerHTML = `<img src="${skill.icon}" title="${skill.name}">`;
+    slot.dataset.desc = skill.desc;
+    slot.dataset.url  = skill.url;
+    slot.dataset.name = skill.name;
+
+    updateSlotVisualState();
+}
+
+
+// ---------------------------------------------------------
+// スキル解除（＋表示に戻す）
+// ---------------------------------------------------------
+function clearUserSkill(slotId) {
+    selectedUserSkills[slotId] = null;
+
+    const slot = document.getElementById(slotId);
+    slot.innerHTML = `<span class="plus">+</span>`;
+    delete slot.dataset.desc;
+    delete slot.dataset.url;
+    delete slot.dataset.name;
+
+    updateSlotVisualState();
+}
+
+
+// ---------------------------------------------------------
+// ポップアップ背景クリックで閉じる
+// ---------------------------------------------------------
+popupBG.addEventListener("click", e=>{
+    if(e.target===popupBG) popupBG.style.display="none";
 });
+
 </script>
 </body>
 </html>
