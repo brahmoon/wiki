@@ -610,6 +610,8 @@ function parseRequest(e) {
     limit: parsePositiveInteger(data.limit),
     offset: parsePositiveInteger(data.offset),
     playerId: data.playerId || data.loginId || data.email || '',
+    currentPlayerId: data.currentPlayerId || '',
+    requestedPlayerId: data.requestedPlayerId || data.pendingPlayerId || '',
     email: data.email || '',
     googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
     adminToken: data.adminToken || data.adminSessionToken || data.token || '',
