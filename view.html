@@ -337,6 +337,309 @@
       color: #6b6b67;
     }
 
+    .hero-skillset-card {
+      margin: 10px 0;
+      font-size: 12px;
+      color: #3d3b34;
+    }
+
+    .hero-skillset-card__body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hero-skillset-slot {
+      border: 1px solid #dfddd6;
+      border-radius: 14px;
+      background: #fffef9;
+      padding: 12px;
+    }
+
+    .hero-skillset-card__grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .hero-skillset-card__row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-skillset-card__row-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .hero-skillset-card__skills {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(56px, 1fr));
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .hero-skillset-cell {
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      padding: 4px 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 56px;
+      font-family: inherit;
+      text-align: left;
+      color: #3f3d37;
+    }
+
+    .hero-skillset-cell:is(button) {
+      cursor: pointer;
+    }
+
+    .hero-skillset-cell--hero {
+      flex: 0 0 auto;
+      min-width: 160px;
+      max-width: 220px;
+      justify-content: flex-start;
+    }
+
+    .hero-skillset-cell--skill {
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .hero-skillset-card--view .hero-skillset-cell--skill.hero-skillset-cell--fixed {
+      background: #f7f6f2;
+    }
+
+    .hero-skillset-cell__figure {
+      width: 46px;
+      height: 46px;
+      border-radius: 10px;
+      background: #f2f1ed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .hero-skillset-card--view .hero-skillset-cell__figure {
+      background: #f1f0ec;
+    }
+
+    .hero-skillset-card__skills .hero-skillset-cell__figure {
+      margin: 0 auto;
+    }
+
+    .hero-skillset-cell__figure img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hero-skillset-cell__placeholder {
+      font-size: 18px;
+      color: #b0aea8;
+    }
+
+    .hero-skillset-cell__label {
+      font-size: 12px;
+      line-height: 1.3;
+      font-weight: 600;
+      color: inherit;
+      display: inline-block;
+    }
+
+    .hero-skillset-cell--skill .hero-skillset-cell__label {
+      width: 100%;
+      font-size: 11px;
+    }
+
+    .hero-skillset-cell.is-empty .hero-skillset-cell__label {
+      color: #9a9892;
+      font-weight: 500;
+    }
+
+    .hero-skillset-card--view [data-info-type] {
+      cursor: pointer;
+    }
+
+    .hero-skillset-info-popup {
+      position: absolute;
+      min-width: 240px;
+      max-width: 280px;
+      background: #fff;
+      border: 1px solid #e2e1de;
+      border-radius: 12px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+      padding: 16px;
+      z-index: 100;
+      display: none;
+    }
+
+    .hero-skillset-info-popup.is-visible {
+      display: block;
+    }
+
+    .hero-skillset-info-popup__close {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      border: none;
+      background: transparent;
+      font-size: 16px;
+      cursor: pointer;
+      color: #6b6b67;
+    }
+
+    .hero-skillset-info-popup__title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 24px 6px 0;
+    }
+
+    .hero-skillset-info-popup__title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .hero-skillset-info-popup__body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-skillset-info-popup__description {
+      font-size: 13px;
+      color: #55534e;
+      line-height: 1.4;
+    }
+
+    .hero-skillset-info-popup__badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #edece7;
+      color: #56534d;
+    }
+
+    .hero-skillset-info-popup__badge--troop {
+      background: #e4f2ff;
+      color: #1465a3;
+    }
+
+    .hero-skillset-info-popup__badge--type {
+      background: #f0ebff;
+      color: #5a36a3;
+    }
+
+    .hero-skillset-info-popup__lines {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-skillset-info-popup__line {
+      font-size: 13px;
+      color: #474540;
+    }
+
+    .hero-skillset-info-popup__line-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .hero-skillset-info-popup__line-title {
+      font-size: 13px;
+    }
+
+    .hero-skillset-info-popup__line-description {
+      margin-top: 2px;
+      line-height: 1.5;
+      color: #5a5752;
+    }
+
+    .hero-skillset-info-popup__link {
+      display: inline-flex;
+      margin-top: 10px;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #2383e2;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    @media (max-width: 720px) {
+      .hero-skillset-card__body {
+        gap: 10px;
+      }
+
+      .hero-skillset-card__grid {
+        gap: 10px;
+      }
+
+      .hero-skillset-card__row {
+        gap: 6px;
+      }
+
+      .hero-skillset-card__row-content {
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .hero-skillset-card__skills {
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: repeat(5, minmax(34px, 1fr));
+        gap: 4px;
+      }
+
+      .hero-skillset-cell {
+        padding: 2px;
+        min-height: 44px;
+        gap: 4px;
+      }
+
+      .hero-skillset-cell--hero {
+        width: auto;
+        min-width: 0;
+        flex: 0 0 auto;
+      }
+
+      .hero-skillset-card__skills .hero-skillset-cell__figure {
+        width: 34px;
+        height: 34px;
+      }
+
+      .hero-skillset-cell__figure {
+        width: 40px;
+        height: 40px;
+      }
+
+      .hero-skillset-cell__label {
+        display: none;
+      }
+    }
+
     .loading-spinner {
       margin: 120px auto;
       width: 48px;
@@ -435,11 +738,344 @@
   </div>
   <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
 
-  <script>
+  <script type="module">
+    import {
+      loadHeroSkillsetData,
+      normalizeHeroSkillsetConfig,
+      encodeHeroSkillsetConfig,
+      getHeroTalents,
+      ROW_KEYS as HERO_SKILLSET_ROWS,
+      USER_SKILL_KEYS as HERO_SKILLSET_USER_SLOTS
+    } from './scripts/heroSkillsetService.js';
     const DEFAULT_TIMEOUT = 25000;
     const LOGIN_STORAGE_KEY = 'wikiLoginState';
 
     const APPS_SCRIPT_ENDPOINT_WIKI = window.APPS_SCRIPT_ENDPOINT_WIKI;
+
+    const heroSkillsetInfoPopup = createHeroSkillsetInfoPopup();
+
+    async function hydrateHeroSkillsetCards(root) {
+      if (!root) {
+        return;
+      }
+      const cards = Array.from(root.querySelectorAll('[data-hero-skillset-card]'));
+      if (!cards.length) {
+        return;
+      }
+      let data;
+      try {
+        data = await loadHeroSkillsetData();
+      } catch (error) {
+        console.error('英雄・スキルデータの読み込みに失敗しました。', error);
+        return;
+      }
+      cards.forEach(card => {
+        const config = normalizeHeroSkillsetConfig(card.getAttribute('data-config'));
+        card.setAttribute('data-config', encodeHeroSkillsetConfig(config));
+        renderHeroSkillsetCardView(card, config, data);
+      });
+    }
+
+    function renderHeroSkillsetCardView(card, config, data) {
+      card.classList.add('hero-skillset-card', 'hero-skillset-card--view');
+      const body = document.createElement('div');
+      body.className = 'hero-skillset-card__body hero-skillset-slot';
+      const grid = document.createElement('div');
+      grid.className = 'hero-skillset-card__grid';
+      HERO_SKILLSET_ROWS.forEach(rowKey => {
+        const rowWrapper = document.createElement('div');
+        rowWrapper.className = 'hero-skillset-card__row';
+        const content = document.createElement('div');
+        content.className = 'hero-skillset-card__row-content';
+        const rowData = config.rows?.[rowKey] || {};
+        const heroId = rowData.heroId || null;
+        const hero = heroId ? data.heroMap.get(heroId) : null;
+        const heroSlot = createViewHeroSlot(hero);
+        const skills = document.createElement('div');
+        skills.className = 'hero-skillset-card__skills';
+        const fixedSkillIds = Array.isArray(hero?.fixedSkillIds) ? hero.fixedSkillIds : [];
+        const slotMap = {
+          skill1: fixedSkillIds[0] ? data.skillMap.get(fixedSkillIds[0]) : null,
+          skill2: fixedSkillIds[1] ? data.skillMap.get(fixedSkillIds[1]) : null,
+          skill3: rowData.userSkills?.skill3 ? data.skillMap.get(rowData.userSkills.skill3) : null,
+          skill4: rowData.userSkills?.skill4 ? data.skillMap.get(rowData.userSkills.skill4) : null,
+          skill5: fixedSkillIds[2] ? data.skillMap.get(fixedSkillIds[2]) : null
+        };
+        Object.entries(slotMap).forEach(([slotKey, skill]) => {
+          const slot = createViewSkillSlot(slotKey, skill);
+          skills.appendChild(slot);
+        });
+        content.append(heroSlot, skills);
+        rowWrapper.append(content);
+        grid.appendChild(rowWrapper);
+      });
+      body.appendChild(grid);
+      card.innerHTML = '';
+      card.appendChild(body);
+      if (card.__heroSkillsetInfoHandler) {
+        card.removeEventListener('click', card.__heroSkillsetInfoHandler);
+      }
+      const handler = event => {
+        const trigger = event.target.closest('[data-info-type]');
+        if (!trigger) {
+          return;
+        }
+        event.stopPropagation();
+        const infoType = trigger.dataset.infoType;
+        const infoId = trigger.dataset.infoId;
+        if (!infoType || !infoId) {
+          return;
+        }
+        const info = infoType === 'hero'
+          ? data.heroMap.get(infoId)
+          : data.skillMap.get(infoId);
+        if (!info) {
+          return;
+        }
+        if (infoType === 'hero') {
+          const talents = getHeroTalents(info);
+          heroSkillsetInfoPopup.show({
+            anchor: trigger,
+            titleText: info.name || '',
+            badgeText: info.troopType || '',
+            badgeVariant: 'troop',
+            lines: talents.map(talent => ({
+              title: talent.name,
+              badgeText: talent.type,
+              badgeVariant: 'type',
+              description: talent.description
+            })),
+            fallbackText: '才能情報が登録されていません。',
+            url: info.url || ''
+          });
+          return;
+        }
+        heroSkillsetInfoPopup.show({
+          anchor: trigger,
+          titleText: info.name || '',
+          badgeText: info.skillType || '',
+          badgeVariant: 'type',
+          lines: info.description
+            ? [{ description: info.description }]
+            : [],
+          fallbackText: '説明が登録されていません。',
+          url: info.url || ''
+        });
+      };
+      card.addEventListener('click', handler);
+      card.__heroSkillsetInfoHandler = handler;
+    }
+
+    function createViewHeroSlot(hero) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'hero-skillset-cell hero-skillset-cell--hero';
+      const figure = createHeroSkillsetFigure(hero?.image, hero?.name, '+');
+      const label = document.createElement('span');
+      label.className = 'hero-skillset-cell__label';
+      if (hero?.id) {
+        label.textContent = hero.name;
+        button.dataset.infoType = 'hero';
+        button.dataset.infoId = hero.id;
+      } else {
+        label.textContent = '英雄未選択';
+        button.classList.add('is-empty');
+      }
+      button.append(figure, label);
+      return button;
+    }
+
+    function createViewSkillSlot(slotKey, skill) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'hero-skillset-cell hero-skillset-cell--skill';
+      const isEditableSlot = slotKey === 'skill3' || slotKey === 'skill4';
+      button.classList.add(
+        isEditableSlot
+          ? 'hero-skillset-cell--editable'
+          : 'hero-skillset-cell--fixed'
+      );
+      const placeholder = isEditableSlot ? '+' : '—';
+      const figure = createHeroSkillsetFigure(skill?.image, skill?.name, placeholder);
+      const label = document.createElement('span');
+      label.className = 'hero-skillset-cell__label';
+      if (skill?.id) {
+        label.textContent = skill.name;
+        button.dataset.infoType = 'skill';
+        button.dataset.infoId = skill.id;
+      } else {
+        label.textContent = isEditableSlot ? 'スキル未設定' : '英雄未選択';
+        button.classList.add('is-empty');
+      }
+      button.append(figure, label);
+      return button;
+    }
+
+    function createHeroSkillsetFigure(imageUrl, alt, placeholder) {
+      const figure = document.createElement('div');
+      figure.className = 'hero-skillset-cell__figure';
+      if (imageUrl) {
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = alt || '';
+        figure.appendChild(img);
+      } else {
+        const span = document.createElement('span');
+        span.className = 'hero-skillset-cell__placeholder';
+        span.textContent = placeholder;
+        figure.appendChild(span);
+      }
+      return figure;
+    }
+
+    function createHeroSkillsetInfoPopup() {
+      const popup = document.createElement('div');
+      popup.className = 'hero-skillset-info-popup';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'hero-skillset-info-popup__close';
+      close.textContent = '×';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'hero-skillset-info-popup__title-row';
+      const title = document.createElement('div');
+      title.className = 'hero-skillset-info-popup__title';
+      const badge = document.createElement('span');
+      badge.className = 'hero-skillset-info-popup__badge';
+      badge.hidden = true;
+      titleRow.append(title, badge);
+      const body = document.createElement('div');
+      body.className = 'hero-skillset-info-popup__body';
+      const link = document.createElement('a');
+      link.className = 'hero-skillset-info-popup__link';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = '説明ページを開く';
+      popup.append(close, titleRow, body, link);
+      document.body.appendChild(popup);
+
+      let currentAnchor = null;
+
+      function hide() {
+        popup.classList.remove('is-visible');
+        currentAnchor = null;
+      }
+
+      close.addEventListener('click', hide);
+      document.addEventListener('click', event => {
+        if (!popup.contains(event.target) && !event.target.closest('[data-info-type]')) {
+          hide();
+        }
+      });
+      function syncPosition() {
+        if (!popup.classList.contains('is-visible') || !currentAnchor) {
+          return;
+        }
+        if (!document.body.contains(currentAnchor)) {
+          hide();
+          return;
+        }
+        positionRelativeToAnchor(currentAnchor);
+      }
+
+      window.addEventListener('scroll', syncPosition, true);
+      window.addEventListener('resize', syncPosition);
+
+      function positionRelativeToAnchor(anchor) {
+        if (!anchor) {
+          return;
+        }
+        const rect = anchor.getBoundingClientRect();
+        popup.style.top = `${window.scrollY + rect.bottom + 8}px`;
+        popup.style.left = `${window.scrollX + rect.left}px`;
+        const popupRect = popup.getBoundingClientRect();
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        const overflowRight = popupRect.right > viewportWidth - 8;
+        if (overflowRight) {
+          const adjustedLeft = window.scrollX + rect.right - popupRect.width;
+          popup.style.left = `${Math.max(adjustedLeft, window.scrollX + 8)}px`;
+        }
+        const updatedRect = popup.getBoundingClientRect();
+        if (updatedRect.left < 8) {
+          popup.style.left = `${window.scrollX + 8}px`;
+        }
+      }
+
+      function buildLineElements(lines = []) {
+        if (!lines.length) {
+          return null;
+        }
+        const container = document.createElement('div');
+        container.className = 'hero-skillset-info-popup__lines';
+        lines.forEach(line => {
+          const lineEl = document.createElement('div');
+          lineEl.className = 'hero-skillset-info-popup__line';
+          if (line.title) {
+            const header = document.createElement('div');
+            header.className = 'hero-skillset-info-popup__line-header';
+            const lineTitle = document.createElement('span');
+            lineTitle.className = 'hero-skillset-info-popup__line-title';
+            lineTitle.textContent = line.title;
+            header.appendChild(lineTitle);
+            if (line.badgeText) {
+              const lineBadge = document.createElement('span');
+              lineBadge.className = `hero-skillset-info-popup__badge hero-skillset-info-popup__badge--${line.badgeVariant || 'type'}`;
+              lineBadge.textContent = line.badgeText;
+              header.appendChild(lineBadge);
+            }
+            lineEl.appendChild(header);
+          }
+          if (line.description) {
+            const desc = document.createElement('div');
+            desc.className = 'hero-skillset-info-popup__line-description';
+            const prefix = line.title ? '：' : '';
+            desc.textContent = `${prefix}${line.description}`;
+            lineEl.appendChild(desc);
+          }
+          if (!line.title && !line.description && line.badgeText) {
+            const fallback = document.createElement('div');
+            fallback.className = 'hero-skillset-info-popup__description';
+            fallback.textContent = line.badgeText;
+            lineEl.appendChild(fallback);
+          }
+          container.appendChild(lineEl);
+        });
+        return container;
+      }
+
+      return {
+        show({ anchor, titleText, badgeText, badgeVariant = 'default', lines = [], fallbackText = '説明が登録されていません。', url }) {
+          title.textContent = titleText || '';
+          if (badgeText) {
+            badge.textContent = badgeText;
+            badge.hidden = false;
+            badge.className = `hero-skillset-info-popup__badge hero-skillset-info-popup__badge--${badgeVariant}`;
+          } else {
+            badge.hidden = true;
+          }
+          body.innerHTML = '';
+          const lineElements = buildLineElements(lines);
+          if (lineElements) {
+            body.appendChild(lineElements);
+          } else {
+            const fallback = document.createElement('div');
+            fallback.className = 'hero-skillset-info-popup__description';
+            fallback.textContent = fallbackText;
+            body.appendChild(fallback);
+          }
+          if (url) {
+            link.href = url;
+            link.hidden = false;
+          } else {
+            link.hidden = true;
+            link.removeAttribute('href');
+          }
+          currentAnchor = anchor || null;
+          popup.classList.add('is-visible');
+          positionRelativeToAnchor(currentAnchor);
+        },
+        hide
+      };
+    }
 
     function fetchWithoutPreflight(url, options = {}, timeout = DEFAULT_TIMEOUT) {
       return new Promise((resolve, reject) => {
@@ -911,6 +1547,7 @@
     async function displayPage(pageId) {
       const normalizedId = normalizePageId(pageId);
       currentPageId = normalizedId;
+      heroSkillsetInfoPopup.hide();
       updateLoginRedirectTarget();
       renderBreadcrumb(normalizedId);
       renderSidebarPages(dataService.getCachedPages() || [], normalizedId);
@@ -932,6 +1569,7 @@
           ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}`
           : '';
         elements.content.innerHTML = page.content || '';
+        await hydrateHeroSkillsetCards(elements.content);
         renderSidebarPages(pages, normalizedId);
         showStatus('');
       } catch (error) {
