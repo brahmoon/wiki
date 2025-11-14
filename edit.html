@@ -1757,6 +1757,21 @@
             localStorage.removeItem(LOGIN_STORAGE_KEY);
         };
 
+        function setEditorPlayerId(playerId) {
+            state.currentPlayerId = (playerId || '').trim();
+        }
+
+        function getEditorPlayerId() {
+            if (state.currentPlayerId) {
+                return state.currentPlayerId;
+            }
+            if (userSettingsState.playerId) {
+                return (userSettingsState.playerId || '').trim();
+            }
+            const loginState = getStoredLoginState();
+            return (loginState?.user?.playerId || '').trim();
+        }
+
         function resolveAdminToken(loginState) {
             const directToken = (loginState?.adminToken || loginState?.user?.adminToken || '').toString().trim();
             if (directToken) {
@@ -2058,6 +2073,7 @@
 
                 userSettingsState.data = settings;
                 userSettingsState.playerId = settings.playerId;
+                setEditorPlayerId(settings.playerId);
                 if (!userSettingsState.isOpen) {
                     fillUserSettingsForm(settings);
                 }
@@ -2135,6 +2151,7 @@
 
                 userSettingsState.data = updatedSettings;
                 userSettingsState.playerId = updatedSettings.playerId;
+                setEditorPlayerId(updatedSettings.playerId);
                 fillUserSettingsForm(updatedSettings);
                 updateStoredLoginStateUser({
                     username: updatedSettings.username,
@@ -2172,6 +2189,11 @@
                     wikiSettingsButton.hidden = !isAdmin;
                     wikiSettingsButton.disabled = !isAdmin;
                 }
+                if (userSettingsState.playerId) {
+                    setEditorPlayerId(userSettingsState.playerId);
+                } else if (loginState?.user?.playerId) {
+                    setEditorPlayerId(loginState.user.playerId);
+                }
             } else {
                 loginStatusText.textContent = '未ログイン';
                 loginButton.hidden = false;
@@ -2184,6 +2206,7 @@
                 }
                 userSettingsState.data = null;
                 userSettingsState.playerId = null;
+                setEditorPlayerId('');
                 if (userSettingsState.isOpen) {
                     closeUserSettingsDialog();
                 }
@@ -2221,6 +2244,7 @@
             refreshDriveImageUserPermissions();
             userSettingsState.data = null;
             userSettingsState.playerId = null;
+            setEditorPlayerId('');
             lastLoginIdentifier = null;
             updateLoginUI();
             const targetPage = state.currentPageId || initialPageIdFromQuery || '';
@@ -2477,6 +2501,7 @@
             currentParentId: null,
             isNewPage: false,
             isApplyingContent: false,
+            currentPlayerId: '',
             linkEditor: {
                 visible: false,
                 openInNewTab: false
@@ -4300,10 +4325,13 @@
             const rawContent = state.editor.getHTML();
             const normalizedContent = normalizePageLinkCards(rawContent);
 
+            const updatedBy = getEditorPlayerId();
+
             const payload = {
                 id,
                 title: titleInput,
-                content: normalizedContent
+                content: normalizedContent,
+                updatedBy
             };
 
             try {
