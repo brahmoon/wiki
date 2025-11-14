@@ -1793,7 +1793,7 @@
         };
 
         function setEditorPlayerId(playerId) {
-            state.currentPlayerId = (playerId || '').trim();
+            state.currentPlayerId = String(playerId || '').trim();
         }
 
         function getEditorPlayerId() {
