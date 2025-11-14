@@ -69,6 +69,10 @@ function doPost(e) {
         return buildResponse(handleRegisterUser(sheet, request), origin);
       case 'requestEditorAccess':
         return buildResponse(handleRequestEditorAccess(sheet, request), origin);
+      case 'cancelEditorRequest':
+        return buildResponse(handleCancelEditorRequest(sheet, request), origin);
+      case 'autoApproveEditorRequest':
+        return buildResponse(handleAutoApproveEditorRequest(sheet, request), origin);
       default:
         return buildResponse(
           {
@@ -602,6 +606,166 @@ function handleRequestEditorAccess(sheet, request) {
   }, request.__adminVerification || adminVerification);
 }
 
+function handleCancelEditorRequest(sheet, request) {
+  const lookupIdentifiers = {
+    playerId: request.currentPlayerId || request.playerId || '',
+    email: request.email || request.googleEmail || '',
+  };
+
+  const record = findAccount(sheet, lookupIdentifiers);
+  if (!record) {
+    return {
+      success: false,
+      message: 'ユーザー情報が見つかりません。',
+    };
+  }
+
+  const accessCheck = verifyRequestAccessToEmail(request, record);
+  if (!accessCheck.success) {
+    return accessCheck;
+  }
+
+  const columns = CONFIG.COLUMNS || {};
+  const updatedValues = record.values.slice();
+  const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
+
+  if (!isPendingPlayerIdValue(currentPlayerIdValue)) {
+    return {
+      success: false,
+      message: '現在申請中の情報はありません。',
+    };
+  }
+
+  if (columns.playerId) {
+    updatedValues[columns.playerId - 1] = '';
+  }
+  if (columns.kingdom) {
+    updatedValues[columns.kingdom - 1] = '';
+  }
+  if (columns.updatedAt) {
+    updatedValues[columns.updatedAt - 1] = new Date();
+  }
+
+  const rowRange = sheet.getRange(record.rowNumber, 1, 1, sheet.getLastColumn());
+  rowRange.setValues([updatedValues]);
+
+  const authorityValue = parseAuthorityValue(record.authority);
+
+  return {
+    success: true,
+    message: '申請をキャンセルしました。',
+    playerId: columns.playerId ? updatedValues[columns.playerId - 1] || '' : '',
+    kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
+    authority: authorityValue !== null ? authorityValue : 1,
+  };
+}
+
+function handleAutoApproveEditorRequest(sheet, request) {
+  const lookupIdentifiers = {
+    playerId: request.currentPlayerId || request.playerId || '',
+    email: request.email || request.googleEmail || '',
+  };
+
+  const record = findAccount(sheet, lookupIdentifiers);
+  if (!record) {
+    return {
+      success: false,
+      message: 'ユーザー情報が見つかりません。',
+    };
+  }
+
+  const accessCheck = verifyRequestAccessToEmail(request, record);
+  if (!accessCheck.success) {
+    return accessCheck;
+  }
+
+  const sanitizedCodePlayerId = sanitizePlayerId(request.playerId || '');
+  const sanitizedCharId = sanitizePlayerId(request.charId || '');
+  const parsedCode = parseAuthorizationCodeValue(request.code);
+  const encodedTimestamp = (request.encodedTimestamp || '').toString().trim();
+
+  if (!sanitizedCodePlayerId || !sanitizedCharId || !encodedTimestamp) {
+    return {
+      success: false,
+      message: '承認情報に不整合があります。',
+    };
+  }
+
+  if (parsedCode.playerId && parsedCode.playerId !== sanitizedCodePlayerId) {
+    return {
+      success: false,
+      message: '承認情報に不整合があります。',
+    };
+  }
+
+  if (parsedCode.encodedTimestamp && parsedCode.encodedTimestamp !== encodedTimestamp) {
+    return {
+      success: false,
+      message: '承認情報に不整合があります。',
+    };
+  }
+
+  if (sanitizedCharId !== sanitizedCodePlayerId) {
+    return {
+      success: false,
+      message: '承認情報に不整合があります。',
+    };
+  }
+
+  const columns = CONFIG.COLUMNS || {};
+  const updatedValues = record.values.slice();
+  const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
+
+  if (!isPendingPlayerIdValue(currentPlayerIdValue)) {
+    return {
+      success: false,
+      message: '申請中の情報が見つかりません。',
+    };
+  }
+
+  const pendingPlayerId = stripPendingPlayerId(currentPlayerIdValue);
+  if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
+    return {
+      success: false,
+      message: '承認情報に不整合があります。',
+    };
+  }
+
+  const recordUpdatedAt = columns.updatedAt ? updatedValues[columns.updatedAt - 1] : '';
+  const normalizedRecordTimestamp = formatDateValue(recordUpdatedAt);
+  const decodedTimestamp = decodeAuthorizationTimestamp(encodedTimestamp);
+  const normalizedDecodedTimestamp = formatDateValue(decodedTimestamp);
+
+  if (!normalizedRecordTimestamp || !normalizedDecodedTimestamp || normalizedRecordTimestamp !== normalizedDecodedTimestamp) {
+    return {
+      success: false,
+      message: '承認情報に不整合があります。',
+    };
+  }
+
+  if (columns.playerId) {
+    updatedValues[columns.playerId - 1] = sanitizedCodePlayerId;
+  }
+  if (columns.authority) {
+    updatedValues[columns.authority - 1] = EDITOR_AUTHORITY_VALUE;
+  }
+  if (columns.updatedAt) {
+    updatedValues[columns.updatedAt - 1] = new Date();
+  }
+
+  const rowRange = sheet.getRange(record.rowNumber, 1, 1, sheet.getLastColumn());
+  rowRange.setValues([updatedValues]);
+
+  return {
+    success: true,
+    autoApproved: true,
+    message: '申請を承認しました。',
+    playerId: columns.playerId ? updatedValues[columns.playerId - 1] || sanitizedCodePlayerId : sanitizedCodePlayerId,
+    kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
+    authority: EDITOR_AUTHORITY_VALUE,
+  };
+}
+
 function parseRequest(e) {
   const data = parseRequestData(e);
   return {
@@ -702,6 +866,12 @@ function sanitizePlayerId(value) {
     .trim();
 }
 
+function stripPendingPlayerId(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^!+/, '');
+}
+
 function sanitizeAuthority(value) {
   return parseAuthorityValue(value);
 }
@@ -713,6 +883,57 @@ function isPendingPlayerIdValue(value) {
 function buildPendingPlayerId(value) {
   const sanitized = sanitizePlayerId(value);
   return sanitized ? '!' + sanitized : '!';
+}
+
+function parseAuthorizationCodeValue(code) {
+  if (!code) {
+    return {
+      playerId: '',
+      encodedTimestamp: '',
+    };
+  }
+
+  const stringValue = code.toString().trim();
+  if (!stringValue) {
+    return {
+      playerId: '',
+      encodedTimestamp: '',
+    };
+  }
+
+  const parts = stringValue.split(',');
+  const playerId = sanitizePlayerId(parts.shift() || '');
+  const encodedTimestamp = parts.join(',').trim();
+  return {
+    playerId: playerId,
+    encodedTimestamp: encodedTimestamp,
+  };
+}
+
+function decodeAuthorizationTimestamp(encodedTimestamp) {
+  if (!encodedTimestamp) {
+    return null;
+  }
+
+  const stringValue = encodedTimestamp.toString().trim();
+  if (!stringValue) {
+    return null;
+  }
+
+  try {
+    const decodedBytes = Utilities.base64Decode(stringValue);
+    const decodedText = Utilities.newBlob(decodedBytes).getDataAsString('UTF-8');
+    if (!decodedText) {
+      return null;
+    }
+    const parsedDate = new Date(decodedText);
+    if (isNaN(parsedDate.getTime())) {
+      return null;
+    }
+    return parsedDate;
+  } catch (error) {
+    return null;
+  }
 }
 
 function normalizeId(value) {
