@@ -273,22 +273,6 @@
             }
         };
 
-        const buildUserIdentityPayload = (basePayload = {}, user = state.user) => {
-            const identity = {};
-            const sourceUser = user || {};
-            const email = (sourceUser.email || '').toString().trim();
-            const googleEmail = (sourceUser.googleEmail || email).toString().trim();
-
-            if (email) {
-                identity.email = email;
-            }
-            if (googleEmail) {
-                identity.googleEmail = googleEmail;
-            }
-
-            return Object.assign({}, basePayload || {}, identity);
-        };
-
         const renderProfile = (user) => {
             if (!user) {
                 elements.profile.style.display = 'none';
@@ -342,13 +326,11 @@
             }
 
             setStatus('アカウント登録状況を確認しています...');
-            const payload = buildUserIdentityPayload(
-                {
-                    action: 'getUserSettings',
-                    playerId: ''
-                },
-                user
-            );
+            const payload = {
+                action: 'getUserSettings',
+                playerId: '',
+                email: user.email
+            };
 
             try {
                 const result = await callAppsScript(payload);
@@ -504,16 +486,14 @@
                 return;
             }
 
-            const payload = buildUserIdentityPayload(
-                {
-                    action: 'registerUser',
-                    playerId: '',
-                    username,
-                    language: CONFIG.DEFAULT_LANGUAGE,
-                    authority: 1
-                },
-                state.user
-            );
+            const payload = {
+                action: 'registerUser',
+                playerId: '',
+                email: state.user.email,
+                username,
+                language: CONFIG.DEFAULT_LANGUAGE,
+                authority: 1
+            };
 
             state.isProcessing = true;
             setStatus('ユーザーを登録しています...');
