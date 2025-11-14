@@ -553,6 +553,10 @@
             isCancelling: false,
         };
 
+        const sanitizeNumberInput = (value) => {
+            return (value || '').toString().replace(/[^0-9]/g, '').trim();
+        };
+
         const params = new URLSearchParams(window.location.search);
         const requestedPageId = (params.get('page') || '').trim();
         const authorizationCodeState = (() => {
@@ -571,10 +575,6 @@
                 completed: false,
             };
         })();
-
-        const sanitizeNumberInput = (value) => {
-            return (value || '').toString().replace(/[^0-9]/g, '').trim();
-        };
 
         const isPendingPlayerId = (value) => {
             return typeof value === 'string' && value.trim().startsWith('!');
