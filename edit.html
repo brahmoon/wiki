@@ -1757,6 +1757,41 @@
             localStorage.removeItem(LOGIN_STORAGE_KEY);
         };
 
+        const state = {
+            editor: null,
+            isDirty: false,
+            pageTree: [],
+            pageMap: new Map(),
+            currentPageId: null,
+            currentParentId: null,
+            isNewPage: false,
+            isApplyingContent: false,
+            currentPlayerId: '',
+            linkEditor: {
+                visible: false,
+                openInNewTab: false
+            },
+            youtubePaste: {
+                visible: false,
+                url: '',
+                from: null,
+                to: null,
+                videoId: null,
+                startSeconds: 0
+            },
+            pageLink: {
+                visible: false,
+                query: '',
+                suggestions: [],
+                activeIndex: -1,
+                pages: []
+            },
+            toolbarConfig: {
+                loaded: false,
+                states: createDefaultToolbarConfigStates()
+            }
+        };
+
         function setEditorPlayerId(playerId) {
             state.currentPlayerId = (playerId || '').trim();
         }
@@ -2491,41 +2526,6 @@
 
         const dataService = new WikiDataService({ endpoint: APPS_SCRIPT_ENDPOINT_WIKI });
         const PAGE_LINK_CACHE_KEY = 'wiki.pageLinkCache';
-
-        const state = {
-            editor: null,
-            isDirty: false,
-            pageTree: [],
-            pageMap: new Map(),
-            currentPageId: null,
-            currentParentId: null,
-            isNewPage: false,
-            isApplyingContent: false,
-            currentPlayerId: '',
-            linkEditor: {
-                visible: false,
-                openInNewTab: false
-            },
-            youtubePaste: {
-                visible: false,
-                url: '',
-                from: null,
-                to: null,
-                videoId: null,
-                startSeconds: 0
-            },
-            pageLink: {
-                visible: false,
-                query: '',
-                suggestions: [],
-                activeIndex: -1,
-                pages: []
-            },
-            toolbarConfig: {
-                loaded: false,
-                states: createDefaultToolbarConfigStates()
-            }
-        };
 
         const elements = {
             appContainer: document.getElementById('appContainer'),
