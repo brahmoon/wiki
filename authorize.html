@@ -498,7 +498,7 @@
                 elements.pendingPlayer.textContent = '-';
                 return;
             }
-            const kingdomValue = (user.kingdom || '').trim();
+            const kingdomValue = String(user.kingdom || '').trim();
             const playerValue = stripPendingPrefix(user.playerId || '');
             elements.pendingKingdom.textContent = kingdomValue || '-';
             elements.pendingPlayer.textContent = playerValue || '-';
