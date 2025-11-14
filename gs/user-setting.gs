@@ -1133,21 +1133,30 @@ function applyCorsHeaders(output, requestOrigin) {
     return output;
   }
 
+  const normalizedRequestOrigin = (requestOrigin || '').trim();
+  var resolvedOrigin = '';
+
   if (allowedOrigins.indexOf('*') !== -1) {
-    output.setHeader('Access-Control-Allow-Origin', '*');
-    return output;
+    resolvedOrigin = '*';
+  } else if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
+    resolvedOrigin = normalizedRequestOrigin;
+  } else if (allowedOrigins.length === 1) {
+    resolvedOrigin = allowedOrigins[0];
+  } else {
+    resolvedOrigin = allowedOrigins[0];
   }
 
-  if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
-    output
-      .setHeader('Access-Control-Allow-Origin', requestOrigin)
-      .setHeader('Vary', 'Origin');
-    return output;
+  if (resolvedOrigin) {
+    output.setHeader('Access-Control-Allow-Origin', resolvedOrigin);
+    if (resolvedOrigin !== '*') {
+      output.setHeader('Vary', 'Origin');
+    }
   }
 
-  if (!requestOrigin && allowedOrigins.length === 1) {
-    output.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
+  output
+    .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    .setHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
