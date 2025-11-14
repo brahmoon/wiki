@@ -1156,6 +1156,29 @@
         let pluginLoadingInProgress = false;
         let pluginSavingInProgress = false;
 
+        const buildAdminIdentityContext = () => {
+            const user = currentLoginState?.user || {};
+            return {
+                email: adminVerificationResult?.email || user.email || '',
+                googleEmail: user.email || '',
+                playerId: user.playerId || '',
+                adminToken: adminVerificationResult?.adminToken || '',
+                origin: window.location.origin
+            };
+        };
+
+        const buildAdminRequestPayload = (payload = {}) => {
+            const context = buildAdminIdentityContext();
+            const sanitized = {};
+            Object.keys(context).forEach((key) => {
+                const value = context[key];
+                if (value !== undefined && value !== null && value !== '') {
+                    sanitized[key] = value;
+                }
+            });
+            return { ...sanitized, ...(payload || {}) };
+        };
+
         const pluginCheckboxMap = new Map();
         const authorityCheckboxMap = new Map();
         const authorityRoleButtons = authorityRoleToggle
@@ -1832,15 +1855,17 @@
         };
 
         const fetchDriveImageAuthorityData = async () => {
+            if (!adminVerificationResult || !adminVerificationResult.success) {
+                throw new Error('管理者認証が確認できません。ページを再読み込みしてください。');
+            }
+
             if (!APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION) {
                 throw new Error('権限管理APIのエンドポイントが設定されていません。');
             }
 
-            const payload = {
-                action: 'getDriveImageAuthorities',
-                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
-                googleEmail: currentLoginState?.user?.email || ''
-            };
+            const payload = buildAdminRequestPayload({
+                action: 'getDriveImageAuthorities'
+            });
 
             const response = await fetch(APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION, {
                 method: 'POST',
@@ -1942,12 +1967,10 @@
                 return;
             }
 
-            const payload = {
+            const payload = buildAdminRequestPayload({
                 action: 'updateDriveImageAuthorities',
-                authorities: buildAuthorityPayload(),
-                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
-                googleEmail: currentLoginState?.user?.email || ''
-            };
+                authorities: buildAuthorityPayload()
+            });
 
             try {
                 clearAuthorityStatus();
@@ -2269,13 +2292,11 @@
                 throw new Error('管理者認証APIのエンドポイントが設定されていません。');
             }
 
-            const payload = {
+            const payload = buildAdminRequestPayload({
                 action: 'updateAuthority',
                 targetPlayerId,
-                authority,
-                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
-                googleEmail: currentLoginState?.user?.email || ''
-            };
+                authority
+            });
 
             const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                 method: 'POST',
@@ -2305,6 +2326,11 @@
                 return;
             }
 
+            if (!adminVerificationResult || !adminVerificationResult.success) {
+                setPluginStatusMessage('管理者認証が確認できません。ページを再読み込みしてください。', 'error');
+                return;
+            }
+
             if (!APPS_SCRIPT_ENDPOINT_ADMIN_AUTH || APPS_SCRIPT_ENDPOINT_ADMIN_AUTH.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
                 setPluginStatusMessage('プラグイン設定APIのエンドポイントが設定されていません。', 'error');
                 return;
@@ -2314,6 +2340,9 @@
             clearPluginStatus();
 
             try {
+                const payload = buildAdminRequestPayload({
+                    action: 'getToolbarPlugins'
+                });
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',
                     mode: 'cors',
@@ -2321,9 +2350,7 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify({
-                        action: 'getToolbarPlugins'
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
@@ -2370,13 +2397,11 @@
             }
 
             const states = getCurrentToolbarStates();
-            const payload = {
+            const payload = buildAdminRequestPayload({
                 action: 'updateToolbarPlugins',
                 toolbarKeys: TOOLBAR_FEATURES.map((feature) => feature.key),
-                toolbarStates: states,
-                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
-                googleEmail: currentLoginState?.user?.email || ''
-            };
+                toolbarStates: states
+            });
 
             clearPluginStatus();
             setPluginSavingState(true);
@@ -2501,6 +2526,11 @@
                 memberDataLoaded = false;
             }
 
+            if (!adminVerificationResult || !adminVerificationResult.success) {
+                showMemberError('管理者認証が確認できません。ページを再読み込みしてください。');
+                return;
+            }
+
             if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
                 showMemberError('ユーザー情報のAPIエンドポイントが正しく設定されていません。');
                 return;
@@ -2518,6 +2548,10 @@
             setMemberLoading(true);
 
             try {
+                const payload = buildAdminRequestPayload({
+                    action: 'listMembers'
+                });
+
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
                     method: 'POST',
                     mode: 'cors',
@@ -2525,9 +2559,7 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify({
-                        action: 'listMembers'
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
@@ -2613,6 +2645,7 @@
                     action: 'verifyAdminAccess',
                     email: loginState?.user?.email || '',
                     googleEmail: loginState?.user?.email || '',
+                    playerId: loginState?.user?.playerId || '',
                     origin: window.location.origin
                 };
 
