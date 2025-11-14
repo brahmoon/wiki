@@ -458,6 +458,18 @@
             color: #6b6a67;
         }
 
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
         .plugin-loading .loading-spinner {
             width: 18px;
             height: 18px;
@@ -554,6 +566,80 @@
             font-weight: 600;
             background: #ecebe7;
             color: #55534e;
+        }
+
+        .member-actions-cell {
+            text-align: right;
+            width: 70px;
+        }
+
+        .member-row-actions {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .member-actions-trigger {
+            border: 1px solid #d7d5d0;
+            background: #fff;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #4b4a45;
+            transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+
+        .member-actions-trigger:hover,
+        .member-actions-trigger:focus-visible {
+            background: #f7f6f3;
+            border-color: #b7b4ad;
+            outline: none;
+        }
+
+        .member-actions-trigger-icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .member-actions-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 190px;
+            background: #fff;
+            border: 1px solid #ecebe7;
+            border-radius: 12px;
+            box-shadow: 0 18px 40px rgba(15, 15, 15, 0.15);
+            padding: 8px 0;
+            z-index: 10;
+            display: none;
+        }
+
+        .member-actions-menu.is-open {
+            display: block;
+        }
+
+        .member-actions-menu-item {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: left;
+            padding: 10px 16px;
+            font-size: 14px;
+            color: #3f3e39;
+            cursor: pointer;
+        }
+
+        .member-actions-menu-item:hover:not([disabled]) {
+            background: #f7f6f3;
+        }
+
+        .member-actions-menu-item[disabled] {
+            color: #b3b0a7;
+            cursor: default;
         }
 
         .member-authority-control {
@@ -708,6 +794,87 @@
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
+        }
+
+        .member-link-dialog {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 17, 17, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 3000;
+        }
+
+        .member-link-dialog[hidden] {
+            display: none;
+        }
+
+        .member-link-dialog__card {
+            width: min(520px, 100%);
+            background: #fff;
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 30px 80px rgba(15, 15, 15, 0.35);
+        }
+
+        .member-link-dialog__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .member-link-dialog__header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .member-link-dialog__close {
+            border: none;
+            background: transparent;
+            font-size: 20px;
+            cursor: pointer;
+            color: #6b6a67;
+        }
+
+        .member-link-dialog__player {
+            margin: 0 0 16px;
+            font-size: 14px;
+            color: #6b6a67;
+        }
+
+        .member-link-dialog__input-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .member-link-dialog__input {
+            flex: 1;
+            min-width: 0;
+            border: 1px solid #d0d0cc;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            background: #f7f6f3;
+        }
+
+        .member-link-dialog__status {
+            margin: 12px 0 0;
+            font-size: 13px;
+            color: #6b6a67;
+        }
+
+        .member-link-dialog__status.is-error {
+            color: #b91c1c;
+        }
+
+        .member-link-dialog__status.is-success {
+            color: #15803d;
         }
 
         .loading-overlay {
@@ -962,6 +1129,7 @@
                                     <th scope="col">Authority</th>
                                     <th scope="col">承認状態</th>
                                     <th scope="col">更新日時</th>
+                                    <th scope="col">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="member-table-body"></tbody>
@@ -1000,6 +1168,27 @@
         <div class="loading-content" role="status" aria-live="polite">
             <div class="loading-spinner" aria-hidden="true"></div>
             <p class="loading-message">権限設定を保存しています…</p>
+        </div>
+    </div>
+    <div id="member-link-dialog" class="member-link-dialog" hidden aria-hidden="true">
+        <div class="member-link-dialog__card" role="dialog" aria-modal="true" aria-labelledby="member-link-dialog-title">
+            <div class="member-link-dialog__header">
+                <h2 id="member-link-dialog-title">申請URLを発行</h2>
+                <button id="member-link-dialog-close" class="member-link-dialog__close" type="button" aria-label="閉じる">×</button>
+            </div>
+            <p id="member-link-dialog-player" class="member-link-dialog__player"></p>
+            <p id="member-link-dialog-description">以下のURLをコピーして対象のプレイヤーに送信してください。</p>
+            <div class="member-link-dialog__input-group">
+                <input
+                    id="member-link-dialog-input"
+                    class="member-link-dialog__input"
+                    type="text"
+                    readonly
+                    aria-describedby="member-link-dialog-description"
+                />
+                <button id="member-link-dialog-copy" class="btn btn-primary" type="button">コピー</button>
+            </div>
+            <p id="member-link-dialog-status" class="member-link-dialog__status" role="status" aria-live="polite"></p>
         </div>
     </div>
     <script>
@@ -1091,6 +1280,12 @@
         const memberTableWrapper = document.getElementById('member-table-wrapper');
         const memberTableBody = document.getElementById('member-table-body');
         const memberEmptyState = document.getElementById('member-empty-state');
+        const memberLinkDialog = document.getElementById('member-link-dialog');
+        const memberLinkDialogInput = document.getElementById('member-link-dialog-input');
+        const memberLinkDialogCopyButton = document.getElementById('member-link-dialog-copy');
+        const memberLinkDialogStatus = document.getElementById('member-link-dialog-status');
+        const memberLinkDialogPlayer = document.getElementById('member-link-dialog-player');
+        const memberLinkDialogCloseButton = document.getElementById('member-link-dialog-close');
         const adminUser = document.getElementById('admin-user');
         const returnEditorButton = document.getElementById('return-editor');
         const layoutRoot = document.querySelector('.layout');
@@ -2185,6 +2380,194 @@
             return typeof value === 'string' && value.trim().startsWith('!');
         };
 
+        const stripPendingPlayerId = (value) => {
+            if (!value) {
+                return '';
+            }
+            return value.replace(/^!+/, '');
+        };
+
+        const safeBase64Encode = (value) => {
+            if (value === undefined || value === null) {
+                return '';
+            }
+            const stringValue = value.toString();
+            try {
+                return window.btoa(unescape(encodeURIComponent(stringValue)));
+            } catch (error) {
+                try {
+                    return window.btoa(stringValue);
+                } catch (encodeError) {
+                    console.error('Failed to encode base64 value', encodeError);
+                    return '';
+                }
+            }
+        };
+
+        const buildAuthorizationLinkForMember = (member) => {
+            if (!member) {
+                return '';
+            }
+            const strippedPlayerId = stripPendingPlayerId(member?.playerId || '');
+            const updatedAt = (member?.updatedAt || '').toString().trim();
+            if (!strippedPlayerId || !updatedAt) {
+                return '';
+            }
+            const encodedTimestamp = safeBase64Encode(updatedAt);
+            if (!encodedTimestamp) {
+                return '';
+            }
+            return `<link="LinkJump:1|https://brahmoon.github.io/wiki/authorize.html?code=${strippedPlayerId},${encodedTimestamp}"</</<1→<>>>>><</<2→<>>>u>編集権限の申請<<3→<>>/u></link<>>`;
+        };
+
+        const setMemberLinkDialogStatus = (message, state = '') => {
+            if (!memberLinkDialogStatus) {
+                return;
+            }
+            memberLinkDialogStatus.textContent = message || '';
+            memberLinkDialogStatus.classList.remove('is-error', 'is-success');
+            if (state === 'error') {
+                memberLinkDialogStatus.classList.add('is-error');
+            } else if (state === 'success') {
+                memberLinkDialogStatus.classList.add('is-success');
+            }
+        };
+
+        const closeMemberLinkDialog = () => {
+            if (memberLinkDialog) {
+                memberLinkDialog.hidden = true;
+                memberLinkDialog.setAttribute('aria-hidden', 'true');
+            }
+            if (memberLinkDialogInput) {
+                memberLinkDialogInput.value = '';
+            }
+            if (memberLinkDialogPlayer) {
+                memberLinkDialogPlayer.textContent = '';
+            }
+            setMemberLinkDialogStatus('');
+        };
+
+        const openMemberAuthorizationLinkDialog = (member) => {
+            const linkValue = buildAuthorizationLinkForMember(member);
+            if (!linkValue) {
+                showMemberError('申請URLを生成できませんでした。対象ユーザーの情報を確認してください。');
+                return;
+            }
+            if (memberLinkDialogInput) {
+                memberLinkDialogInput.value = linkValue;
+                memberLinkDialogInput.focus();
+                memberLinkDialogInput.select();
+            }
+            if (memberLinkDialogPlayer) {
+                const strippedPlayerId = stripPendingPlayerId(member?.playerId || '');
+                const kingdom = normalizeCellValue(member?.kingdom);
+                memberLinkDialogPlayer.textContent = `Player ID: ${strippedPlayerId || '-'} / Kingdom: ${kingdom || '-'}`;
+            }
+            setMemberLinkDialogStatus('コピーしてゲーム内で送信してください。');
+            if (memberLinkDialog) {
+                memberLinkDialog.hidden = false;
+                memberLinkDialog.setAttribute('aria-hidden', 'false');
+            }
+        };
+
+        const copyMemberAuthorizationLink = async () => {
+            const linkValue = memberLinkDialogInput?.value || '';
+            if (!linkValue) {
+                setMemberLinkDialogStatus('コピーするURLがありません。', 'error');
+                return;
+            }
+            try {
+                if (navigator?.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(linkValue);
+                } else if (document.queryCommandSupported && document.queryCommandSupported('copy')) {
+                    memberLinkDialogInput?.focus();
+                    memberLinkDialogInput?.select();
+                    const succeeded = document.execCommand('copy');
+                    if (!succeeded) {
+                        throw new Error('コピーに失敗しました。');
+                    }
+                } else {
+                    throw new Error('コピー機能が利用できません。');
+                }
+                setMemberLinkDialogStatus('コピーしました。', 'success');
+            } catch (error) {
+                console.error('Failed to copy authorization link', error);
+                setMemberLinkDialogStatus('コピーに失敗しました。手動でコピーしてください。', 'error');
+            }
+        };
+
+        let openMemberActionsMenu = null;
+
+        const closeMemberActionMenu = () => {
+            if (!openMemberActionsMenu) {
+                return;
+            }
+            openMemberActionsMenu.classList.remove('is-open');
+            if (openMemberActionsMenu.__triggerElement) {
+                openMemberActionsMenu.__triggerElement.setAttribute('aria-expanded', 'false');
+            }
+            openMemberActionsMenu = null;
+        };
+
+        const createMemberActionsCell = (member) => {
+            const cell = document.createElement('td');
+            cell.className = 'member-actions-cell';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'member-row-actions';
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'member-actions-trigger';
+            button.setAttribute('aria-haspopup', 'true');
+            button.setAttribute('aria-expanded', 'false');
+            button.innerHTML = '<span class="sr-only">ユーザー操作</span><span class="member-actions-trigger-icon" aria-hidden="true">⋮</span>';
+
+            const menu = document.createElement('div');
+            menu.className = 'member-actions-menu';
+            menu.__triggerElement = button;
+            menu.addEventListener('click', (event) => {
+                event.stopPropagation();
+            });
+
+            if (isPendingPlayerId(member?.playerId)) {
+                const issueButton = document.createElement('button');
+                issueButton.type = 'button';
+                issueButton.className = 'member-actions-menu-item';
+                issueButton.textContent = '申請URLを発行';
+                issueButton.addEventListener('click', () => {
+                    openMemberAuthorizationLinkDialog(member);
+                    closeMemberActionMenu();
+                });
+                menu.appendChild(issueButton);
+            } else {
+                const disabledButton = document.createElement('button');
+                disabledButton.type = 'button';
+                disabledButton.className = 'member-actions-menu-item';
+                disabledButton.textContent = '操作できる項目はありません';
+                disabledButton.disabled = true;
+                menu.appendChild(disabledButton);
+            }
+
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (openMemberActionsMenu === menu) {
+                    closeMemberActionMenu();
+                    return;
+                }
+                closeMemberActionMenu();
+                menu.classList.add('is-open');
+                button.setAttribute('aria-expanded', 'true');
+                openMemberActionsMenu = menu;
+            });
+
+            wrapper.appendChild(button);
+            wrapper.appendChild(menu);
+            cell.appendChild(wrapper);
+
+            return cell;
+        };
+
         const createAuthorityCell = (member, updatedCell) => {
             const cell = document.createElement('td');
             const authorityValue = parseAuthorityValue(member?.authority);
@@ -2493,6 +2876,7 @@
             }
 
             memberTableBody.textContent = '';
+            closeMemberActionMenu();
 
             if (!Array.isArray(members) || members.length === 0) {
                 memberTableWrapper.hidden = true;
@@ -2548,6 +2932,9 @@
                 row.appendChild(approvalCell);
 
                 row.appendChild(updatedCell);
+
+                const actionsCell = createMemberActionsCell(member);
+                row.appendChild(actionsCell);
 
                 fragment.appendChild(row);
             });
@@ -2815,6 +3202,27 @@
 
         authorizationLoginButton?.addEventListener('click', () => {
             window.location.href = buildLoginUrl();
+        });
+
+        memberLinkDialogCopyButton?.addEventListener('click', copyMemberAuthorizationLink);
+        memberLinkDialogCloseButton?.addEventListener('click', closeMemberLinkDialog);
+        memberLinkDialog?.addEventListener('click', (event) => {
+            if (event.target === memberLinkDialog) {
+                closeMemberLinkDialog();
+            }
+        });
+
+        document.addEventListener('click', () => {
+            closeMemberActionMenu();
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeMemberActionMenu();
+                if (memberLinkDialog && !memberLinkDialog.hidden) {
+                    closeMemberLinkDialog();
+                }
+            }
         });
 
         initializeAdminConsole();
