@@ -115,7 +115,6 @@ function doPost(e) {
     let adminVerification = null;
     const ADMIN_ACTIONS = {
       updateAuthority: true,
-      getToolbarPlugins: true,
       updateToolbarPlugins: true,
       getDriveImageAuthorities: true,
       updateDriveImageAuthorities: true
@@ -127,6 +126,12 @@ function doPost(e) {
         return buildResponse(adminVerification, origin);
       }
       request.__adminVerification = adminVerification;
+    } else if (action === 'getToolbarPlugins' && hasAdminIdentityPayload(request)) {
+      const optionalVerification = verifyAdminAccess(sheet, request);
+      if (optionalVerification && optionalVerification.success) {
+        adminVerification = optionalVerification;
+        request.__adminVerification = adminVerification;
+      }
     }
 
     let result;
@@ -261,6 +266,19 @@ function verifyAdminAccess(sheet, request) {
   }
 
   return result;
+}
+
+function hasAdminIdentityPayload(request) {
+  if (!request) {
+    return false;
+  }
+
+  return Boolean(
+    request.adminToken ||
+      normalizeId(request.googleEmail) ||
+      normalizeId(request.email) ||
+      normalizeId(request.playerId)
+  );
 }
 
 function withAdminVerification(result, verification) {
@@ -653,17 +671,14 @@ function parseAuthorityValue(value) {
 }
 
 function getToolbarPlugins(sheet, request, adminVerification) {
-  const verification = adminVerification || verifyAdminAccess(sheet, request);
-  if (!verification.success) {
-    return verification;
-  }
-
   const states = loadToolbarStates();
-  return withAdminVerification({
+  const result = {
     success: true,
     message: 'Toolbar plugin states retrieved.',
     toolbarConfig: buildToolbarConfigResponse(states)
-  }, verification);
+  };
+
+  return withAdminVerification(result, adminVerification);
 }
 
 function updateToolbarPlugins(sheet, request, adminVerification) {
