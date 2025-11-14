@@ -1156,75 +1156,6 @@
         let pluginLoadingInProgress = false;
         let pluginSavingInProgress = false;
 
-        const resolveAdminEmails = () => {
-            const loginEmail = currentLoginState?.user?.email || '';
-            const verificationEmail = adminVerificationResult?.email || '';
-            const googleAccountEmail = adminVerificationResult?.googleAccountEmail || '';
-
-            return {
-                email: verificationEmail || loginEmail || googleAccountEmail || '',
-                googleEmail: googleAccountEmail || loginEmail || verificationEmail || ''
-            };
-        };
-
-        const getAdminRequestContext = () => {
-            const { email, googleEmail } = resolveAdminEmails();
-            const context = {
-                email,
-                googleEmail
-            };
-
-            const adminToken = adminVerificationResult?.adminToken;
-            if (adminToken) {
-                context.adminToken = adminToken;
-            }
-
-            return context;
-        };
-
-        const syncAdminSessionFromResult = (result) => {
-            if (!result || typeof result !== 'object') {
-                return;
-            }
-
-            const previous = adminVerificationResult || {};
-            const next = Object.assign({}, previous);
-
-            if (result.success === true) {
-                next.success = true;
-            }
-
-            if (result.adminToken) {
-                next.adminToken = result.adminToken;
-                next.adminTokenExpiresAt = result.adminTokenExpiresAt || previous.adminTokenExpiresAt || null;
-            }
-
-            adminVerificationResult = next;
-        };
-
-        const isAdminAuthorizationFailure = (result) => {
-            if (!result || result.success !== false) {
-                return false;
-            }
-
-            const message = (result.message || '').toString();
-            if (!message) {
-                return false;
-            }
-
-            return ['管理者', '認証', 'トークン'].some((keyword) => message.includes(keyword));
-        };
-
-        const handleAdminAuthorizationFailure = (result) => {
-            const message = (result && result.message) || '管理者権限の確認に失敗しました。';
-            adminVerificationResult = Object.assign({}, adminVerificationResult || {}, {
-                success: false,
-                adminToken: undefined,
-                adminTokenExpiresAt: undefined
-            });
-            showAuthorizationError(message);
-        };
-
         const pluginCheckboxMap = new Map();
         const authorityCheckboxMap = new Map();
         const authorityRoleButtons = authorityRoleToggle
@@ -1905,9 +1836,11 @@
                 throw new Error('権限管理APIのエンドポイントが設定されていません。');
             }
 
-            const payload = Object.assign({}, getAdminRequestContext(), {
-                action: 'getDriveImageAuthorities'
-            });
+            const payload = {
+                action: 'getDriveImageAuthorities',
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
 
             const response = await fetch(APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION, {
                 method: 'POST',
@@ -1925,11 +1858,7 @@
             }
 
             const result = await response.json().catch(() => null);
-            syncAdminSessionFromResult(result);
             if (!result || !result.success) {
-                if (isAdminAuthorizationFailure(result)) {
-                    handleAdminAuthorizationFailure(result);
-                }
                 throw new Error((result && result.message) || '権限設定の取得に失敗しました。');
             }
 
@@ -2013,10 +1942,12 @@
                 return;
             }
 
-            const payload = Object.assign({}, getAdminRequestContext(), {
+            const payload = {
                 action: 'updateDriveImageAuthorities',
-                authorities: buildAuthorityPayload()
-            });
+                authorities: buildAuthorityPayload(),
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
 
             try {
                 clearAuthorityStatus();
@@ -2038,11 +1969,7 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                syncAdminSessionFromResult(result);
                 if (!result || !result.success) {
-                    if (isAdminAuthorizationFailure(result)) {
-                        handleAdminAuthorizationFailure(result);
-                    }
                     throw new Error((result && result.message) || '権限設定の保存に失敗しました。');
                 }
 
@@ -2342,11 +2269,13 @@
                 throw new Error('管理者認証APIのエンドポイントが設定されていません。');
             }
 
-            const payload = Object.assign({}, getAdminRequestContext(), {
+            const payload = {
                 action: 'updateAuthority',
                 targetPlayerId,
-                authority
-            });
+                authority,
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
 
             const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                 method: 'POST',
@@ -2364,11 +2293,7 @@
             }
 
             const result = await response.json().catch(() => null);
-            syncAdminSessionFromResult(result);
             if (!result || !result.success) {
-                if (isAdminAuthorizationFailure(result)) {
-                    handleAdminAuthorizationFailure(result);
-                }
                 throw new Error((result && result.message) || '権限の更新に失敗しました。');
             }
 
@@ -2377,15 +2302,6 @@
 
         const loadToolbarPluginSettings = async () => {
             if (pluginLoadingInProgress) {
-                return;
-            }
-
-            if (!adminVerificationResult || !adminVerificationResult.success) {
-                setPluginStatusMessage('管理者認証が確認できません。ページを再読み込みしてください。', 'error');
-                handleAdminAuthorizationFailure({
-                    message: '管理者認証が確認できませんでした。再度ログインしてください。',
-                    success: false
-                });
                 return;
             }
 
@@ -2398,9 +2314,6 @@
             clearPluginStatus();
 
             try {
-                const payload = Object.assign({}, getAdminRequestContext(), {
-                    action: 'getToolbarPlugins'
-                });
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',
                     mode: 'cors',
@@ -2408,7 +2321,9 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        action: 'getToolbarPlugins'
+                    })
                 });
 
                 if (!response.ok) {
@@ -2417,11 +2332,7 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                syncAdminSessionFromResult(result);
                 if (!result || !result.success) {
-                    if (isAdminAuthorizationFailure(result)) {
-                        handleAdminAuthorizationFailure(result);
-                    }
                     throw new Error((result && result.message) || 'プラグイン設定の取得に失敗しました。');
                 }
 
@@ -2459,11 +2370,13 @@
             }
 
             const states = getCurrentToolbarStates();
-            const payload = Object.assign({}, getAdminRequestContext(), {
+            const payload = {
                 action: 'updateToolbarPlugins',
                 toolbarKeys: TOOLBAR_FEATURES.map((feature) => feature.key),
-                toolbarStates: states
-            });
+                toolbarStates: states,
+                email: adminVerificationResult?.email || currentLoginState?.user?.email || '',
+                googleEmail: currentLoginState?.user?.email || ''
+            };
 
             clearPluginStatus();
             setPluginSavingState(true);
@@ -2488,11 +2401,7 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                syncAdminSessionFromResult(result);
                 if (!result || !result.success) {
-                    if (isAdminAuthorizationFailure(result)) {
-                        handleAdminAuthorizationFailure(result);
-                    }
                     throw new Error((result && result.message) || 'プラグイン設定の保存に失敗しました。');
                 }
 
@@ -2609,9 +2518,6 @@
             setMemberLoading(true);
 
             try {
-                const payload = Object.assign({}, getAdminRequestContext(), {
-                    action: 'listMembers'
-                });
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
                     method: 'POST',
                     mode: 'cors',
@@ -2619,7 +2525,9 @@
                     headers: {
                         'Content-Type': 'text/plain'
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        action: 'listMembers'
+                    })
                 });
 
                 if (!response.ok) {
@@ -2628,11 +2536,7 @@
                 }
 
                 const result = await response.json().catch(() => null);
-                syncAdminSessionFromResult(result);
                 if (!result || !result.success) {
-                    if (isAdminAuthorizationFailure(result)) {
-                        handleAdminAuthorizationFailure(result);
-                    }
                     throw new Error((result && result.message) || 'ユーザー情報を取得できませんでした。');
                 }
 
@@ -2711,10 +2615,6 @@
                     googleEmail: loginState?.user?.email || '',
                     origin: window.location.origin
                 };
-
-                if (adminVerificationResult?.adminToken) {
-                    payload.adminToken = adminVerificationResult.adminToken;
-                }
 
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
                     method: 'POST',
