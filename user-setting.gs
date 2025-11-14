@@ -131,39 +131,6 @@ function requireAdminAuthority(sheet, request) {
   };
 }
 
-function verifyRequestAccessToEmail(sheet, request, targetEmail) {
-  const adminVerification = requireAdminAuthority(sheet, request);
-  if (adminVerification && adminVerification.success) {
-    return {
-      success: true,
-      isAdmin: true,
-      admin: adminVerification.account,
-    };
-  }
-
-  const normalizedGoogleEmail = normalizeId(request && request.googleEmail);
-  if (!normalizedGoogleEmail) {
-    return {
-      success: false,
-      message: 'Googleアカウントの認証情報が確認できませんでした。再度ログインしてください。',
-    };
-  }
-
-  const normalizedTargetEmail = normalizeId(targetEmail);
-  if (normalizedTargetEmail && normalizedTargetEmail === normalizedGoogleEmail) {
-    return {
-      success: true,
-      isAdmin: false,
-    };
-  }
-
-  return {
-    success: false,
-    message:
-      'ログイン中のGoogleアカウントと対象ユーザーのメールアドレスが一致しません。再度ログインしてください。',
-  };
-}
-
 function handleListMembers(sheet, request) {
   const adminVerification = requireAdminAuthority(sheet, request);
   if (!adminVerification.success) {
@@ -254,11 +221,6 @@ function handleGetUserSettings(sheet, request) {
     };
   }
 
-  const accessCheck = verifyRequestAccessToEmail(sheet, request, record.email);
-  if (!accessCheck.success) {
-    return accessCheck;
-  }
-
   return {
     success: true,
     message: 'ユーザー設定を取得しました。',
@@ -293,11 +255,6 @@ function handleUpdateUserSettings(sheet, request) {
       success: false,
       message: '該当するユーザーが見つかりません。',
     };
-  }
-
-  const accessCheck = verifyRequestAccessToEmail(sheet, request, record.email);
-  if (!accessCheck.success) {
-    return accessCheck;
   }
 
   const kingdomValue = sanitizeKingdom(request.kingdom);
@@ -342,7 +299,7 @@ function handleRegisterUser(sheet, request) {
   if (!email) {
     return {
       success: false,
-      message: '登録するメールアドレスを入力してください。',
+      message: 'Googleアカウントのメールアドレスを取得できませんでした。',
     };
   }
 
@@ -352,11 +309,6 @@ function handleRegisterUser(sheet, request) {
       success: false,
       message: 'ユーザーネームを入力してください。',
     };
-  }
-
-  const accessCheck = verifyRequestAccessToEmail(sheet, request, email);
-  if (!accessCheck.success) {
-    return accessCheck;
   }
 
   const playerId = (request.playerId || '').toString().trim();
