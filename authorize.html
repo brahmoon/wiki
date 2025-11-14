@@ -10,10 +10,19 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --surface: #ffffff;
+            --muted: #6b6a67;
+            --accent: #2563eb;
+            --accent-strong: #1d4ed8;
+            --accent-soft: rgba(37, 99, 235, 0.12);
+            --border: #e6e4df;
+        }
+
         body {
             margin: 0;
             min-height: 100vh;
-            background: #f5f5f5;
+            background: radial-gradient(circle at top, rgba(37, 99, 235, 0.08), transparent 50%), #f5f6fb;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             color: #37352f;
             display: flex;
@@ -27,13 +36,25 @@
         }
 
         .authorize-card {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.08);
+            background: var(--surface);
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(15, 15, 15, 0.08);
             padding: min(48px, 8vw);
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .authorize-card::before {
+            content: '';
+            position: absolute;
+            inset: 24px;
+            border-radius: 20px;
+            border: 1px solid rgba(37, 99, 235, 0.08);
+            pointer-events: none;
         }
 
         .view-section[hidden] {
@@ -42,27 +63,27 @@
 
         h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: clamp(24px, 3vw, 32px);
             font-weight: 700;
         }
 
         h2 {
             margin: 0 0 8px;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 700;
         }
 
         p {
             margin: 0 0 12px;
             line-height: 1.7;
-            color: #5b5954;
+            color: var(--muted);
         }
 
         .flow-list,
         .condition-list {
             margin: 0;
             padding-left: 20px;
-            color: #5b5954;
+            color: var(--muted);
             line-height: 1.6;
         }
 
@@ -76,25 +97,102 @@
             content: '☑';
             position: absolute;
             left: 0;
-            color: #2383e2;
+            color: var(--accent);
         }
 
-        .section-title {
-            font-size: 14px;
-            letter-spacing: 0.08em;
+        .eyebrow {
+            font-size: 13px;
+            letter-spacing: 0.12em;
             font-weight: 700;
             text-transform: uppercase;
-            color: #7c7a75;
+            color: #8f8d88;
         }
 
-        .request-block {
-            border: 1px solid #e3e2df;
-            border-radius: 12px;
+        .hero {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .hero-badge {
+            align-self: flex-start;
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .info-card {
+            border: 1px solid var(--border);
+            border-radius: 16px;
             padding: 20px;
+            background: #fbfbfa;
+        }
+
+        .info-card-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #7c7a75;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .check-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            color: var(--muted);
+        }
+
+        .check-list li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .check-list li::before {
+            content: '';
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            display: inline-flex;
+        }
+
+        .request-panel {
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px;
             display: flex;
             flex-direction: column;
             gap: 20px;
-            background: #fafaf9;
+            background: #fff;
+        }
+
+        .request-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .request-panel-description {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
         }
 
         form {
@@ -119,7 +217,7 @@
 
         input[type="text"]:focus {
             outline: none;
-            border-color: #2383e2;
+            border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.15);
         }
 
@@ -146,13 +244,14 @@
         }
 
         .btn-primary {
-            background: #2383e2;
-            border-color: #1d70c4;
+            background: var(--accent);
+            border-color: var(--accent-strong);
             color: #fff;
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
         }
 
         .btn-primary:hover:not(:disabled) {
-            background: #1a6bc2;
+            background: var(--accent-strong);
         }
 
         .btn-secondary {
@@ -179,34 +278,54 @@
             color: #0f7b6c;
         }
 
-        .pending-card {
-            border: 1px solid #bee3f8;
-            background: #ebf8ff;
-            color: #205493;
-            border-radius: 12px;
-            padding: 20px;
+        .status-card {
+            border: 1px solid rgba(37, 99, 235, 0.15);
+            background: rgba(37, 99, 235, 0.08);
+            color: #1e3a8a;
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
-        .pending-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 8px;
+        .status-pill {
+            align-self: flex-start;
+            border-radius: 999px;
+            padding: 4px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(37, 99, 235, 0.2);
         }
 
-        .pending-meta {
+        .status-metrics {
             display: flex;
             flex-wrap: wrap;
-            gap: 12px;
-            margin-top: 12px;
+            gap: 16px;
         }
 
-        .pending-meta span {
-            background: #fff;
-            border-radius: 6px;
-            padding: 6px 10px;
-            border: 1px solid #d9ecff;
-            font-size: 13px;
-            color: #205493;
+        .status-metric {
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            padding: 10px 16px;
+            border: 1px solid rgba(37, 99, 235, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 140px;
+        }
+
+        .status-metric span {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #44506c;
+        }
+
+        .status-metric strong {
+            font-size: 18px;
+            color: #1e3a8a;
         }
 
         .loading-text {
@@ -221,7 +340,7 @@
             .authorize-card {
                 padding: 24px;
             }
-            .pending-meta {
+            .status-metrics {
                 flex-direction: column;
             }
         }
@@ -239,45 +358,64 @@
                 </div>
             </div>
             <div id="view-form" class="view-section" hidden>
-                <div class="section-title">--- 編集権限の申請 ---</div>
-                <div class="request-block">
-                    <div>
-                        <h2>- 申請の流れ -</h2>
+                <div class="hero">
+                    <span class="hero-badge">Editor Access</span>
+                    <h1>Wiki編集チームに参加しましょう</h1>
+                    <p>管理者へ申請を送信し、編集用アカウントへのアクセス権を獲得できます。プレイヤー情報をご準備のうえ申請を行ってください。</p>
+                </div>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="info-card-title">申請の流れ</div>
                         <ol class="flow-list">
                             <li>このページからプレイヤー情報を送信し申請を行います。</li>
                             <li>管理者から申請したプレイヤーID宛にメッセージが届くのでURLにアクセスしてください。</li>
                         </ol>
                     </div>
-                    <div>
-                        <h2>- 申請条件 -</h2>
-                        <ul class="condition-list">
+                    <div class="info-card">
+                        <div class="info-card-title">申請条件</div>
+                        <ul class="check-list">
                             <li>撃破戦力が1,000,000,000を越えていること</li>
                         </ul>
                     </div>
-                    <div>
-                        <h2>- 申請 -</h2>
-                        <form id="authorize-form">
-                            <label for="kingdom-input">Kingdom</label>
-                            <input id="kingdom-input" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 1001">
-                            <label for="player-input">Player ID</label>
-                            <input id="player-input" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 123456789">
-                            <div class="status-message" id="form-status" role="status" aria-live="polite"></div>
-                            <div class="button-row">
-                                <button id="submit-button" class="btn-primary" type="submit">申請</button>
-                                <button id="refresh-button" class="btn-secondary" type="button">最新の状態を確認</button>
-                            </div>
-                        </form>
+                </div>
+                <div class="request-panel">
+                    <div class="request-panel-header">
+                        <div>
+                            <p class="eyebrow">申請フォーム</p>
+                            <h2>プレイヤー情報を送信</h2>
+                            <p class="request-panel-description">申請内容は管理者に直接送信され、承認後にプレイヤーID宛へ案内が届きます。</p>
+                        </div>
                     </div>
+                    <form id="authorize-form">
+                        <label for="kingdom-input">Kingdom</label>
+                        <input id="kingdom-input" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 1001">
+                        <label for="player-input">Player ID</label>
+                        <input id="player-input" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 123456789">
+                        <div class="status-message" id="form-status" role="status" aria-live="polite"></div>
+                        <div class="button-row">
+                            <button id="submit-button" class="btn-primary" type="submit">申請</button>
+                            <button id="refresh-button" class="btn-secondary" type="button">最新の状態を確認</button>
+                        </div>
+                    </form>
                 </div>
             </div>
             <div id="view-pending" class="view-section" hidden>
-                <div class="section-title">--- 申請状況 ---</div>
-                <div class="pending-card">
-                    <div class="pending-title">承認待ちです</div>
+                <div class="hero">
+                    <span class="hero-badge">Application Status</span>
+                    <h1>承認待ちです</h1>
                     <p>編集権限の申請を受け付けました。管理者からの承認をお待ちください。承認が完了するとプレイヤーID宛に案内が届きます。</p>
-                    <div class="pending-meta">
-                        <span>Kingdom: <strong id="pending-kingdom">-</strong></span>
-                        <span>Player ID: <strong id="pending-player">-</strong></span>
+                </div>
+                <div class="status-card">
+                    <div class="status-pill">Pending</div>
+                    <div class="status-metrics">
+                        <div class="status-metric">
+                            <span>Kingdom</span>
+                            <strong id="pending-kingdom">-</strong>
+                        </div>
+                        <div class="status-metric">
+                            <span>Player ID</span>
+                            <strong id="pending-player">-</strong>
+                        </div>
                     </div>
                 </div>
                 <div class="status-message" id="pending-status" role="status" aria-live="polite"></div>
