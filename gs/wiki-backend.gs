@@ -111,6 +111,8 @@ function routeAction(data) {
         id: data.id,
         title: data.title,
         content: data.content,
+        updatedBy: data.updatedBy,
+        order: data.order,
       });
     case 'getPages':
       return getPages();
