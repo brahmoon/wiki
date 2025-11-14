@@ -153,7 +153,7 @@ function parseOrderValue(value) {
 }
 
 function ensureSheetStructure(sheet) {
-  const headers = ['ID', 'Title', 'Content', 'UpdatedAt', 'Order'];
+  const headers = ['ID', 'Title', 'Content', 'UpdatedAt', 'UpdatedBy', 'Order'];
   const current = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
   let needsUpdate = false;
   for (let i = 0; i < headers.length; i++) {
@@ -179,7 +179,7 @@ function getPages() {
       return { success: true, pages: [] };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 5);
+    const width = Math.max(sheet.getLastColumn(), 6);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const pages = data
       .filter(row => row[0])
@@ -187,7 +187,8 @@ function getPages() {
         id: row[0],
         title: row[1] || '無題',
         updatedAt: row[3] || '',
-        order: parseOrderValue(row[4])
+        updatedBy: row[4] || '',
+        order: parseOrderValue(row[5])
       }));
 
     return { success: true, pages };
@@ -209,7 +210,7 @@ function getPage(id) {
       return { success: false, message: 'No pages found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 5);
+    const width = Math.max(sheet.getLastColumn(), 6);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const row = data.find(r => r[0] && r[0].toString() === id.toString());
     if (!row) {
@@ -223,7 +224,8 @@ function getPage(id) {
         title: row[1] || '無題',
         content: row[2] || '',
         updatedAt: row[3] || '',
-        order: parseOrderValue(row[4])
+        updatedBy: row[4] || '',
+        order: parseOrderValue(row[5])
       }
     };
   } catch (error) {
@@ -242,7 +244,7 @@ function savePage(page) {
     const lastRow = sheet.getLastRow();
     const updatedAt = new Date().toISOString();
 
-    const width = Math.max(sheet.getLastColumn(), 5);
+    const width = Math.max(sheet.getLastColumn(), 6);
     const data = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, width).getValues() : [];
 
     let targetRow = -1;
@@ -250,7 +252,7 @@ function savePage(page) {
     if (data.length) {
       targetRow = data.findIndex(row => row[0] && row[0].toString() === page.id.toString());
       if (targetRow >= 0) {
-        existingOrder = parseOrderValue(data[targetRow][4]);
+        existingOrder = parseOrderValue(data[targetRow][5]);
         targetRow += 2;
       }
     }
@@ -270,7 +272,7 @@ function savePage(page) {
         }
         const rowParent = getParentIdFromPageId(rowId.toString());
         if (rowParent === parentId) {
-          const parsed = parseOrderValue(row[4]);
+          const parsed = parseOrderValue(row[5]);
           if (parsed !== null && parsed > maxOrder) {
             maxOrder = parsed;
           }
@@ -290,11 +292,12 @@ function savePage(page) {
       page.title || '無題',
       page.content || '',
       updatedAt,
+      page.updatedBy || '',
       orderValue
     ];
 
     if (targetRow > 0) {
-      sheet.getRange(targetRow, 1, 1, 5).setValues([rowData]);
+      sheet.getRange(targetRow, 1, 1, 6).setValues([rowData]);
       return { success: true, message: 'Page updated', updatedAt };
     }
 
@@ -325,7 +328,7 @@ function renamePageTree(params) {
       return { success: false, message: 'Page not found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 5);
+    const width = Math.max(sheet.getLastColumn(), 6);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const updates = [];
     const prefix = originalId + '/';
@@ -403,7 +406,7 @@ function reorderPages(params) {
       return { success: false, message: 'No pages found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 5);
+    const width = Math.max(sheet.getLastColumn(), 6);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
 
     const entries = data.map((row, index) => {
@@ -411,7 +414,7 @@ function reorderPages(params) {
       return {
         id,
         parent: getParentIdFromPageId(id),
-        order: parseOrderValue(row[4]),
+        order: parseOrderValue(row[5]),
         index,
       };
     });
@@ -486,7 +489,7 @@ function reorderPages(params) {
     }
 
     updates.forEach(update => {
-      sheet.getRange(update.rowIndex, 5).setValue(update.order);
+      sheet.getRange(update.rowIndex, 6).setValue(update.order);
     });
 
     return { success: true, message: 'Order updated' };
