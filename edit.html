@@ -3239,7 +3239,7 @@
         }
 
         async function loadToolbarPluginConfig() {
-            const toolbarConfigEndpoint = APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
+            const toolbarConfigEndpoint = resolveToolbarConfigEndpoint();
             if (!toolbarConfigEndpoint) {
                 applyToolbarConfigStates(null);
                 state.toolbarConfig.loaded = false;
