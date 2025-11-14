@@ -1788,7 +1788,7 @@
             },
             toolbarConfig: {
                 loaded: false,
-                states: createDefaultToolbarConfigStates()
+                states: {}
             }
         };
 
@@ -2510,6 +2510,8 @@
                 createButton: editor => createToolbarButton('🖼️', () => editor.commands.openImageModal(), () => false, 'Drive画像を挿入')
             }
         ];
+
+        state.toolbarConfig.states = createDefaultToolbarConfigStates();
 
         function createDefaultToolbarConfigStates() {
             const defaults = {};
