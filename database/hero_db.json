@@ -1,0 +1,26 @@
+[
+  {
+    "id": "heroA",
+    "name": "Hero A",
+    "image": "./img/hero/heroA.png",
+    "description": "高い攻撃力と機動力を兼ね備えた万能型の戦士。素早く敵陣に切り込み、味方に有利な状況を作り出します。",
+    "url": "./view.html?page=heroes/heroA",
+    "fixedSkillIds": ["heroA_skill1", "heroA_skill3"]
+  },
+  {
+    "id": "heroB",
+    "name": "Hero B",
+    "image": "./img/hero/heroB.png",
+    "description": "重装甲で味方を守る守護者。ヘイトを集めながら味方の生存力を高める耐久型の英雄です。",
+    "url": "./view.html?page=heroes/heroB",
+    "fixedSkillIds": ["heroB_skill1", "heroB_skill3"]
+  },
+  {
+    "id": "heroC",
+    "name": "Hero C",
+    "image": "./img/hero/heroC.png",
+    "description": "魔術と支援術式を巧みに操る支援型の英雄。味方の能力を底上げし、長期戦で真価を発揮します。",
+    "url": "./view.html?page=heroes/heroC",
+    "fixedSkillIds": ["heroC_skill1", "heroC_skill3"]
+  }
+]
