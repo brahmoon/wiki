@@ -2377,6 +2377,7 @@
         const APPS_SCRIPT_ENDPOINT_WIKI = window.APPS_SCRIPT_ENDPOINT_WIKI;
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
         const APPS_SCRIPT_ENDPOINT_ADMIN_AUTH = window.APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
+        const APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN = window.APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN;
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION = APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
 
         const TOOLBAR_FEATURES = [
@@ -3221,15 +3222,33 @@
             }
         }
 
+        // Toolbar configuration can be fetched without admin authentication, so prefer
+        // the dedicated toolbar Apps Script endpoint and only fall back to the admin
+        // endpoint when the toolbar endpoint is not configured for backward compatibility.
+        function resolveToolbarConfigEndpoint() {
+            if (isEndpointConfigured(APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN)) {
+                return APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN;
+            }
+            if (isEndpointConfigured(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH)) {
+                return APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
+            }
+            return null;
+        }
+
+        function isEndpointConfigured(endpoint) {
+            return typeof endpoint === 'string' && endpoint.trim() && !endpoint.includes('YOUR_');
+        }
+
         async function loadToolbarPluginConfig() {
-            if (!APPS_SCRIPT_ENDPOINT_ADMIN_AUTH || APPS_SCRIPT_ENDPOINT_ADMIN_AUTH.includes('YOUR_AUTHORIZE_DEPLOYMENT_ID')) {
+            const toolbarConfigEndpoint = resolveToolbarConfigEndpoint();
+            if (!toolbarConfigEndpoint) {
                 applyToolbarConfigStates(null);
                 state.toolbarConfig.loaded = false;
                 return;
             }
 
             try {
-                const response = await fetch(APPS_SCRIPT_ENDPOINT_ADMIN_AUTH, {
+                const response = await fetch(toolbarConfigEndpoint, {
                     method: 'POST',
                     mode: 'cors',
                     credentials: 'omit',
