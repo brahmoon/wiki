@@ -112,6 +112,15 @@ function doPost(e) {
       result = verifyAdminAccess(sheet, request);
     } else if (action === 'getDriveImagePermissions') {
       result = getDriveImagePermissions(request);
+    } else if (action === 'getToolbarPlugins') {
+      let optionalVerification = null;
+      if (hasAdminIdentityPayload(request)) {
+        const verificationAttempt = verifyAdminAccess(sheet, request);
+        if (verificationAttempt && verificationAttempt.success) {
+          optionalVerification = verificationAttempt;
+        }
+      }
+      result = getToolbarPlugins(optionalVerification);
     } else {
       const verification = verifyAdminAccess(sheet, request);
       if (!verification.success) {
@@ -120,8 +129,6 @@ function doPost(e) {
 
       if (action === 'updateAuthority') {
         result = updateAuthority(sheet, request, verification);
-      } else if (action === 'getToolbarPlugins') {
-        result = getToolbarPlugins(verification);
       } else if (action === 'updateToolbarPlugins') {
         result = updateToolbarPlugins(sheet, request, verification);
       } else if (action === 'getDriveImageAuthorities') {
@@ -242,6 +249,19 @@ function verifyAdminAccess(sheet, request) {
     adminToken: token.token,
     adminTokenExpiresAt: token.expiresAt
   };
+}
+
+function hasAdminIdentityPayload(request) {
+  if (!request) {
+    return false;
+  }
+
+  return Boolean(
+    request.adminToken ||
+      normalizeId(request.googleEmail) ||
+      normalizeId(request.email) ||
+      normalizeId(request.playerId)
+  );
 }
 
 function updateAuthority(sheet, request, adminVerification) {
