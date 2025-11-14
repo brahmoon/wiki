@@ -1,0 +1,119 @@
+[
+  {
+    "id": "heroA_skill1",
+    "name": "烈風斬",
+    "image": "./img/skill/skillA1.png",
+    "description": "Hero A が放つ二連撃。先制で敵の防御を削り取ります。",
+    "url": "./view.html?page=skills/heroA/skill1",
+    "category": "hero",
+    "skillType": "連携"
+  },
+  {
+    "id": "heroA_skill2",
+    "name": "疾風穿槍",
+    "image": "./img/skill/skillA2.png",
+    "description": "Hero A の得意とする突き技。機動しながら敵の弱点を穿ちます。",
+    "url": "./view.html?page=skills/heroA/skill2",
+    "category": "hero",
+    "skillType": "指揮"
+  },
+  {
+    "id": "heroA_skill3",
+    "name": "星嵐陣",
+    "image": "./img/skill/skillA3.png",
+    "description": "前衛全体の与ダメージを増幅する陣を設置します。",
+    "url": "./view.html?page=skills/heroA/skill3",
+    "category": "hero",
+    "skillType": "支援"
+  },
+  {
+    "id": "heroB_skill1",
+    "name": "轟雷の盾",
+    "image": "./img/skill/skillB1.png",
+    "description": "Hero B の周囲に雷盾を展開し、反撃ダメージを与えます。",
+    "url": "./view.html?page=skills/heroB/skill1",
+    "category": "hero",
+    "skillType": "反撃"
+  },
+  {
+    "id": "heroB_skill2",
+    "name": "鉄壁の号令",
+    "image": "./img/skill/skillB2.png",
+    "description": "味方前衛へ鉄壁の姿勢を指示し、被ダメージを大幅に軽減します。",
+    "url": "./view.html?page=skills/heroB/skill2",
+    "category": "hero",
+    "skillType": "指揮"
+  },
+  {
+    "id": "heroB_skill3",
+    "name": "グロリアスウォール",
+    "image": "./img/skill/skillB3.png",
+    "description": "味方全体に強力な障壁を付与し、攻撃を肩代わりします。",
+    "url": "./view.html?page=skills/heroB/skill3",
+    "category": "hero",
+    "skillType": "支援"
+  },
+  {
+    "id": "heroC_skill1",
+    "name": "共鳴魔唱",
+    "image": "./img/skill/skillA2.png",
+    "description": "味方の魔法攻撃力を底上げするチャントを詠唱します。",
+    "url": "./view.html?page=skills/heroC/skill1",
+    "category": "hero",
+    "skillType": "支援"
+  },
+  {
+    "id": "heroC_skill2",
+    "name": "星環律動",
+    "image": "./img/skill/skill3.png",
+    "description": "魔力の律動で味方にリジェネ効果とスキル加速を与えます。",
+    "url": "./view.html?page=skills/heroC/skill2",
+    "category": "hero",
+    "skillType": "連携"
+  },
+  {
+    "id": "heroC_skill3",
+    "name": "蒼環障壁",
+    "image": "./img/skill/skillB2.png",
+    "description": "ダメージを吸収する蒼色の環を展開し、継続回復も付与します。",
+    "url": "./view.html?page=skills/heroC/skill3",
+    "category": "hero",
+    "skillType": "指揮"
+  },
+  {
+    "id": "skill_support",
+    "name": "支援戦術",
+    "image": "./img/skill/skill1.png",
+    "description": "味方全体の攻撃と防御を短時間強化します。",
+    "url": "./view.html?page=skills/support",
+    "category": "user",
+    "skillType": "支援"
+  },
+  {
+    "id": "skill_barrier",
+    "name": "障壁術式",
+    "image": "./img/skill/skill2.png",
+    "description": "味方一体にダメージを無効化する障壁を付与します。",
+    "url": "./view.html?page=skills/barrier",
+    "category": "user",
+    "skillType": "防御"
+  },
+  {
+    "id": "skill_haste",
+    "name": "迅速の歌",
+    "image": "./img/skill/skill3.png",
+    "description": "行動速度を上げる歌を歌い、ターン短縮を行います。",
+    "url": "./view.html?page=skills/haste",
+    "category": "user",
+    "skillType": "支援"
+  },
+  {
+    "id": "skill_focus",
+    "name": "集中の型",
+    "image": "./img/skill/skillA2.png",
+    "description": "クリティカル発生率を上げる集中の型を伝授します。",
+    "url": "./view.html?page=skills/focus",
+    "category": "user",
+    "skillType": "攻撃"
+  }
+]
