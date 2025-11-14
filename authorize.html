@@ -264,6 +264,17 @@
             background: #ebe9e4;
         }
 
+        .btn-danger {
+            background: #dc2626;
+            border-color: #b91c1c;
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(220, 38, 38, 0.25);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #b91c1c;
+        }
+
         .status-message {
             font-size: 13px;
             min-height: 18px;
@@ -331,6 +342,35 @@
         .loading-text {
             font-size: 14px;
             color: #5b5954;
+        }
+
+        .result-card {
+            border: 1px solid rgba(15, 163, 70, 0.2);
+            background: rgba(16, 185, 129, 0.08);
+            border-radius: 20px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            color: #065f46;
+        }
+
+        .result-card.error {
+            border-color: rgba(220, 38, 38, 0.2);
+            background: rgba(248, 113, 113, 0.12);
+            color: #7f1d1d;
+        }
+
+        .result-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .result-message {
+            margin: 0;
+            line-height: 1.7;
+            color: inherit;
         }
 
         @media (max-width: 600px) {
@@ -422,6 +462,42 @@
                 <div class="button-row">
                     <button id="pending-refresh" class="btn-secondary" type="button">最新の状態を確認</button>
                     <button id="pending-view" class="btn-secondary" type="button">閲覧ページに戻る</button>
+                    <button id="pending-cancel" class="btn-danger" type="button">申請キャンセル</button>
+                </div>
+            </div>
+            <div id="view-cancelled" class="view-section" hidden>
+                <div class="hero">
+                    <span class="hero-badge">Application Update</span>
+                    <h1>申請をキャンセルしました</h1>
+                    <p id="cancelled-message">申請内容を取り消しました。再度申請を行う場合は下のボタンからフォームに戻ってください。</p>
+                </div>
+                <div class="button-row">
+                    <button id="cancelled-reapply" class="btn-primary" type="button">再申請を行う</button>
+                    <button id="cancelled-view" class="btn-secondary" type="button">閲覧ページに戻る</button>
+                </div>
+            </div>
+            <div id="view-approved" class="view-section" hidden>
+                <div class="hero">
+                    <span class="hero-badge">Editor Access</span>
+                    <h1>承認が完了しました</h1>
+                    <p class="result-message" id="approved-message">申請が承認されました。以下のボタンから編集ページに進むことができます。</p>
+                </div>
+                <div class="result-card">
+                    <p class="result-message">承認処理が完了しました。Wiki編集ページへ移動して編集を開始してください。</p>
+                </div>
+                <div class="result-actions">
+                    <button id="approved-edit" class="btn-primary" type="button">編集ページへ</button>
+                    <button id="approved-view" class="btn-secondary" type="button">閲覧ページに戻る</button>
+                </div>
+            </div>
+            <div id="view-code-error" class="view-section" hidden>
+                <div class="hero">
+                    <span class="hero-badge">Authorization Error</span>
+                    <h1>承認に失敗しました</h1>
+                    <p class="result-message" id="code-error-message">承認情報に不整合があります。案内に記載されたURLを確認してください。</p>
+                </div>
+                <div class="result-actions">
+                    <button id="code-error-view" class="btn-secondary" type="button">閲覧ページに戻る</button>
                 </div>
             </div>
             <div id="view-loading" class="view-section" hidden>
@@ -439,6 +515,9 @@
             login: document.getElementById('view-login'),
             form: document.getElementById('view-form'),
             pending: document.getElementById('view-pending'),
+            cancelled: document.getElementById('view-cancelled'),
+            approved: document.getElementById('view-approved'),
+            codeError: document.getElementById('view-code-error'),
             loading: document.getElementById('view-loading'),
         };
 
@@ -456,20 +535,46 @@
             pendingStatus: document.getElementById('pending-status'),
             pendingRefresh: document.getElementById('pending-refresh'),
             pendingView: document.getElementById('pending-view'),
+            pendingCancel: document.getElementById('pending-cancel'),
+            cancelledMessage: document.getElementById('cancelled-message'),
+            cancelledReapply: document.getElementById('cancelled-reapply'),
+            cancelledView: document.getElementById('cancelled-view'),
+            approvedMessage: document.getElementById('approved-message'),
+            approvedEdit: document.getElementById('approved-edit'),
+            approvedView: document.getElementById('approved-view'),
+            codeErrorMessage: document.getElementById('code-error-message'),
+            codeErrorView: document.getElementById('code-error-view'),
         };
 
         const state = {
             isSubmitting: false,
             isLoading: false,
             user: null,
+            isCancelling: false,
         };
-
-        const params = new URLSearchParams(window.location.search);
-        const requestedPageId = (params.get('page') || '').trim();
 
         const sanitizeNumberInput = (value) => {
             return (value || '').toString().replace(/[^0-9]/g, '').trim();
         };
+
+        const params = new URLSearchParams(window.location.search);
+        const requestedPageId = (params.get('page') || '').trim();
+        const authorizationCodeState = (() => {
+            const rawCode = (params.get('code') || '').trim();
+            if (!rawCode) {
+                return { hasCode: false };
+            }
+            const [rawPlayerId, ...rest] = rawCode.split(',');
+            const encodedTimestamp = rest.join(',').trim();
+            return {
+                hasCode: true,
+                rawCode,
+                playerId: sanitizeNumberInput(rawPlayerId),
+                encodedTimestamp,
+                charId: sanitizeNumberInput(params.get('char_id') || ''),
+                completed: false,
+            };
+        })();
 
         const isPendingPlayerId = (value) => {
             return typeof value === 'string' && value.trim().startsWith('!');
@@ -608,6 +713,39 @@
             });
         };
 
+        const setCancelledMessage = (message) => {
+            if (elements.cancelledMessage) {
+                elements.cancelledMessage.textContent = message || '申請をキャンセルしました。';
+            }
+        };
+
+        const setApprovedMessage = (message) => {
+            if (elements.approvedMessage) {
+                elements.approvedMessage.textContent = message || '申請が承認されました。';
+            }
+        };
+
+        const setCodeErrorMessage = (message) => {
+            if (elements.codeErrorMessage) {
+                elements.codeErrorMessage.textContent = message || '承認情報に不整合があります。';
+            }
+        };
+
+        const showCancellationView = (message) => {
+            setCancelledMessage(message);
+            showSection('cancelled');
+        };
+
+        const showApprovedView = (message) => {
+            setApprovedMessage(message);
+            showSection('approved');
+        };
+
+        const showCodeErrorView = (message) => {
+            setCodeErrorMessage(message);
+            showSection('codeError');
+        };
+
         const setFormStatus = (message, type = '') => {
             if (!elements.formStatus) {
                 return;
@@ -710,6 +848,12 @@
             setPendingStatus('');
             try {
                 await refreshUserProfile();
+                if (authorizationCodeState?.hasCode) {
+                    const handled = await tryResolveAuthorizationCode();
+                    if (handled) {
+                        return;
+                    }
+                }
                 handleAuthorizedUser(state.user);
             } catch (error) {
                 console.error('Failed to load user info', error);
@@ -825,6 +969,99 @@
             }
         };
 
+        const handlePendingCancel = async () => {
+            if (state.isCancelling) {
+                return;
+            }
+            const confirmCancel = window.confirm('申請をキャンセルしますか？');
+            if (!confirmCancel) {
+                return;
+            }
+            state.isCancelling = true;
+            elements.pendingCancel?.setAttribute('disabled', 'true');
+            setPendingStatus('申請をキャンセルしています…');
+            try {
+                const payload = { action: 'cancelEditorRequest' };
+                const result = await callUserSettingsApi(payload);
+                if (!result.success) {
+                    if (result.requiresReauthentication) {
+                        localStorage.removeItem(LOGIN_STORAGE_KEY);
+                        requireLogin();
+                        return;
+                    }
+                    throw new Error(result.message || '申請のキャンセルに失敗しました。');
+                }
+                const updatedUser = updateStoredLoginStateUser({
+                    playerId: result.playerId || '',
+                    kingdom: result.kingdom ?? '',
+                    authority: result.authority ?? state.user?.authority ?? 1,
+                });
+                state.user = updatedUser || state.user;
+                showCancellationView(result.message || '申請をキャンセルしました。');
+            } catch (error) {
+                console.error('Failed to cancel request', error);
+                setPendingStatus(error.message || '申請のキャンセルに失敗しました。', 'error');
+            } finally {
+                state.isCancelling = false;
+                elements.pendingCancel?.removeAttribute('disabled');
+            }
+        };
+
+        const handleReapply = () => {
+            setFormStatus('KingdomとPlayer IDを再度入力してください。');
+            if (elements.kingdomInput) {
+                elements.kingdomInput.value = '';
+            }
+            if (elements.playerInput) {
+                elements.playerInput.value = '';
+            }
+            showSection('form');
+        };
+
+        const tryResolveAuthorizationCode = async () => {
+            if (!authorizationCodeState?.hasCode || authorizationCodeState.completed) {
+                return false;
+            }
+            authorizationCodeState.completed = true;
+            if (!authorizationCodeState.playerId || !authorizationCodeState.encodedTimestamp || !authorizationCodeState.charId) {
+                showCodeErrorView('承認情報に不整合があります。');
+                return true;
+            }
+            try {
+                const payload = {
+                    action: 'autoApproveEditorRequest',
+                    code: authorizationCodeState.rawCode,
+                    playerId: authorizationCodeState.playerId,
+                    encodedTimestamp: authorizationCodeState.encodedTimestamp,
+                    charId: authorizationCodeState.charId,
+                };
+                const result = await callUserSettingsApi(payload);
+                if (!result.success) {
+                    if (result.requiresReauthentication) {
+                        localStorage.removeItem(LOGIN_STORAGE_KEY);
+                        requireLogin();
+                        return true;
+                    }
+                    throw new Error(result.message || '承認情報の確認に失敗しました。');
+                }
+                if (!result.autoApproved) {
+                    throw new Error(result.message || '承認情報に不整合があります。');
+                }
+                const updatedUser = updateStoredLoginStateUser({
+                    playerId: result.playerId || result.updatedPlayerId || state.user?.playerId || '',
+                    kingdom: result.kingdom ?? state.user?.kingdom,
+                    authority: result.authority ?? state.user?.authority,
+                });
+                state.user = updatedUser || state.user;
+                showApprovedView(result.message || '申請が承認されました。');
+                return true;
+            } catch (error) {
+                console.error('Failed to auto approve request', error);
+                showCodeErrorView(error.message || '承認情報に不整合があります。');
+                return true;
+            }
+        };
+
         elements.form?.addEventListener('submit', handleFormSubmit);
         elements.refreshButton?.addEventListener('click', handleRefresh);
         elements.pendingRefresh?.addEventListener('click', handlePendingRefresh);
@@ -835,6 +1072,20 @@
             window.location.href = buildViewUrl();
         });
         elements.pendingView?.addEventListener('click', () => {
+            window.location.href = buildViewUrl();
+        });
+        elements.pendingCancel?.addEventListener('click', handlePendingCancel);
+        elements.cancelledReapply?.addEventListener('click', handleReapply);
+        elements.cancelledView?.addEventListener('click', () => {
+            window.location.href = buildViewUrl();
+        });
+        elements.approvedEdit?.addEventListener('click', () => {
+            window.location.href = buildEditUrl();
+        });
+        elements.approvedView?.addEventListener('click', () => {
+            window.location.href = buildViewUrl();
+        });
+        elements.codeErrorView?.addEventListener('click', () => {
             window.location.href = buildViewUrl();
         });
 
