@@ -28,6 +28,8 @@ const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminThreshold() {
   return 99;
 })();
 
+const EDITOR_AUTHORITY_VALUE = 2;
+
 function doGet(e) {
   return createJsonOutput(
     {
@@ -65,6 +67,8 @@ function doPost(e) {
         return buildResponse(handleUpdateUserSettings(sheet, request), origin);
       case 'registerUser':
         return buildResponse(handleRegisterUser(sheet, request), origin);
+      case 'requestEditorAccess':
+        return buildResponse(handleRequestEditorAccess(sheet, request), origin);
       default:
         return buildResponse(
           {
@@ -480,6 +484,80 @@ function handleRegisterUser(sheet, request) {
   }, request.__adminVerification || adminVerification);
 }
 
+function handleRequestEditorAccess(sheet, request) {
+  const adminVerification = resolveAdminVerification(sheet, request);
+  if (adminVerification && !adminVerification.success) {
+    return adminVerification;
+  }
+
+  const desiredPlayerId = sanitizePlayerId(request.requestedPlayerId || request.playerId);
+  if (!desiredPlayerId) {
+    return {
+      success: false,
+      message: '申請するPlayer IDを入力してください。'
+    };
+  }
+
+  const kingdomValue = sanitizeKingdom(request.kingdom);
+  if (!kingdomValue) {
+    return {
+      success: false,
+      message: 'Kingdom番号を入力してください。'
+    };
+  }
+
+  const lookupIdentifiers = {
+    playerId: request.currentPlayerId || request.playerId || '',
+    email: request.email || request.googleEmail || ''
+  };
+
+  const record = findAccount(sheet, lookupIdentifiers);
+  if (!record) {
+    return {
+      success: false,
+      message: 'ユーザー情報が見つかりません。'
+    };
+  }
+
+  const accessCheck = verifyRequestAccessToEmail(request, record);
+  if (!accessCheck.success) {
+    return accessCheck;
+  }
+
+  const authorityValue = parseAuthorityValue(record.authority);
+  if (authorityValue !== null && authorityValue >= EDITOR_AUTHORITY_VALUE && !isPendingPlayerIdValue(record.playerId)) {
+    return {
+      success: false,
+      message: 'すでに編集権限をお持ちのアカウントです。'
+    };
+  }
+
+  const columns = CONFIG.COLUMNS || {};
+  const updatedValues = record.values.slice();
+  const pendingPlayerId = buildPendingPlayerId(desiredPlayerId);
+
+  if (columns.playerId) {
+    updatedValues[columns.playerId - 1] = pendingPlayerId;
+  }
+  if (columns.kingdom) {
+    updatedValues[columns.kingdom - 1] = kingdomValue;
+  }
+  if (columns.updatedAt) {
+    updatedValues[columns.updatedAt - 1] = new Date();
+  }
+
+  const rowRange = sheet.getRange(record.rowNumber, 1, 1, sheet.getLastColumn());
+  rowRange.setValues([updatedValues]);
+
+  return appendAdminVerification({
+    success: true,
+    message: '編集権限の申請を受け付けました。',
+    playerId: columns.playerId ? updatedValues[columns.playerId - 1] : pendingPlayerId,
+    kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] : kingdomValue,
+    authority: authorityValue !== null ? authorityValue : 1
+  }, request.__adminVerification || adminVerification);
+}
+
 function parseRequest(e) {
   const data = parseRequestData(e);
   return {
@@ -572,8 +650,23 @@ function sanitizeLanguage(value) {
   return 'ja';
 }
 
+function sanitizePlayerId(value) {
+  return String(value || '')
+    .replace(/[^0-9]/g, '')
+    .trim();
+}
+
 function sanitizeAuthority(value) {
   return parseAuthorityValue(value);
+}
+
+function isPendingPlayerIdValue(value) {
+  return typeof value === 'string' && value.toString().trim().indexOf('!') === 0;
+}
+
+function buildPendingPlayerId(value) {
+  const sanitized = sanitizePlayerId(value);
+  return sanitized ? '!' + sanitized : '!';
 }
 
 function normalizeId(value) {

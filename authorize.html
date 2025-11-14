@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>編集権限の申請</title>
+    <script src="./scripts/appsScriptEndpoints.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            color: #37352f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .authorize-container {
+            width: min(720px, 100%);
+        }
+
+        .authorize-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 18px 48px rgba(15, 15, 15, 0.08);
+            padding: min(48px, 8vw);
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .view-section[hidden] {
+            display: none !important;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        h2 {
+            margin: 0 0 8px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        p {
+            margin: 0 0 12px;
+            line-height: 1.7;
+            color: #5b5954;
+        }
+
+        .flow-list,
+        .condition-list {
+            margin: 0;
+            padding-left: 20px;
+            color: #5b5954;
+            line-height: 1.6;
+        }
+
+        .condition-list li {
+            list-style: none;
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .condition-list li::before {
+            content: '☑';
+            position: absolute;
+            left: 0;
+            color: #2383e2;
+        }
+
+        .section-title {
+            font-size: 14px;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #7c7a75;
+        }
+
+        .request-block {
+            border: 1px solid #e3e2df;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            background: #fafaf9;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        input[type="text"] {
+            height: 44px;
+            border-radius: 8px;
+            border: 1px solid #d0d0cc;
+            padding: 0 14px;
+            font-size: 15px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #2383e2;
+            box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.15);
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        button {
+            height: 44px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            padding: 0 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #2383e2;
+            border-color: #1d70c4;
+            color: #fff;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1a6bc2;
+        }
+
+        .btn-secondary {
+            background: #f7f6f3;
+            border-color: #e3e2df;
+            color: #37352f;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #ebe9e4;
+        }
+
+        .status-message {
+            font-size: 13px;
+            min-height: 18px;
+            color: #5b5954;
+        }
+
+        .status-message.error {
+            color: #c0352b;
+        }
+
+        .status-message.success {
+            color: #0f7b6c;
+        }
+
+        .pending-card {
+            border: 1px solid #bee3f8;
+            background: #ebf8ff;
+            color: #205493;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .pending-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .pending-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .pending-meta span {
+            background: #fff;
+            border-radius: 6px;
+            padding: 6px 10px;
+            border: 1px solid #d9ecff;
+            font-size: 13px;
+            color: #205493;
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: #5b5954;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 16px;
+            }
+            .authorize-card {
+                padding: 24px;
+            }
+            .pending-meta {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="authorize-container">
+        <div class="authorize-card">
+            <div id="view-login" class="view-section" hidden>
+                <h1>ログインが必要です</h1>
+                <p>編集権限の申請にはログインが必要です。Googleアカウントでログインしてから再度アクセスしてください。</p>
+                <div class="button-row">
+                    <button id="login-button" class="btn-primary" type="button">ログインページへ</button>
+                    <button id="view-button" class="btn-secondary" type="button">閲覧ページに戻る</button>
+                </div>
+            </div>
+            <div id="view-form" class="view-section" hidden>
+                <div class="section-title">--- 編集権限の申請 ---</div>
+                <div class="request-block">
+                    <div>
+                        <h2>- 申請の流れ -</h2>
+                        <ol class="flow-list">
+                            <li>このページからプレイヤー情報を送信し申請を行います。</li>
+                            <li>管理者から申請したプレイヤーID宛にメッセージが届くのでURLにアクセスしてください。</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <h2>- 申請条件 -</h2>
+                        <ul class="condition-list">
+                            <li>撃破戦力が1,000,000,000を越えていること</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h2>- 申請 -</h2>
+                        <form id="authorize-form">
+                            <label for="kingdom-input">Kingdom</label>
+                            <input id="kingdom-input" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 1001">
+                            <label for="player-input">Player ID</label>
+                            <input id="player-input" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 123456789">
+                            <div class="status-message" id="form-status" role="status" aria-live="polite"></div>
+                            <div class="button-row">
+                                <button id="submit-button" class="btn-primary" type="submit">申請</button>
+                                <button id="refresh-button" class="btn-secondary" type="button">最新の状態を確認</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div id="view-pending" class="view-section" hidden>
+                <div class="section-title">--- 申請状況 ---</div>
+                <div class="pending-card">
+                    <div class="pending-title">承認待ちです</div>
+                    <p>編集権限の申請を受け付けました。管理者からの承認をお待ちください。承認が完了するとプレイヤーID宛に案内が届きます。</p>
+                    <div class="pending-meta">
+                        <span>Kingdom: <strong id="pending-kingdom">-</strong></span>
+                        <span>Player ID: <strong id="pending-player">-</strong></span>
+                    </div>
+                </div>
+                <div class="status-message" id="pending-status" role="status" aria-live="polite"></div>
+                <div class="button-row">
+                    <button id="pending-refresh" class="btn-secondary" type="button">最新の状態を確認</button>
+                    <button id="pending-view" class="btn-secondary" type="button">閲覧ページに戻る</button>
+                </div>
+            </div>
+            <div id="view-loading" class="view-section" hidden>
+                <div class="loading-text">情報を取得しています…</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const LOGIN_STORAGE_KEY = 'wikiLoginState';
+        const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
+        const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
+        const EDITOR_AUTHORITY_VALUE = 2;
+
+        const sections = {
+            login: document.getElementById('view-login'),
+            form: document.getElementById('view-form'),
+            pending: document.getElementById('view-pending'),
+            loading: document.getElementById('view-loading'),
+        };
+
+        const elements = {
+            loginButton: document.getElementById('login-button'),
+            viewButton: document.getElementById('view-button'),
+            form: document.getElementById('authorize-form'),
+            kingdomInput: document.getElementById('kingdom-input'),
+            playerInput: document.getElementById('player-input'),
+            submitButton: document.getElementById('submit-button'),
+            refreshButton: document.getElementById('refresh-button'),
+            formStatus: document.getElementById('form-status'),
+            pendingKingdom: document.getElementById('pending-kingdom'),
+            pendingPlayer: document.getElementById('pending-player'),
+            pendingStatus: document.getElementById('pending-status'),
+            pendingRefresh: document.getElementById('pending-refresh'),
+            pendingView: document.getElementById('pending-view'),
+        };
+
+        const state = {
+            isSubmitting: false,
+            isLoading: false,
+            user: null,
+        };
+
+        const params = new URLSearchParams(window.location.search);
+        const requestedPageId = (params.get('page') || '').trim();
+
+        const sanitizeNumberInput = (value) => {
+            return (value || '').toString().replace(/[^0-9]/g, '').trim();
+        };
+
+        const isPendingPlayerId = (value) => {
+            return typeof value === 'string' && value.trim().startsWith('!');
+        };
+
+        const stripPendingPrefix = (value) => {
+            if (!value) {
+                return '';
+            }
+            return value.replace(/^!+/, '');
+        };
+
+        const parseAuthority = (value) => {
+            if (value === null || value === undefined || value === '') {
+                return null;
+            }
+            const number = Number(value);
+            return Number.isFinite(number) ? number : null;
+        };
+
+        const getStoredLoginState = () => {
+            try {
+                const value = localStorage.getItem(LOGIN_STORAGE_KEY);
+                return value ? JSON.parse(value) : null;
+            } catch (error) {
+                console.error('Failed to parse login state', error);
+                return null;
+            }
+        };
+
+        const updateStoredLoginStateUser = (updates) => {
+            const stored = getStoredLoginState();
+            if (!stored?.user) {
+                return null;
+            }
+            const updatedState = {
+                ...stored,
+                user: {
+                    ...stored.user,
+                    ...updates,
+                },
+            };
+            localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(updatedState));
+            return updatedState.user;
+        };
+
+        const buildLoginUrl = () => {
+            const url = new URL('./login.html', window.location.href);
+            url.searchParams.set('redirect', 'authorize.html');
+            if (requestedPageId) {
+                url.searchParams.set('page', requestedPageId);
+            }
+            return url.toString();
+        };
+
+        const buildViewUrl = () => {
+            const url = new URL('./view.html', window.location.href);
+            if (requestedPageId) {
+                url.searchParams.set('page', requestedPageId);
+            }
+            return url.toString();
+        };
+
+        const buildEditUrl = () => {
+            const url = new URL('./edit.html', window.location.href);
+            if (requestedPageId) {
+                url.searchParams.set('page', requestedPageId);
+            }
+            return url.toString();
+        };
+
+        const buildUserSettingsPayload = (payload = {}) => {
+            const loginState = getStoredLoginState();
+            const user = loginState?.user || {};
+            const identity = {};
+            const email = (user.email || '').toString().trim();
+            const googleEmail = (user.googleEmail || email).toString().trim();
+            if (email) {
+                identity.email = email;
+            }
+            if (googleEmail) {
+                identity.googleEmail = googleEmail;
+            }
+            return { ...payload, ...identity };
+        };
+
+        const callUserSettingsApi = async (payload) => {
+            if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
+                throw new Error('ユーザー設定APIのエンドポイントが設定されていません。');
+            }
+
+            const controller = new AbortController();
+            const timer = window.setTimeout(() => controller.abort(), USER_SETTINGS_REQUEST_TIMEOUT);
+
+            try {
+                const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+                    method: 'POST',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    body: JSON.stringify(buildUserSettingsPayload(payload)),
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error(`ユーザー情報の取得に失敗しました (HTTP ${response.status})${errorText ? `: ${errorText}` : ''}`);
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result) {
+                    throw new Error('ユーザー情報の解析に失敗しました。');
+                }
+                return result;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('ユーザー情報の取得がタイムアウトしました。');
+                }
+                if (error instanceof TypeError) {
+                    throw new Error('ユーザー情報サービスに接続できませんでした。ネットワークまたはCORS設定を確認してください。');
+                }
+                throw error;
+            } finally {
+                window.clearTimeout(timer);
+            }
+        };
+
+        const showSection = (key) => {
+            Object.entries(sections).forEach(([name, element]) => {
+                if (!element) {
+                    return;
+                }
+                element.hidden = name !== key;
+            });
+        };
+
+        const setFormStatus = (message, type = '') => {
+            if (!elements.formStatus) {
+                return;
+            }
+            elements.formStatus.textContent = message || '';
+            elements.formStatus.classList.remove('error', 'success');
+            if (type) {
+                elements.formStatus.classList.add(type);
+            }
+        };
+
+        const setPendingStatus = (message, type = '') => {
+            if (!elements.pendingStatus) {
+                return;
+            }
+            elements.pendingStatus.textContent = message || '';
+            elements.pendingStatus.classList.remove('error', 'success');
+            if (type) {
+                elements.pendingStatus.classList.add(type);
+            }
+        };
+
+        const updatePendingMeta = (user) => {
+            if (!user) {
+                elements.pendingKingdom.textContent = '-';
+                elements.pendingPlayer.textContent = '-';
+                return;
+            }
+            const kingdomValue = (user.kingdom || '').trim();
+            const playerValue = stripPendingPrefix(user.playerId || '');
+            elements.pendingKingdom.textContent = kingdomValue || '-';
+            elements.pendingPlayer.textContent = playerValue || '-';
+        };
+
+        const refreshUserProfile = async () => {
+            const loginState = getStoredLoginState();
+            if (!loginState?.user) {
+                state.user = null;
+                return null;
+            }
+
+            const payload = {
+                action: 'getUserSettings',
+                playerId: loginState.user.playerId || '',
+                email: loginState.user.email || '',
+            };
+
+            const result = await callUserSettingsApi(payload);
+            if (!result.success) {
+                if (result.requiresReauthentication) {
+                    localStorage.removeItem(LOGIN_STORAGE_KEY);
+                }
+                throw new Error(result.message || 'ユーザー情報の取得に失敗しました。');
+            }
+
+            const updatedUser = updateStoredLoginStateUser({
+                playerId: result.playerId || loginState.user.playerId,
+                username: result.username || loginState.user.username,
+                kingdom: result.kingdom ?? loginState.user.kingdom,
+                language: result.language || loginState.user.language,
+                authority: result.authority,
+            });
+
+            state.user = updatedUser || getStoredLoginState()?.user || null;
+            return state.user;
+        };
+
+        const requireLogin = () => {
+            showSection('login');
+        };
+
+        const handleAuthorizedUser = (user) => {
+            if (!user) {
+                requireLogin();
+                return;
+            }
+            const authority = parseAuthority(user.authority);
+            if (authority !== null && authority >= EDITOR_AUTHORITY_VALUE && !isPendingPlayerId(user.playerId)) {
+                window.location.replace(buildEditUrl());
+                return;
+            }
+            if (isPendingPlayerId(user.playerId)) {
+                updatePendingMeta(user);
+                setPendingStatus('承認が完了するまでお待ちください。');
+                showSection('pending');
+                return;
+            }
+            showSection('form');
+        };
+
+        const initializeAuthorizePage = async () => {
+            const loginState = getStoredLoginState();
+            if (!loginState?.user) {
+                requireLogin();
+                return;
+            }
+
+            showSection('loading');
+            setFormStatus('');
+            setPendingStatus('');
+            try {
+                await refreshUserProfile();
+                handleAuthorizedUser(state.user);
+            } catch (error) {
+                console.error('Failed to load user info', error);
+                const latestState = getStoredLoginState();
+                if (!latestState?.user) {
+                    requireLogin();
+                    return;
+                }
+                setFormStatus(error.message || 'ユーザー情報の取得に失敗しました。', 'error');
+                showSection('form');
+            }
+        };
+
+        const handleFormSubmit = async (event) => {
+            event.preventDefault();
+            if (state.isSubmitting) {
+                return;
+            }
+
+            if (!state.user) {
+                setFormStatus('ログイン状態を確認してください。', 'error');
+                return;
+            }
+
+            const kingdom = sanitizeNumberInput(elements.kingdomInput?.value);
+            const playerId = sanitizeNumberInput(elements.playerInput?.value);
+
+            if (!kingdom) {
+                setFormStatus('Kingdom番号を入力してください。', 'error');
+                elements.kingdomInput?.focus();
+                return;
+            }
+            if (!playerId) {
+                setFormStatus('Player IDを入力してください。', 'error');
+                elements.playerInput?.focus();
+                return;
+            }
+
+            state.isSubmitting = true;
+            elements.submitButton?.setAttribute('disabled', 'true');
+            elements.refreshButton?.setAttribute('disabled', 'true');
+            setFormStatus('申請を送信しています…');
+
+            try {
+                const payload = {
+                    action: 'requestEditorAccess',
+                    kingdom,
+                    requestedPlayerId: playerId,
+                    currentPlayerId: state.user?.playerId || '',
+                    playerId: state.user?.playerId || '',
+                };
+                const result = await callUserSettingsApi(payload);
+                if (!result.success) {
+                    if (result.requiresReauthentication) {
+                        localStorage.removeItem(LOGIN_STORAGE_KEY);
+                        requireLogin();
+                        return;
+                    }
+                    throw new Error(result.message || '申請の送信に失敗しました。');
+                }
+
+                const updatedUser = updateStoredLoginStateUser({
+                    playerId: result.playerId || `!${playerId}`,
+                    kingdom: result.kingdom ?? kingdom,
+                    authority: result.authority ?? state.user?.authority ?? 1,
+                });
+                state.user = updatedUser || state.user;
+                updatePendingMeta(state.user);
+                setPendingStatus('申請を受け付けました。承認までしばらくお待ちください。', 'success');
+                showSection('pending');
+            } catch (error) {
+                console.error('Failed to submit request', error);
+                setFormStatus(error.message || '申請の送信に失敗しました。', 'error');
+            } finally {
+                state.isSubmitting = false;
+                elements.submitButton?.removeAttribute('disabled');
+                elements.refreshButton?.removeAttribute('disabled');
+            }
+        };
+
+        const handleRefresh = async () => {
+            setFormStatus('最新の情報を取得しています…');
+            try {
+                await refreshUserProfile();
+                handleAuthorizedUser(state.user);
+                setFormStatus('最新の情報を取得しました。', 'success');
+            } catch (error) {
+                console.error('Failed to refresh state', error);
+                const latestState = getStoredLoginState();
+                if (!latestState?.user) {
+                    requireLogin();
+                    return;
+                }
+                setFormStatus(error.message || '最新情報の取得に失敗しました。', 'error');
+            }
+        };
+
+        const handlePendingRefresh = async () => {
+            setPendingStatus('最新の情報を取得しています…');
+            try {
+                await refreshUserProfile();
+                handleAuthorizedUser(state.user);
+                updatePendingMeta(state.user);
+                setPendingStatus('最新の情報を確認しました。', 'success');
+            } catch (error) {
+                console.error('Failed to refresh pending status', error);
+                const latestState = getStoredLoginState();
+                if (!latestState?.user) {
+                    requireLogin();
+                    return;
+                }
+                setPendingStatus(error.message || '最新情報の取得に失敗しました。', 'error');
+            }
+        };
+
+        elements.form?.addEventListener('submit', handleFormSubmit);
+        elements.refreshButton?.addEventListener('click', handleRefresh);
+        elements.pendingRefresh?.addEventListener('click', handlePendingRefresh);
+        elements.loginButton?.addEventListener('click', () => {
+            window.location.href = buildLoginUrl();
+        });
+        elements.viewButton?.addEventListener('click', () => {
+            window.location.href = buildViewUrl();
+        });
+        elements.pendingView?.addEventListener('click', () => {
+            window.location.href = buildViewUrl();
+        });
+
+        window.addEventListener('storage', (event) => {
+            if (event.key === LOGIN_STORAGE_KEY) {
+                initializeAuthorizePage();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAuthorizePage();
+        });
+    </script>
+</body>
+</html>

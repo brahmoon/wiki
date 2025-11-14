@@ -1643,6 +1643,7 @@
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
         const ADMIN_AUTHORITY_VALUE = 99;
+        const EDITOR_AUTHORITY_VALUE = 2;
 
         const DRIVE_IMAGE_PERMISSION_DEBUG = true;
 
@@ -1928,6 +1929,15 @@
             return url.toString();
         };
 
+        const buildAuthorizeUrl = (pageId) => {
+            const url = new URL('./authorize.html', window.location.href);
+            const targetPage = (pageId || '').trim();
+            if (targetPage) {
+                url.searchParams.set('page', targetPage);
+            }
+            return url.toString();
+        };
+
         const buildWikiSettingsUrl = () => {
             return new URL('./setting.html', window.location.href).toString();
         };
@@ -1980,6 +1990,29 @@
             }
             const number = Number(value);
             return Number.isFinite(number) ? number : null;
+        }
+
+        function isPendingPlayerId(value) {
+            return typeof value === 'string' && value.trim().startsWith('!');
+        }
+
+        function shouldRedirectToAuthorize(user) {
+            if (!user) {
+                return false;
+            }
+            if (isPendingPlayerId(user.playerId)) {
+                return true;
+            }
+            const authorityValue = parseAuthority(user.authority);
+            if (authorityValue === null) {
+                return true;
+            }
+            return authorityValue < EDITOR_AUTHORITY_VALUE;
+        }
+
+        function redirectToAuthorizePage() {
+            const targetPage = state.currentPageId || initialPageIdFromQuery || '';
+            window.location.replace(buildAuthorizeUrl(targetPage));
         }
 
         let driveImageExtensionInstance = null;
@@ -2228,6 +2261,10 @@
                     setEditorPlayerId(userSettingsState.playerId);
                 } else if (loginState?.user?.playerId) {
                     setEditorPlayerId(loginState.user.playerId);
+                }
+                if (shouldRedirectToAuthorize(loginState?.user)) {
+                    redirectToAuthorizePage();
+                    return;
                 }
             } else {
                 loginStatusText.textContent = '未ログイン';
