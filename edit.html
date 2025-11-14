@@ -2377,7 +2377,6 @@
         const APPS_SCRIPT_ENDPOINT_WIKI = window.APPS_SCRIPT_ENDPOINT_WIKI;
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
         const APPS_SCRIPT_ENDPOINT_ADMIN_AUTH = window.APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
-        const APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN = window.APPS_SCRIPT_ENDPOINT_TOOLBAR_PLUGIN;
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION = APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
 
         const TOOLBAR_FEATURES = [
@@ -3240,7 +3239,7 @@
         }
 
         async function loadToolbarPluginConfig() {
-            const toolbarConfigEndpoint = resolveToolbarConfigEndpoint();
+            const toolbarConfigEndpoint = APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
             if (!toolbarConfigEndpoint) {
                 applyToolbarConfigStates(null);
                 state.toolbarConfig.loaded = false;
