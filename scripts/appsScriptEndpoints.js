@@ -8,7 +8,7 @@
     DRIVE_IMAGE: 'https://script.google.com/macros/s/AKfycbxaS2LMlxk5rx-XK6XTkFG2S58NKTkOnBL3smjF_mbyP_QA0PDJJ2hBE0_-PEX7nSO4/exec',
     LOGIN: 'https://script.google.com/macros/s/AKfycbwHhnYgB02en5yytMZEp37uj6R6sG9avJaI-NiBPtlNOm1hf5KkICOeMqPMrIIIne8k/exec',
     ADMIN_AUTH: 'https://script.google.com/macros/s/AKfycbxY_eqIlG2elhiNqtnBi__jUywu7LuanURjT0HA4uI2cOdnLbD9cCEiDGaqFEdz0-BHEA/exec',
-    USER_SETTINGS: 'https://script.google.com/macros/s/AKfycbyYoXyz7T7JuYHbz2c1EGyv2sFMIx17u4UE0UMybNHPRRDfx45NT6S3z4O5tYF_n8Zxrg/exec',
+    USER_SETTINGS: 'https://script.google.com/macros/s/AKfycbyGPRft1uwHFfqDuWHfqgrawD4P7HHB7E_kHEy6P62Yz0dLxCaZuJDHzfXsYYO8PTd4Tg/exec',
     TOOLBAR_PLUGIN: 'https://script.google.com/macros/s/AKfycbxY_eqIlG2elhiNqtnBi__jUywu7LuanURjT0HA4uI2cOdnLbD9cCEiDGaqFEdz0-BHEA/exec',
   });
 
