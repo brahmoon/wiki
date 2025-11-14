@@ -610,6 +610,23 @@
             color: #7f5f00;
         }
 
+        .member-approval-cell {
+            text-align: center;
+        }
+
+        .member-approval-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e1f3ff;
+            color: #0f4c81;
+            border: 1px solid #b8e1ff;
+        }
+
         .member-loading,
         .member-empty,
         .member-error {
@@ -943,6 +960,7 @@
                                     <th scope="col">Kingdom</th>
                                     <th scope="col">言語</th>
                                     <th scope="col">Authority</th>
+                                    <th scope="col">承認状態</th>
                                     <th scope="col">更新日時</th>
                                 </tr>
                             </thead>
@@ -2163,6 +2181,10 @@
             return authorityValue !== null && authorityValue >= ADMIN_AUTHORITY_VALUE;
         };
 
+        const isPendingPlayerId = (value) => {
+            return typeof value === 'string' && value.trim().startsWith('!');
+        };
+
         const createAuthorityCell = (member, updatedCell) => {
             const cell = document.createElement('td');
             const authorityValue = parseAuthorityValue(member?.authority);
@@ -2225,6 +2247,22 @@
             control.appendChild(button);
 
             cell.appendChild(control);
+            return cell;
+        };
+
+        const createApprovalStatusCell = (member) => {
+            const cell = document.createElement('td');
+            cell.className = 'member-approval-cell';
+
+            if (isPendingPlayerId(member?.playerId)) {
+                const badge = document.createElement('span');
+                badge.className = 'member-approval-badge';
+                badge.textContent = '承認待ち';
+                cell.appendChild(badge);
+            } else {
+                cell.textContent = '-';
+            }
+
             return cell;
         };
 
@@ -2505,6 +2543,9 @@
 
                 const authorityCell = createAuthorityCell(member, updatedCell);
                 row.appendChild(authorityCell);
+
+                const approvalCell = createApprovalStatusCell(member);
+                row.appendChild(approvalCell);
 
                 row.appendChild(updatedCell);
 
