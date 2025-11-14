@@ -94,15 +94,8 @@ function doOptions(e) {
 }
 
 function requireAdminAuthority(sheet, request) {
-  if (typeof verifyAdminAccess !== 'function') {
-    return {
-      success: false,
-      message: '管理者権限の検証機能が利用できません。'
-    };
-  }
-
-  const verification = verifyAdminAccess(sheet, request);
-  if (verification && verification.success) {
+  const verification = runAdminVerification(sheet, request);
+  if (verification && verification.success && request) {
     request.__adminVerification = verification;
   }
   return verification;
@@ -117,18 +110,69 @@ function resolveAdminVerification(sheet, request) {
     return null;
   }
 
-  if (typeof verifyAdminAccess !== 'function') {
-    return {
-      success: false,
-      message: '管理者権限の検証機能が利用できません。'
-    };
-  }
-
-  const verification = verifyAdminAccess(sheet, request);
-  if (verification.success) {
+  const verification = runAdminVerification(sheet, request);
+  if (verification && verification.success && request) {
     request.__adminVerification = verification;
   }
   return verification;
+}
+
+function runAdminVerification(sheet, request) {
+  if (typeof verifyAdminAccess === 'function') {
+    return verifyAdminAccess(sheet, request);
+  }
+  return fallbackVerifyAdminAccess(sheet, request);
+}
+
+function fallbackVerifyAdminAccess(sheet, request) {
+  const normalizedGoogleEmail = normalizeId(request && request.googleEmail);
+  const normalizedEmail = normalizeId(request && request.email);
+  const lookupEmail = normalizedGoogleEmail || normalizedEmail;
+
+  if (!lookupEmail) {
+    return {
+      success: false,
+      message: 'Googleアカウントのメールアドレスが確認できませんでした。',
+      requiresReauthentication: true
+    };
+  }
+
+  if (!sheet) {
+    return {
+      success: false,
+      message: 'アカウント情報が確認できません。管理者にお問い合わせください。'
+    };
+  }
+
+  const account = findAccount(sheet, { email: lookupEmail, playerId: request && request.playerId });
+
+  if (!account) {
+    return {
+      success: false,
+      message: '管理者アカウントが登録されていません。',
+      requiresReauthentication: true
+    };
+  }
+
+  const authorityValue = parseAuthorityValue(account.authority);
+  if (authorityValue === null || authorityValue < ADMIN_AUTHORITY_THRESHOLD) {
+    return {
+      success: false,
+      message: '管理者権限がありません。',
+      authority: authorityValue
+    };
+  }
+
+  return {
+    success: true,
+    message: '管理者権限が確認されました。',
+    playerId: account.playerId || '',
+    username: account.username || '',
+    email: account.email || '',
+    authority: authorityValue,
+    adminAuthority: authorityValue,
+    adminEmail: account.email || ''
+  };
 }
 
 function verifyRequestAccessToEmail(request, account) {
