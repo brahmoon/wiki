@@ -1083,8 +1083,8 @@
                     playerId: authorizationCodeState.playerId,
                     charId: authorizationCodeState.charId,
                     currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
-                    email: state.user?.email || '',
-                    googleEmail: state.user?.googleEmail || '',
+                    email: state.user.email || state.user.googleEmail,
+                    googleEmail: state.user.googleEmail || state.user.email,
                 };
 
                 console.log("DEBUG: email in state.user.email =", state.user?.email);
