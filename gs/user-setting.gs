@@ -732,11 +732,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
   }
 
   const recordUpdatedAt = columns.updatedAt ? updatedValues[columns.updatedAt - 1] : '';
-  const normalizedRecordTimestamp = formatDateValue(recordUpdatedAt);
   const decodedTimestamp = decodeAuthorizationTimestamp(encodedTimestamp);
-  const normalizedDecodedTimestamp = formatDateValue(decodedTimestamp);
 
-  if (!normalizedRecordTimestamp || !normalizedDecodedTimestamp || normalizedRecordTimestamp !== normalizedDecodedTimestamp) {
+  if (!timestampsAreEquivalent(recordUpdatedAt, decodedTimestamp)) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
@@ -1027,6 +1025,46 @@ function formatDateValue(value) {
   }
 
   return '';
+}
+
+function timestampsAreEquivalent(firstValue, secondValue) {
+  const firstDate = coerceDateValue(firstValue);
+  const secondDate = coerceDateValue(secondValue);
+
+  if (firstDate && secondDate) {
+    const difference = Math.abs(firstDate.getTime() - secondDate.getTime());
+    return difference <= 1000;
+  }
+
+  const normalizedFirst = formatDateValue(firstValue);
+  const normalizedSecond = formatDateValue(secondValue);
+  return Boolean(normalizedFirst && normalizedSecond && normalizedFirst === normalizedSecond);
+}
+
+function coerceDateValue(value) {
+  if (!value && value !== 0) {
+    return null;
+  }
+
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return new Date(value.getTime());
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const dateFromNumber = new Date(value);
+    return isNaN(dateFromNumber.getTime()) ? null : dateFromNumber;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsedDate = new Date(trimmed);
+    return isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }
+
+  return null;
 }
 
 function buildResponse(result, origin) {
