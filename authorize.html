@@ -1038,8 +1038,14 @@
                 return false;
             }
             authorizationCodeState.completed = true;
-            if (!authorizationCodeState.playerId || !authorizationCodeState.charId) {
+            const decodedPlayerId = authorizationCodeState.playerId;
+            const requestedCharId = authorizationCodeState.charId;
+            if (!decodedPlayerId || !requestedCharId) {
                 showCodeErrorView('承認情報に不整合があります。');
+                return true;
+            }
+            if (decodedPlayerId !== requestedCharId) {
+                showCodeErrorView('承認コードとキャラクターIDが一致しません。');
                 return true;
             }
             try {
@@ -1048,6 +1054,7 @@
                     code: authorizationCodeState.rawCode,
                     playerId: authorizationCodeState.playerId,
                     charId: authorizationCodeState.charId,
+                    currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
                 };
                 const result = await callUserSettingsApi(payload);
                 if (!result.success) {
