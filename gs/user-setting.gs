@@ -1136,27 +1136,12 @@ function applyCorsHeaders(output, requestOrigin) {
   const normalizedRequestOrigin = (requestOrigin || '').trim();
   var resolvedOrigin = '';
 
-  if (allowedOrigins.indexOf('*') !== -1) {
-    resolvedOrigin = '*';
-  } else if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
-    resolvedOrigin = normalizedRequestOrigin;
-  } else if (allowedOrigins.length === 1) {
-    resolvedOrigin = allowedOrigins[0];
-  } else {
-    resolvedOrigin = allowedOrigins[0];
+  const normalizedRequestOrigin = (requestOrigin || '').trim();
+  if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
+    output
+      .setHeader('Access-Control-Allow-Origin', normalizedRequestOrigin)
+      .setHeader('Vary', 'Origin');
   }
-
-  if (resolvedOrigin) {
-    output.setHeader('Access-Control-Allow-Origin', resolvedOrigin);
-    if (resolvedOrigin !== '*') {
-      output.setHeader('Vary', 'Origin');
-    }
-  }
-
-  output
-    .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    .setHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
