@@ -554,7 +554,17 @@
         };
 
         const sanitizeNumberInput = (value) => {
-            return (value || '').toString().replace(/[^0-9]/g, '').trim();
+            if (value === null || value === undefined) {
+                return '';
+            }
+            let normalizedValue = value.toString();
+            if (typeof normalizedValue.normalize === 'function') {
+                normalizedValue = normalizedValue.normalize('NFKC');
+            }
+            return normalizedValue
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/\s+/g, '')
+                .replace(/[^0-9]/g, '');
         };
 
         const safeBase64Decode = (value) => {
@@ -599,7 +609,13 @@
             if (!value) {
                 return '';
             }
-            return value.replace(/^!+/, '');
+            let normalizedValue = value.toString();
+            if (typeof normalizedValue.normalize === 'function') {
+                normalizedValue = normalizedValue.normalize('NFKC');
+            }
+            normalizedValue = normalizedValue.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+            normalizedValue = normalizedValue.replace(/^[!！]+/, '');
+            return sanitizeNumberInput(normalizedValue);
         };
 
         const parseAuthority = (value) => {
@@ -1038,16 +1054,26 @@
                 return false;
             }
             authorizationCodeState.completed = true;
-            if (!authorizationCodeState.playerId || !authorizationCodeState.charId) {
+            const {
+                playerId: decodedPlayerId = '',
+                charId: requestedCharId = '',
+                rawCode = '',
+            } = authorizationCodeState;
+            if (!decodedPlayerId || !requestedCharId) {
                 showCodeErrorView('承認情報に不整合があります。');
+                return true;
+            }
+            if (decodedPlayerId !== requestedCharId) {
+                showCodeErrorView('承認コードとキャラクターIDが一致しません。');
                 return true;
             }
             try {
                 const payload = {
                     action: 'autoApproveEditorRequest',
-                    code: authorizationCodeState.rawCode,
-                    playerId: authorizationCodeState.playerId,
-                    charId: authorizationCodeState.charId,
+                    code: rawCode,
+                    playerId: decodedPlayerId,
+                    charId: requestedCharId,
+                    currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
                 };
                 const result = await callUserSettingsApi(payload);
                 if (!result.success) {
