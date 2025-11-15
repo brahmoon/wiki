@@ -1034,44 +1034,97 @@
         };
 
         const tryResolveAuthorizationCode = async () => {
+            console.log("DEBUG: tryResolveAuthorizationCode called");
+            console.log("DEBUG: authorizationCodeState =", authorizationCodeState);
+
             if (!authorizationCodeState?.hasCode || authorizationCodeState.completed) {
+                console.log("DEBUG: No code or already completed. Abort.");
                 return false;
             }
+
             authorizationCodeState.completed = true;
+
             const decodedPlayerId = authorizationCodeState.playerId;
             const requestedCharId = authorizationCodeState.charId;
+            const rawCode = authorizationCodeState.rawCode;
+
+            console.log("DEBUG: decodedPlayerId =", decodedPlayerId);
+            console.log("DEBUG: requestedCharId =", requestedCharId);
+            console.log("DEBUG: rawCode =", rawCode);
+
+            // playerId または charId が空の場合
             if (!decodedPlayerId || !requestedCharId) {
-                showCodeErrorView('承認情報に不整合があります。(IDの不一致)');
+                console.log("DEBUG: decodedPlayerId or requestedCharId missing");
+                showCodeErrorView("承認情報に不整合があります。(IDの不一致)");
                 return true;
             }
+
+            // playerId と charId の一致確認
             if (decodedPlayerId !== requestedCharId) {
-                showCodeErrorView('承認コードとキャラクターIDが一致しません。');
+                console.log("DEBUG: decodedPlayerId and requestedCharId mismatch");
+                showCodeErrorView("承認コードとキャラクターIDが一致しません。");
                 return true;
             }
+
             try {
-                console.log("🚀 Sending payload:", payload);
+                const currentPid = stripPendingPrefix(state.user?.playerId || "");
+                console.log("DEBUG: current stored playerId =", state.user?.playerId);
+                console.log("DEBUG: stripped pending playerId =", currentPid);
+
+                const payload = {
+                    action: "autoApproveEditorRequest",
+                    code: rawCode,
+                    playerId: authorizationCodeState.playerId,
+                    charId: authorizationCodeState.charId,
+                    currentPlayerId: currentPid,
+                };
+
+                console.log("DEBUG: Sending payload to API =", payload);
 
                 const result = await callUserSettingsApi(payload);
 
-                console.log("📥 Received result:", result);
+                console.log("DEBUG: API response =", result);
 
+                // API success=false
                 if (!result.success) {
+                    console.log("DEBUG: API returned success=false");
+                    console.log("DEBUG: API error message =", result.message);
+
                     if (result.requiresReauthentication) {
+                        console.log("DEBUG: requiresReauthentication=true, clearing login");
                         localStorage.removeItem(LOGIN_STORAGE_KEY);
                         requireLogin();
                         return true;
                     }
-                    throw new Error(result.message || '承認情報の確認に失敗しました。');
+
+                    throw new Error(result.message || "承認情報の確認に失敗しました。");
                 }
 
+                // autoApproved フラグがない場合
                 if (!result.autoApproved) {
-                    throw new Error(result.message || '承認情報に不整合があります。（API）');
+                    console.log("DEBUG: API returned success=true but autoApproved=false");
+                    console.log("DEBUG: API message =", result.message);
+                    throw new Error(result.message || "承認情報に不整合があります。（API）");
                 }
 
-                ...
+                console.log("DEBUG: Approval successful. Applying updated user info.");
+
+                const updatedUser = updateStoredLoginStateUser({
+                    playerId: result.playerId || result.updatedPlayerId || state.user?.playerId || "",
+                    kingdom: result.kingdom ?? state.user?.kingdom,
+                    authority: result.authority ?? state.user?.authority,
+                });
+
+                console.log("DEBUG: updatedUser =", updatedUser);
+
+                state.user = updatedUser || state.user;
+
+                showApprovedView(result.message || "申請が承認されました。");
+                return true;
+
             } catch (error) {
-                console.error('❌ Failed to auto approve request', error);
-                showCodeErrorView('承認情報に不整合があります。（エラー）');
+                console.error("DEBUG: Exception thrown during approval:", error);
+                showCodeErrorView("承認情報に不整合があります。（エラー）");
                 return true;
             }
         };
