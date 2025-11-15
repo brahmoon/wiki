@@ -1078,7 +1078,8 @@
                 return true;
             } catch (error) {
                 console.error('Failed to auto approve request', error);
-                showCodeErrorView(error.message || '承認情報に不整合があります。（エラー）');
+                showCodeErrorView('承認情報に不整合があります。（エラー）');
+                //showCodeErrorView(error.message || '承認情報に不整合があります。（エラー）');
                 return true;
             }
         };
