@@ -666,29 +666,48 @@ function handleAutoApproveEditorRequest(sheet, request) {
     playerId: normalizedCurrentPlayerId,
     email: request.email || request.googleEmail || '',
   };
+  let pendingPlayerIdMatches = false;
+  let emailLookupPlayerId = '';
+  let pendingPlayerId = '';
 
   const record = findAccount(sheet, lookupIdentifiers);
   if (!record) {
     return {
       success: false,
       message: 'ユーザー情報が見つかりません。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
     };
-  }
-
-  const accessCheck = verifyRequestAccessToEmail(request, record);
-  if (!accessCheck.success) {
-    return accessCheck;
   }
 
   const sanitizedCodePlayerId = String(sanitizePlayerId(request.playerId || '') || '');
   const sanitizedCharId = String(sanitizePlayerId(request.charId || '') || '');
   const parsedCode = parseAuthorizationCodeValue(request.code);
   const parsedCodePlayerId = String(sanitizePlayerId(parsedCode.playerId || '') || '');
+  const columns = CONFIG.COLUMNS || {};
+  const updatedValues = record.values.slice();
+  const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
+  emailLookupPlayerId = String(sanitizePlayerId(record.playerId || currentPlayerIdValue) || '');
+  pendingPlayerId = String(sanitizePlayerId(stripPendingPlayerId(currentPlayerIdValue)) || '');
+  pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === sanitizedCodePlayerId;
+
+  const accessCheck = verifyRequestAccessToEmail(request, record);
+  if (!accessCheck.success) {
+    return Object.assign({}, accessCheck, {
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+    });
+  }
 
   if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
     };
   }
 
@@ -696,6 +715,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
     };
   }
 
@@ -703,27 +725,29 @@ function handleAutoApproveEditorRequest(sheet, request) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
     };
   }
-
-  const columns = CONFIG.COLUMNS || {};
-  const updatedValues = record.values.slice();
-  const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
 
   if (!isPendingPlayerIdValue(currentPlayerIdValue)) {
     return {
       success: false,
       message: '申請中の情報が見つかりません。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
     };
   }
 
-  const pendingPlayerId = String(
-    sanitizePlayerId(stripPendingPlayerId(currentPlayerIdValue)) || '',
-  );
   if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
     };
   }
 
@@ -747,6 +771,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     playerId: columns.playerId ? updatedValues[columns.playerId - 1] || sanitizedCodePlayerId : sanitizedCodePlayerId,
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
     authority: EDITOR_AUTHORITY_VALUE,
+    pendingPlayerIdMatches,
+    emailLookupPlayerId,
+    pendingPlayerId,
   };
 }
 
