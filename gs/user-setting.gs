@@ -1136,7 +1136,6 @@ function applyCorsHeaders(output, requestOrigin) {
   const normalizedRequestOrigin = (requestOrigin || '').trim();
   var resolvedOrigin = '';
 
-  const normalizedRequestOrigin = (requestOrigin || '').trim();
   if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
     output
       .setHeader('Access-Control-Allow-Origin', normalizedRequestOrigin)
