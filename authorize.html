@@ -1041,7 +1041,7 @@
             const decodedPlayerId = authorizationCodeState.playerId;
             const requestedCharId = authorizationCodeState.charId;
             if (!decodedPlayerId || !requestedCharId) {
-                showCodeErrorView('承認情報に不整合があります。');
+                showCodeErrorView('承認情報に不整合があります。(IDの不一致)');
                 return true;
             }
             if (decodedPlayerId !== requestedCharId) {
@@ -1066,7 +1066,7 @@
                     throw new Error(result.message || '承認情報の確認に失敗しました。');
                 }
                 if (!result.autoApproved) {
-                    throw new Error(result.message || '承認情報に不整合があります。');
+                    throw new Error(result.message || '承認情報に不整合があります。（API）');
                 }
                 const updatedUser = updateStoredLoginStateUser({
                     playerId: result.playerId || result.updatedPlayerId || state.user?.playerId || '',
@@ -1078,7 +1078,7 @@
                 return true;
             } catch (error) {
                 console.error('Failed to auto approve request', error);
-                showCodeErrorView(error.message || '承認情報に不整合があります。');
+                showCodeErrorView(error.message || '承認情報に不整合があります。（エラー）');
                 return true;
             }
         };
