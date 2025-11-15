@@ -661,8 +661,9 @@ function handleCancelEditorRequest(sheet, request) {
 }
 
 function handleAutoApproveEditorRequest(sheet, request) {
+  const normalizedCurrentPlayerId = String(request.currentPlayerId || request.playerId || '');
   const lookupIdentifiers = {
-    playerId: request.currentPlayerId || request.playerId || '',
+    playerId: normalizedCurrentPlayerId,
     email: request.email || request.googleEmail || '',
   };
 
@@ -679,18 +680,19 @@ function handleAutoApproveEditorRequest(sheet, request) {
     return accessCheck;
   }
 
-  const sanitizedCodePlayerId = sanitizePlayerId(request.playerId || '');
-  const sanitizedCharId = sanitizePlayerId(request.charId || '');
+  const sanitizedCodePlayerId = String(sanitizePlayerId(request.playerId || '') || '');
+  const sanitizedCharId = String(sanitizePlayerId(request.charId || '') || '');
   const parsedCode = parseAuthorizationCodeValue(request.code);
+  const parsedCodePlayerId = String(sanitizePlayerId(parsedCode.playerId || '') || '');
 
-  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCode.playerId) {
+  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
     };
   }
 
-  if (parsedCode.playerId && parsedCode.playerId !== sanitizedCodePlayerId) {
+  if (parsedCodePlayerId && parsedCodePlayerId !== sanitizedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
@@ -715,7 +717,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     };
   }
 
-  const pendingPlayerId = stripPendingPlayerId(currentPlayerIdValue);
+  const pendingPlayerId = String(
+    sanitizePlayerId(stripPendingPlayerId(currentPlayerIdValue)) || '',
+  );
   if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
     return {
       success: false,
@@ -841,15 +845,30 @@ function sanitizeLanguage(value) {
 }
 
 function sanitizePlayerId(value) {
-  return String(value || '')
-    .replace(/[^0-9]/g, '')
-    .trim();
+  if (value === null || value === undefined) {
+    return '';
+  }
+  let normalizedValue = String(value);
+  if (typeof normalizedValue.normalize === 'function') {
+    normalizedValue = normalizedValue.normalize('NFKC');
+  }
+  return normalizedValue
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[^0-9]/g, '');
 }
 
 function stripPendingPlayerId(value) {
-  return String(value || '')
-    .trim()
-    .replace(/^!+/, '');
+  if (value === null || value === undefined) {
+    return '';
+  }
+  let normalizedValue = String(value);
+  if (typeof normalizedValue.normalize === 'function') {
+    normalizedValue = normalizedValue.normalize('NFKC');
+  }
+  normalizedValue = normalizedValue.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  normalizedValue = normalizedValue.replace(/^[!！]+/, '');
+  return normalizedValue;
 }
 
 function sanitizeAuthority(value) {
