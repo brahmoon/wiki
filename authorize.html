@@ -554,7 +554,17 @@
         };
 
         const sanitizeNumberInput = (value) => {
-            return (value || '').toString().replace(/[^0-9]/g, '').trim();
+            if (value === null || value === undefined) {
+                return '';
+            }
+            let normalizedValue = value.toString();
+            if (typeof normalizedValue.normalize === 'function') {
+                normalizedValue = normalizedValue.normalize('NFKC');
+            }
+            return normalizedValue
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/\s+/g, '')
+                .replace(/[^0-9]/g, '');
         };
 
         const safeBase64Decode = (value) => {
@@ -599,7 +609,13 @@
             if (!value) {
                 return '';
             }
-            return value.replace(/^!+/, '');
+            let normalizedValue = value.toString();
+            if (typeof normalizedValue.normalize === 'function') {
+                normalizedValue = normalizedValue.normalize('NFKC');
+            }
+            normalizedValue = normalizedValue.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+            normalizedValue = normalizedValue.replace(/^[!！]+/, '');
+            return sanitizeNumberInput(normalizedValue);
         };
 
         const parseAuthority = (value) => {
@@ -1043,29 +1059,16 @@
             }
 
             authorizationCodeState.completed = true;
-
             const decodedPlayerId = authorizationCodeState.playerId;
             const requestedCharId = authorizationCodeState.charId;
-            const rawCode = authorizationCodeState.rawCode;
-
-            console.log("DEBUG: decodedPlayerId =", decodedPlayerId);
-            console.log("DEBUG: requestedCharId =", requestedCharId);
-            console.log("DEBUG: rawCode =", rawCode);
-
-            // playerId または charId が空の場合
             if (!decodedPlayerId || !requestedCharId) {
-                console.log("DEBUG: decodedPlayerId or requestedCharId missing");
-                showCodeErrorView("承認情報に不整合があります。(IDの不一致)");
+                showCodeErrorView('承認情報に不整合があります。');
                 return true;
             }
-
-            // playerId と charId の一致確認
             if (decodedPlayerId !== requestedCharId) {
-                console.log("DEBUG: decodedPlayerId and requestedCharId mismatch");
-                showCodeErrorView("承認コードとキャラクターIDが一致しません。");
+                showCodeErrorView('承認コードとキャラクターIDが一致しません。');
                 return true;
             }
-
             try {
                 const currentPid = stripPendingPrefix(state.user?.playerId || "");
                 console.log("DEBUG: current stored playerId =", state.user?.playerId);
@@ -1076,7 +1079,7 @@
                     code: rawCode,
                     playerId: authorizationCodeState.playerId,
                     charId: authorizationCodeState.charId,
-                    currentPlayerId: currentPid,
+                    currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
                 };
 
                 console.log("DEBUG: Sending payload to API =", payload);

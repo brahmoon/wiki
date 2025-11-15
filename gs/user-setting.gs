@@ -845,15 +845,30 @@ function sanitizeLanguage(value) {
 }
 
 function sanitizePlayerId(value) {
-  return String(value || '')
-    .replace(/[^0-9]/g, '')
-    .trim();
+  if (value === null || value === undefined) {
+    return '';
+  }
+  let normalizedValue = String(value);
+  if (typeof normalizedValue.normalize === 'function') {
+    normalizedValue = normalizedValue.normalize('NFKC');
+  }
+  return normalizedValue
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[^0-9]/g, '');
 }
 
 function stripPendingPlayerId(value) {
-  return String(value || '')
-    .trim()
-    .replace(/^!+/, '');
+  if (value === null || value === undefined) {
+    return '';
+  }
+  let normalizedValue = String(value);
+  if (typeof normalizedValue.normalize === 'function') {
+    normalizedValue = normalizedValue.normalize('NFKC');
+  }
+  normalizedValue = normalizedValue.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  normalizedValue = normalizedValue.replace(/^[!！]+/, '');
+  return normalizedValue;
 }
 
 function sanitizeAuthority(value) {
