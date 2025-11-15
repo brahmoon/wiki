@@ -557,6 +557,22 @@
             return (value || '').toString().replace(/[^0-9]/g, '').trim();
         };
 
+        const safeBase64Decode = (value) => {
+            if (!value) {
+                return '';
+            }
+            try {
+                return decodeURIComponent(escape(window.atob(value)));
+            } catch (error) {
+                try {
+                    return window.atob(value);
+                } catch (decodeError) {
+                    console.error('Failed to decode base64 value', decodeError);
+                    return '';
+                }
+            }
+        };
+
         const params = new URLSearchParams(window.location.search);
         const requestedPageId = (params.get('page') || '').trim();
         const authorizationCodeState = (() => {
@@ -564,13 +580,12 @@
             if (!rawCode) {
                 return { hasCode: false };
             }
-            const [rawPlayerId, ...rest] = rawCode.split(',');
-            const encodedTimestamp = rest.join(',').trim();
+            const decodedPlayerId = safeBase64Decode(rawCode);
+            const sanitizedDecodedPlayerId = sanitizeNumberInput(decodedPlayerId);
             return {
                 hasCode: true,
                 rawCode,
-                playerId: sanitizeNumberInput(rawPlayerId),
-                encodedTimestamp,
+                playerId: sanitizedDecodedPlayerId,
                 charId: sanitizeNumberInput(params.get('char_id') || ''),
                 completed: false,
             };
@@ -1023,7 +1038,7 @@
                 return false;
             }
             authorizationCodeState.completed = true;
-            if (!authorizationCodeState.playerId || !authorizationCodeState.encodedTimestamp || !authorizationCodeState.charId) {
+            if (!authorizationCodeState.playerId || !authorizationCodeState.charId) {
                 showCodeErrorView('承認情報に不整合があります。');
                 return true;
             }
@@ -1032,7 +1047,6 @@
                     action: 'autoApproveEditorRequest',
                     code: authorizationCodeState.rawCode,
                     playerId: authorizationCodeState.playerId,
-                    encodedTimestamp: authorizationCodeState.encodedTimestamp,
                     charId: authorizationCodeState.charId,
                 };
                 const result = await callUserSettingsApi(payload);

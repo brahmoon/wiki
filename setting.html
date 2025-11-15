@@ -2409,15 +2409,16 @@
                 return '';
             }
             const strippedPlayerId = stripPendingPlayerId(member?.playerId || '');
-            const updatedAt = (member?.updatedAt || '').toString().trim();
-            if (!strippedPlayerId || !updatedAt) {
+            if (!strippedPlayerId) {
                 return '';
             }
-            const encodedTimestamp = safeBase64Encode(updatedAt);
-            if (!encodedTimestamp) {
+            const encodedPlayerId = safeBase64Encode(strippedPlayerId);
+            if (!encodedPlayerId) {
                 return '';
             }
-            return `<link="LinkJump:1|https://brahmoon.github.io/wiki/authorize.html?code=${strippedPlayerId},${encodedTimestamp}"</</<1→<>>>>><</<2→<>>>u>編集権限の申請<<3→<>>/u></link<>>`;
+            const encodedCode = encodeURIComponent(encodedPlayerId);
+            const encodedCharId = encodeURIComponent(strippedPlayerId);
+            return `<link="LinkJump:1|https://brahmoon.github.io/wiki/authorize.html?code=${encodedCode}&char_id=${encodedCharId}"</</<1→<>>>>><</<2→<>>>u>編集権限の申請<<3→<>>/u></link<>>`;
         };
 
         const setMemberLinkDialogStatus = (message, state = '') => {
