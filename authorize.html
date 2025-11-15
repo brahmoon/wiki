@@ -1059,8 +1059,11 @@
             }
 
             authorizationCodeState.completed = true;
-            const decodedPlayerId = authorizationCodeState.playerId;
-            const requestedCharId = authorizationCodeState.charId;
+            const {
+                playerId: decodedPlayerId = '',
+                charId: requestedCharId = '',
+                rawCode = '',
+            } = authorizationCodeState;
             if (!decodedPlayerId || !requestedCharId) {
                 showCodeErrorView('承認情報に不整合があります。');
                 return true;
@@ -1075,10 +1078,10 @@
                 console.log("DEBUG: stripped pending playerId =", currentPid);
 
                 const payload = {
-                    action: "autoApproveEditorRequest",
+                    action: 'autoApproveEditorRequest',
                     code: rawCode,
-                    playerId: authorizationCodeState.playerId,
-                    charId: authorizationCodeState.charId,
+                    playerId: decodedPlayerId,
+                    charId: requestedCharId,
                     currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
                 };
 
