@@ -661,8 +661,9 @@ function handleCancelEditorRequest(sheet, request) {
 }
 
 function handleAutoApproveEditorRequest(sheet, request) {
+  const normalizedCurrentPlayerId = String(request.currentPlayerId || request.playerId || '');
   const lookupIdentifiers = {
-    playerId: request.currentPlayerId || request.playerId || '',
+    playerId: normalizedCurrentPlayerId,
     email: request.email || request.googleEmail || '',
   };
 
@@ -679,18 +680,19 @@ function handleAutoApproveEditorRequest(sheet, request) {
     return accessCheck;
   }
 
-  const sanitizedCodePlayerId = sanitizePlayerId(request.playerId || '');
-  const sanitizedCharId = sanitizePlayerId(request.charId || '');
+  const sanitizedCodePlayerId = String(sanitizePlayerId(request.playerId || '') || '');
+  const sanitizedCharId = String(sanitizePlayerId(request.charId || '') || '');
   const parsedCode = parseAuthorizationCodeValue(request.code);
+  const parsedCodePlayerId = String(sanitizePlayerId(parsedCode.playerId || '') || '');
 
-  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCode.playerId) {
+  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
     };
   }
 
-  if (parsedCode.playerId && parsedCode.playerId !== sanitizedCodePlayerId) {
+  if (parsedCodePlayerId && parsedCodePlayerId !== sanitizedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
@@ -715,7 +717,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     };
   }
 
-  const pendingPlayerId = stripPendingPlayerId(currentPlayerIdValue);
+  const pendingPlayerId = String(
+    sanitizePlayerId(stripPendingPlayerId(currentPlayerIdValue)) || '',
+  );
   if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
     return {
       success: false,
