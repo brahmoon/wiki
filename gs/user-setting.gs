@@ -682,9 +682,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
   const sanitizedCodePlayerId = sanitizePlayerId(request.playerId || '');
   const sanitizedCharId = sanitizePlayerId(request.charId || '');
   const parsedCode = parseAuthorizationCodeValue(request.code);
-  const encodedTimestamp = (request.encodedTimestamp || '').toString().trim();
 
-  if (!sanitizedCodePlayerId || !sanitizedCharId || !encodedTimestamp) {
+  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCode.playerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
@@ -692,13 +691,6 @@ function handleAutoApproveEditorRequest(sheet, request) {
   }
 
   if (parsedCode.playerId && parsedCode.playerId !== sanitizedCodePlayerId) {
-    return {
-      success: false,
-      message: '承認情報に不整合があります。',
-    };
-  }
-
-  if (parsedCode.encodedTimestamp && parsedCode.encodedTimestamp !== encodedTimestamp) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
@@ -725,16 +717,6 @@ function handleAutoApproveEditorRequest(sheet, request) {
 
   const pendingPlayerId = stripPendingPlayerId(currentPlayerIdValue);
   if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
-    return {
-      success: false,
-      message: '承認情報に不整合があります。',
-    };
-  }
-
-  const recordUpdatedAt = columns.updatedAt ? updatedValues[columns.updatedAt - 1] : '';
-  const decodedTimestamp = decodeAuthorizationTimestamp(encodedTimestamp);
-
-  if (!timestampsAreEquivalent(recordUpdatedAt, decodedTimestamp)) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
@@ -887,7 +869,6 @@ function parseAuthorizationCodeValue(code) {
   if (!code) {
     return {
       playerId: '',
-      encodedTimestamp: '',
     };
   }
 
@@ -895,42 +876,19 @@ function parseAuthorizationCodeValue(code) {
   if (!stringValue) {
     return {
       playerId: '',
-      encodedTimestamp: '',
     };
-  }
-
-  const parts = stringValue.split(',');
-  const playerId = sanitizePlayerId(parts.shift() || '');
-  const encodedTimestamp = parts.join(',').trim();
-  return {
-    playerId: playerId,
-    encodedTimestamp: encodedTimestamp,
-  };
-}
-
-function decodeAuthorizationTimestamp(encodedTimestamp) {
-  if (!encodedTimestamp) {
-    return null;
-  }
-
-  const stringValue = encodedTimestamp.toString().trim();
-  if (!stringValue) {
-    return null;
   }
 
   try {
     const decodedBytes = Utilities.base64Decode(stringValue);
     const decodedText = Utilities.newBlob(decodedBytes).getDataAsString('UTF-8');
-    if (!decodedText) {
-      return null;
-    }
-    const parsedDate = new Date(decodedText);
-    if (isNaN(parsedDate.getTime())) {
-      return null;
-    }
-    return parsedDate;
+    return {
+      playerId: sanitizePlayerId(decodedText),
+    };
   } catch (error) {
-    return null;
+    return {
+      playerId: '',
+    };
   }
 }
 
