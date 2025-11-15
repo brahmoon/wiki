@@ -1088,10 +1088,12 @@
                 console.log("DEBUG: Sending payload to API =", payload);
 
                 const result = await callUserSettingsApi(payload);
-
-                console.log("DEBUG: API response =", result);
-
-                // API success=false
+                console.debug('DEBUG: backend playerId comparison result', {
+                    pendingPlayerIdMatches: Boolean(result?.pendingPlayerIdMatches),
+                    backendPendingPlayerId: result?.pendingPlayerId || '',
+                    backendEmailLookupPlayerId: result?.emailLookupPlayerId || '',
+                    requestedPlayerId: decodedPlayerId,
+                });
                 if (!result.success) {
                     console.log("DEBUG: API returned success=false");
                     console.log("DEBUG: API error message =", result.message);
