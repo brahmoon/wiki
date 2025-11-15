@@ -1049,14 +1049,12 @@
                 return true;
             }
             try {
-                const payload = {
-                    action: 'autoApproveEditorRequest',
-                    code: authorizationCodeState.rawCode,
-                    playerId: authorizationCodeState.playerId,
-                    charId: authorizationCodeState.charId,
-                    currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
-                };
+                console.log("🚀 Sending payload:", payload);
+
                 const result = await callUserSettingsApi(payload);
+
+                console.log("📥 Received result:", result);
+
                 if (!result.success) {
                     if (result.requiresReauthentication) {
                         localStorage.removeItem(LOGIN_STORAGE_KEY);
@@ -1065,21 +1063,15 @@
                     }
                     throw new Error(result.message || '承認情報の確認に失敗しました。');
                 }
+
                 if (!result.autoApproved) {
                     throw new Error(result.message || '承認情報に不整合があります。（API）');
                 }
-                const updatedUser = updateStoredLoginStateUser({
-                    playerId: result.playerId || result.updatedPlayerId || state.user?.playerId || '',
-                    kingdom: result.kingdom ?? state.user?.kingdom,
-                    authority: result.authority ?? state.user?.authority,
-                });
-                state.user = updatedUser || state.user;
-                showApprovedView(result.message || '申請が承認されました。');
-                return true;
+
+                ...
             } catch (error) {
-                console.error('Failed to auto approve request', error);
+                console.error('❌ Failed to auto approve request', error);
                 showCodeErrorView('承認情報に不整合があります。（エラー）');
-                //showCodeErrorView(error.message || '承認情報に不整合があります。（エラー）');
                 return true;
             }
         };
