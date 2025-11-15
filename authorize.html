@@ -1048,6 +1048,7 @@
                     code: authorizationCodeState.rawCode,
                     playerId: authorizationCodeState.playerId,
                     charId: authorizationCodeState.charId,
+                    currentPlayerId: state.user?.playerId || '',
                 };
                 const result = await callUserSettingsApi(payload);
                 if (!result.success) {
