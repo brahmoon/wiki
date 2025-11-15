@@ -1079,11 +1079,18 @@
 
                 const payload = {
                     action: 'autoApproveEditorRequest',
-                    code: rawCode,
-                    playerId: decodedPlayerId,
-                    charId: requestedCharId,
+                    code: authorizationCodeState.rawCode,
+                    playerId: authorizationCodeState.playerId,
+                    charId: authorizationCodeState.charId,
                     currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
+                    email: state.user?.email || '',
+                    googleEmail: state.user?.googleEmail || '',
                 };
+
+                console.log("DEBUG: email in state.user.email =", state.user?.email);
+                console.log("DEBUG: email in state.user.googleEmail =", state.user?.googleEmail);
+                console.log("DEBUG: email in payload =", payload.email);
+                console.log("DEBUG: googleEmail in payload =", payload.googleEmail);
 
                 console.log("DEBUG: Sending payload to API =", payload);
 
