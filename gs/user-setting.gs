@@ -1219,9 +1219,9 @@ function createUserSettingsPreflightResponse(requestOrigin) {
   applyUserSettingsCorsHeaders(output, requestOrigin);
 
   output
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    .setHeader('Access-Control-Max-Age', '3600');
+    .appendHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .appendHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .appendHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
@@ -1244,26 +1244,26 @@ function applyUserSettingsCorsHeaders(output, requestOrigin) {
   }
 
   if (allowedOrigins.indexOf('*') !== -1) {
-    output.setHeader('Access-Control-Allow-Origin', '*');
+    output.appendHeader('Access-Control-Allow-Origin', '*');
     return output;
   }
 
   const normalizedOrigin = (requestOrigin || '').trim();
   if (normalizedOrigin && allowedOrigins.indexOf(normalizedOrigin) !== -1) {
     output
-      .setHeader('Access-Control-Allow-Origin', normalizedOrigin)
-      .setHeader('Vary', 'Origin');
+      .appendHeader('Access-Control-Allow-Origin', normalizedOrigin)
+      .appendHeader('Vary', 'Origin');
     return output;
   }
 
   if (!normalizedOrigin && allowedOrigins.length === 1) {
-    output.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
+    output.appendHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
   }
 
   output
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    .setHeader('Access-Control-Max-Age', '3600');
+    .appendHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .appendHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .appendHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
