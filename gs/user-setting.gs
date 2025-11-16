@@ -184,12 +184,13 @@ function verifyRequestAccessToEmail(request, account) {
     return {
       success: false,
       message: 'リクエスト情報が不足しています。',
-      requiresReauthentication: true
+      requiresReauthentication: true,
+      emailMatchesLogin: false
     };
   }
 
   if (request.__adminVerification && request.__adminVerification.success) {
-    return { success: true };
+    return { success: true, emailMatchesLogin: true };
   }
 
   const normalizedAccountEmail = normalizeId(account && account.email);
@@ -199,18 +200,20 @@ function verifyRequestAccessToEmail(request, account) {
     return {
       success: false,
       message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
-      requiresReauthentication: true
+      requiresReauthentication: true,
+      emailMatchesLogin: false
     };
   }
 
   if (normalizedAccountEmail && normalizedAccountEmail === normalizedRequestEmail) {
-    return { success: true };
+    return { success: true, emailMatchesLogin: true };
   }
 
   return {
     success: false,
     message: '他のユーザーのデータを操作することはできません。',
-    requiresReauthentication: true
+    requiresReauthentication: true,
+    emailMatchesLogin: false
   };
 }
 
@@ -669,6 +672,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
   let pendingPlayerIdMatches = false;
   let emailLookupPlayerId = '';
   let pendingPlayerId = '';
+  let emailMatchesLogin = false;
 
   const record = findAccount(sheet, lookupIdentifiers);
   if (!record) {
@@ -678,6 +682,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -693,11 +698,13 @@ function handleAutoApproveEditorRequest(sheet, request) {
   pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === sanitizedCodePlayerId;
 
   const accessCheck = verifyRequestAccessToEmail(request, record);
+  emailMatchesLogin = Boolean(accessCheck && accessCheck.emailMatchesLogin);
   if (!accessCheck.success) {
     return Object.assign({}, accessCheck, {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
+      emailMatchesLogin,
     });
   }
 
@@ -708,6 +715,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -718,6 +726,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -728,6 +737,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -738,6 +748,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -748,6 +759,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -774,6 +786,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
     pendingPlayerIdMatches,
     emailLookupPlayerId,
     pendingPlayerId,
+    emailMatchesLogin,
   };
 }
 

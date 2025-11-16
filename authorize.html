@@ -1079,12 +1079,10 @@
 
                 const payload = {
                     action: 'autoApproveEditorRequest',
-                    code: authorizationCodeState.rawCode,
-                    playerId: authorizationCodeState.playerId,
-                    charId: authorizationCodeState.charId,
+                    code: rawCode,
+                    playerId: decodedPlayerId,
+                    charId: requestedCharId,
                     currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
-                    email: state.user.email || state.user.googleEmail,
-                    googleEmail: state.user.googleEmail || state.user.email,
                 };
 
                 console.log("DEBUG: email in state.user.email =", state.user?.email);
@@ -1099,6 +1097,7 @@
                     pendingPlayerIdMatches: Boolean(result?.pendingPlayerIdMatches),
                     backendPendingPlayerId: result?.pendingPlayerId || '',
                     backendEmailLookupPlayerId: result?.emailLookupPlayerId || '',
+                    backendEmailMatchesLogin: Boolean(result?.emailMatchesLogin),
                     requestedPlayerId: decodedPlayerId,
                 });
                 if (!result.success) {
