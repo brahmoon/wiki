@@ -31,18 +31,18 @@ const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminThreshold() {
 const EDITOR_AUTHORITY_VALUE = 2;
 
 function doGet(e) {
-  return createJsonOutput(
+  return createUserSettingsJsonOutput(
     {
       success: true,
       message: 'User directory endpoint is running',
       timestamp: new Date().toISOString(),
     },
-    getRequestOrigin(e),
+    resolveCorsRequestOrigin(e),
   );
 }
 
 function doPost(e) {
-  const origin = getRequestOrigin(e);
+  const origin = resolveCorsRequestOrigin(e);
   try {
     const request = parseRequest(e);
     const action = (request.action || 'listMembers').toString();
@@ -94,7 +94,7 @@ function doPost(e) {
 }
 
 function doOptions(e) {
-  return createPreflightResponse(getRequestOrigin(e));
+  return createUserSettingsPreflightResponse(resolveCorsRequestOrigin(e));
 }
 
 function requireAdminAuthority(sheet, request) {
@@ -1159,35 +1159,57 @@ function buildResponse(result, origin) {
     payload.requiresReauthentication = Boolean(result.requiresReauthentication);
   }
 
-  return createJsonOutput(payload, origin);
+  return createUserSettingsJsonOutput(payload, origin);
 }
 
-function getRequestOrigin(e) {
+function resolveCorsRequestOrigin(e) {
+  if (typeof getRequestOrigin === 'function') {
+    return getRequestOrigin(e);
+  }
   if (!e || !e.headers) {
     return '';
   }
   return e.headers.origin || e.headers.Origin || '';
 }
 
-function createJsonOutput(data, requestOrigin) {
+function createUserSettingsJsonOutput(data, requestOrigin) {
+  if (typeof createJsonOutput === 'function') {
+    return createJsonOutput(data, requestOrigin);
+  }
+
   const output = ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 
-  applyCorsHeaders(output, requestOrigin);
+  applyUserSettingsCorsHeaders(output, requestOrigin);
 
   return output;
 }
 
-function createPreflightResponse(requestOrigin) {
+function createUserSettingsPreflightResponse(requestOrigin) {
+  if (typeof createPreflightResponse === 'function') {
+    return createPreflightResponse(requestOrigin);
+  }
+
   const output = ContentService
     .createTextOutput('')
     .setMimeType(ContentService.MimeType.TEXT);
 
-  return applyCorsHeaders(output, requestOrigin);
+  applyUserSettingsCorsHeaders(output, requestOrigin);
+
+  output
+    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .setHeader('Access-Control-Max-Age', '3600');
+
+  return output;
 }
 
-function applyCorsHeaders(output, requestOrigin) {
+function applyUserSettingsCorsHeaders(output, requestOrigin) {
+  if (typeof applyCorsHeaders === 'function') {
+    return applyCorsHeaders(output, requestOrigin);
+  }
+
   const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || [])
     .map(function(origin) {
       return (origin || '').trim();
