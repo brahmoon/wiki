@@ -416,11 +416,15 @@
                 const user = await userResponse.json();
                 setStatus('アカウントを確認しています...');
                 const verified = await verifyPlayerId(user);
+                const googleEmail = (user.email || '').toString().trim();
+                const googleName = (user.name || '').toString().trim();
                 const verifiedUser = {
                     ...user,
                     username: verified.username,
                     playerId: verified.playerId,
                     email: verified.email,
+                    googleEmail,
+                    googleName,
                     kingdom: verified.kingdom,
                     language: verified.language,
                     authority: verified.authority

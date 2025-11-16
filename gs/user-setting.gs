@@ -673,6 +673,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
   let emailLookupPlayerId = '';
   let pendingPlayerId = '';
   let emailMatchesLogin = false;
+  let lookupEmail = normalizeId(lookupIdentifiers.email);
 
   const record = findAccount(sheet, lookupIdentifiers);
   if (!record) {
@@ -683,6 +684,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
+      lookupEmail,
     };
   }
 
@@ -705,6 +707,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
+      lookupEmail,
     });
   }
 
@@ -716,6 +719,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
+      lookupEmail,
     };
   }
 
@@ -727,6 +731,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
+      lookupEmail,
     };
   }
 
@@ -738,6 +743,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
+      lookupEmail,
     };
   }
 
@@ -749,6 +755,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
+      lookupEmail,
     };
   }
 
@@ -760,6 +767,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
+      lookupEmail,
     };
   }
 
@@ -787,6 +795,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
     emailLookupPlayerId,
     pendingPlayerId,
     emailMatchesLogin,
+    lookupEmail,
   };
 }
 
@@ -975,18 +984,22 @@ function findAccount(sheet, identifiers) {
   const values = range.getValues();
 
   const normalizedPlayerId = normalizeId(identifiers.playerId);
+  const normalizedSanitizedPlayerId = normalizeId(sanitizePlayerId(identifiers.playerId));
   const normalizedEmail = normalizeId(identifiers.email);
   const columns = CONFIG.COLUMNS;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rowPlayerId = normalizeId(columns.playerId ? row[columns.playerId - 1] : '');
+    const rawRowPlayerId = columns.playerId ? row[columns.playerId - 1] : '';
+    const rowPlayerId = normalizeId(rawRowPlayerId);
+    const rowSanitizedPlayerId = normalizeId(sanitizePlayerId(rawRowPlayerId));
     const rowEmail = columns.email ? normalizeId(row[columns.email - 1]) : '';
 
     const playerMatch = normalizedPlayerId && rowPlayerId && rowPlayerId === normalizedPlayerId;
+    const sanitizedPlayerMatch = normalizedSanitizedPlayerId && rowSanitizedPlayerId && rowSanitizedPlayerId === normalizedSanitizedPlayerId;
     const emailMatch = normalizedEmail && rowEmail && rowEmail === normalizedEmail;
 
-    if (playerMatch || emailMatch) {
+    if (playerMatch || sanitizedPlayerMatch || emailMatch) {
       return {
         rowNumber: firstDataRow + i,
         values: row,
