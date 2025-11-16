@@ -1239,5 +1239,10 @@ function applyUserSettingsCorsHeaders(output, requestOrigin) {
     output.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
   }
 
+  output
+    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .setHeader('Access-Control-Max-Age', '3600');
+
   return output;
 }
