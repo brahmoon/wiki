@@ -554,7 +554,17 @@
         };
 
         const sanitizeNumberInput = (value) => {
-            return (value || '').toString().replace(/[^0-9]/g, '').trim();
+            if (value === null || value === undefined) {
+                return '';
+            }
+            let normalizedValue = value.toString();
+            if (typeof normalizedValue.normalize === 'function') {
+                normalizedValue = normalizedValue.normalize('NFKC');
+            }
+            return normalizedValue
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/\s+/g, '')
+                .replace(/[^0-9]/g, '');
         };
 
         const safeBase64Decode = (value) => {
@@ -599,7 +609,13 @@
             if (!value) {
                 return '';
             }
-            return value.replace(/^!+/, '');
+            let normalizedValue = value.toString();
+            if (typeof normalizedValue.normalize === 'function') {
+                normalizedValue = normalizedValue.normalize('NFKC');
+            }
+            normalizedValue = normalizedValue.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+            normalizedValue = normalizedValue.replace(/^[!！]+/, '');
+            return sanitizeNumberInput(normalizedValue);
         };
 
         const parseAuthority = (value) => {
@@ -661,19 +677,31 @@
             return url.toString();
         };
 
+        const resolveUserIdentity = () => {
+            const storedState = getStoredLoginState();
+            const storedUser = storedState?.user;
+            const fallbackUser = state.user;
+            const baseUser = storedUser || fallbackUser || {};
+            const resolvedEmail = (baseUser.email || '').toString().trim();
+            const resolvedGoogleEmail = (baseUser.googleEmail || resolvedEmail).toString().trim();
+            return {
+                email: resolvedEmail,
+                googleEmail: resolvedGoogleEmail,
+            };
+        };
+
         const buildUserSettingsPayload = (payload = {}) => {
-            const loginState = getStoredLoginState();
-            const user = loginState?.user || {};
-            const identity = {};
-            const email = (user.email || '').toString().trim();
-            const googleEmail = (user.googleEmail || email).toString().trim();
-            if (email) {
-                identity.email = email;
+            const identity = resolveUserIdentity();
+            const normalizedEmail = (payload.email || identity.email || '').toString().trim();
+            const normalizedGoogleEmail = (payload.googleEmail || identity.googleEmail || normalizedEmail || '').toString().trim();
+            const resolvedIdentity = {};
+            if (normalizedEmail) {
+                resolvedIdentity.email = normalizedEmail;
             }
-            if (googleEmail) {
-                identity.googleEmail = googleEmail;
+            if (normalizedGoogleEmail) {
+                resolvedIdentity.googleEmail = normalizedGoogleEmail;
             }
-            return { ...payload, ...identity };
+            return { ...payload, ...resolvedIdentity };
         };
 
         const callUserSettingsApi = async (payload) => {
@@ -1038,18 +1066,54 @@
                 return false;
             }
             authorizationCodeState.completed = true;
-            if (!authorizationCodeState.playerId || !authorizationCodeState.charId) {
+            console.debug('DEBUG: tryResolveAuthorizationCode called');
+            console.debug('DEBUG: authorizationCodeState =', authorizationCodeState);
+            const {
+                playerId: decodedPlayerId = '',
+                charId: requestedCharId = '',
+                rawCode = '',
+            } = authorizationCodeState;
+            if (!decodedPlayerId || !requestedCharId) {
                 showCodeErrorView('承認情報に不整合があります。');
                 return true;
             }
+            if (decodedPlayerId !== requestedCharId) {
+                showCodeErrorView('承認コードとキャラクターIDが一致しません。');
+                return true;
+            }
             try {
+                const storedPlayerId = state.user?.playerId || '';
+                console.debug('DEBUG: current stored playerId =', storedPlayerId);
+                console.debug('DEBUG: stripped pending playerId =', stripPendingPrefix(storedPlayerId));
+                console.debug('DEBUG: email in state.user.email =', state.user?.email || '');
+                console.debug('DEBUG: email in state.user.googleEmail =', state.user?.googleEmail || '');
+                const storedLoginIdentity = getStoredLoginState();
+                console.debug('DEBUG: email in stored login state =', {
+                    email: storedLoginIdentity?.user?.email || '',
+                    googleEmail: storedLoginIdentity?.user?.googleEmail || '',
+                });
                 const payload = {
                     action: 'autoApproveEditorRequest',
-                    code: authorizationCodeState.rawCode,
-                    playerId: authorizationCodeState.playerId,
-                    charId: authorizationCodeState.charId,
+                    code: rawCode,
+                    playerId: decodedPlayerId,
+                    charId: requestedCharId,
+                    currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
                 };
+                const resolvedPayload = buildUserSettingsPayload(payload);
+                console.debug('DEBUG: email/googleEmail in request payload =', {
+                    email: resolvedPayload.email || '',
+                    googleEmail: resolvedPayload.googleEmail || '',
+                });
+                console.debug('DEBUG: Sending payload to API =', resolvedPayload);
                 const result = await callUserSettingsApi(payload);
+                console.debug('DEBUG: backend playerId comparison result', {
+                    pendingPlayerIdMatches: Boolean(result?.pendingPlayerIdMatches),
+                    backendPendingPlayerId: result?.pendingPlayerId || '',
+                    backendEmailLookupPlayerId: result?.emailLookupPlayerId || '',
+                    backendEmailMatchesLogin: Boolean(result?.emailMatchesLogin),
+                    backendLookupEmail: result?.lookupEmail || '',
+                    requestedPlayerId: decodedPlayerId,
+                });
                 if (!result.success) {
                     if (result.requiresReauthentication) {
                         localStorage.removeItem(LOGIN_STORAGE_KEY);
