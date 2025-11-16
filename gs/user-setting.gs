@@ -952,9 +952,15 @@ function parseAuthorizationCodeValue(code) {
 }
 
 function normalizeId(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase();
+  let v = String(value || '').trim();
+
+  if (v.normalize) {
+    v = v.normalize('NFKC');
+  }
+
+  v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+  return v.toLowerCase();
 }
 
 function findAccount(sheet, identifiers) {
