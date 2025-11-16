@@ -1184,14 +1184,7 @@ function createPreflightResponse(requestOrigin) {
     .createTextOutput('')
     .setMimeType(ContentService.MimeType.TEXT);
 
-  applyCorsHeaders(output, requestOrigin);
-
-  output
-    .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    .setHeader('Access-Control-Max-Age', '3600');
-
-  return output;
+  return applyCorsHeaders(output, requestOrigin);
 }
 
 function applyCorsHeaders(output, requestOrigin) {
@@ -1203,18 +1196,28 @@ function applyCorsHeaders(output, requestOrigin) {
       return origin;
     });
 
-  if (!allowedOrigins.length) {
-    return output;
-  }
-
   const normalizedRequestOrigin = (requestOrigin || '').trim();
-  var resolvedOrigin = '';
+  var originToSet = '';
 
-  if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
-    output
-      .setHeader('Access-Control-Allow-Origin', normalizedRequestOrigin)
-      .setHeader('Vary', 'Origin');
+  if (allowedOrigins.indexOf('*') !== -1) {
+    originToSet = '*';
+  } else if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
+    originToSet = normalizedRequestOrigin;
+  } else if (!normalizedRequestOrigin && allowedOrigins.length === 1) {
+    originToSet = allowedOrigins[0];
   }
+
+  if (originToSet) {
+    output.setHeader('Access-Control-Allow-Origin', originToSet);
+    if (originToSet !== '*') {
+      output.setHeader('Vary', 'Origin');
+    }
+  }
+
+  output
+    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .setHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
