@@ -1196,10 +1196,10 @@ function createPreflightResponse(requestOrigin) {
 
 function applyCorsHeaders(output, requestOrigin) {
   const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || [])
-    .map(function (origin) {
+    .map(function(origin) {
       return (origin || '').trim();
     })
-    .filter(function (origin) {
+    .filter(function(origin) {
       return origin;
     });
 
@@ -1207,13 +1207,21 @@ function applyCorsHeaders(output, requestOrigin) {
     return output;
   }
 
-  const normalizedRequestOrigin = (requestOrigin || '').trim();
-  var resolvedOrigin = '';
+  if (allowedOrigins.indexOf('*') !== -1) {
+    output.setHeader('Access-Control-Allow-Origin', '*');
+    return output;
+  }
 
-  if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
+  const normalizedOrigin = (requestOrigin || '').trim();
+  if (normalizedOrigin && allowedOrigins.indexOf(normalizedOrigin) !== -1) {
     output
-      .setHeader('Access-Control-Allow-Origin', normalizedRequestOrigin)
+      .setHeader('Access-Control-Allow-Origin', normalizedOrigin)
       .setHeader('Vary', 'Origin');
+    return output;
+  }
+
+  if (!normalizedOrigin && allowedOrigins.length === 1) {
+    output.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
   }
 
   return output;
