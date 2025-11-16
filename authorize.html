@@ -1062,9 +1062,14 @@
         };
 
         const tryResolveAuthorizationCode = async () => {
+            console.log("DEBUG: tryResolveAuthorizationCode called");
+            console.log("DEBUG: authorizationCodeState =", authorizationCodeState);
+
             if (!authorizationCodeState?.hasCode || authorizationCodeState.completed) {
+                console.log("DEBUG: No code or already completed. Abort.");
                 return false;
             }
+
             authorizationCodeState.completed = true;
             console.debug('DEBUG: tryResolveAuthorizationCode called');
             console.debug('DEBUG: authorizationCodeState =', authorizationCodeState);
@@ -1115,27 +1120,44 @@
                     requestedPlayerId: decodedPlayerId,
                 });
                 if (!result.success) {
+                    console.log("DEBUG: API returned success=false");
+                    console.log("DEBUG: API error message =", result.message);
+
                     if (result.requiresReauthentication) {
+                        console.log("DEBUG: requiresReauthentication=true, clearing login");
                         localStorage.removeItem(LOGIN_STORAGE_KEY);
                         requireLogin();
                         return true;
                     }
-                    throw new Error(result.message || '承認情報の確認に失敗しました。');
+
+                    throw new Error(result.message || "承認情報の確認に失敗しました。");
                 }
+
+                // autoApproved フラグがない場合
                 if (!result.autoApproved) {
-                    throw new Error(result.message || '承認情報に不整合があります。');
+                    console.log("DEBUG: API returned success=true but autoApproved=false");
+                    console.log("DEBUG: API message =", result.message);
+                    throw new Error(result.message || "承認情報に不整合があります。（API）");
                 }
+
+                console.log("DEBUG: Approval successful. Applying updated user info.");
+
                 const updatedUser = updateStoredLoginStateUser({
-                    playerId: result.playerId || result.updatedPlayerId || state.user?.playerId || '',
+                    playerId: result.playerId || result.updatedPlayerId || state.user?.playerId || "",
                     kingdom: result.kingdom ?? state.user?.kingdom,
                     authority: result.authority ?? state.user?.authority,
                 });
+
+                console.log("DEBUG: updatedUser =", updatedUser);
+
                 state.user = updatedUser || state.user;
-                showApprovedView(result.message || '申請が承認されました。');
+
+                showApprovedView(result.message || "申請が承認されました。");
                 return true;
+
             } catch (error) {
-                console.error('Failed to auto approve request', error);
-                showCodeErrorView(error.message || '承認情報に不整合があります。');
+                console.error("DEBUG: Exception thrown during approval:", error);
+                showCodeErrorView("承認情報に不整合があります。（エラー）");
                 return true;
             }
         };
