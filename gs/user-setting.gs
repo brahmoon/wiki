@@ -184,12 +184,13 @@ function verifyRequestAccessToEmail(request, account) {
     return {
       success: false,
       message: 'リクエスト情報が不足しています。',
-      requiresReauthentication: true
+      requiresReauthentication: true,
+      emailMatchesLogin: false
     };
   }
 
   if (request.__adminVerification && request.__adminVerification.success) {
-    return { success: true };
+    return { success: true, emailMatchesLogin: true };
   }
 
   const normalizedAccountEmail = normalizeId(account && account.email);
@@ -199,18 +200,20 @@ function verifyRequestAccessToEmail(request, account) {
     return {
       success: false,
       message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
-      requiresReauthentication: true
+      requiresReauthentication: true,
+      emailMatchesLogin: false
     };
   }
 
   if (normalizedAccountEmail && normalizedAccountEmail === normalizedRequestEmail) {
-    return { success: true };
+    return { success: true, emailMatchesLogin: true };
   }
 
   return {
     success: false,
     message: '他のユーザーのデータを操作することはできません。',
-    requiresReauthentication: true
+    requiresReauthentication: true,
+    emailMatchesLogin: false
   };
 }
 
@@ -661,39 +664,69 @@ function handleCancelEditorRequest(sheet, request) {
 }
 
 function handleAutoApproveEditorRequest(sheet, request) {
+  const normalizedCurrentPlayerId = String(request.currentPlayerId || request.playerId || '');
   const lookupIdentifiers = {
-    playerId: request.currentPlayerId || request.playerId || '',
+    playerId: normalizedCurrentPlayerId,
     email: request.email || request.googleEmail || '',
   };
+  let pendingPlayerIdMatches = false;
+  let emailLookupPlayerId = '';
+  let pendingPlayerId = '';
+  let emailMatchesLogin = false;
 
   const record = findAccount(sheet, lookupIdentifiers);
   if (!record) {
     return {
       success: false,
       message: 'ユーザー情報が見つかりません。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+      emailMatchesLogin,
     };
   }
+
+  const sanitizedCodePlayerId = String(sanitizePlayerId(request.playerId || '') || '');
+  const sanitizedCharId = String(sanitizePlayerId(request.charId || '') || '');
+  const parsedCode = parseAuthorizationCodeValue(request.code);
+  const parsedCodePlayerId = String(sanitizePlayerId(parsedCode.playerId || '') || '');
+  const columns = CONFIG.COLUMNS || {};
+  const updatedValues = record.values.slice();
+  const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
+  emailLookupPlayerId = String(sanitizePlayerId(record.playerId || currentPlayerIdValue) || '');
+  pendingPlayerId = String(sanitizePlayerId(stripPendingPlayerId(currentPlayerIdValue)) || '');
+  pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === sanitizedCodePlayerId;
 
   const accessCheck = verifyRequestAccessToEmail(request, record);
+  emailMatchesLogin = Boolean(accessCheck && accessCheck.emailMatchesLogin);
   if (!accessCheck.success) {
-    return accessCheck;
+    return Object.assign({}, accessCheck, {
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+      emailMatchesLogin,
+    });
   }
 
-  const sanitizedCodePlayerId = sanitizePlayerId(request.playerId || '');
-  const sanitizedCharId = sanitizePlayerId(request.charId || '');
-  const parsedCode = parseAuthorizationCodeValue(request.code);
-
-  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCode.playerId) {
+  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
-  if (parsedCode.playerId && parsedCode.playerId !== sanitizedCodePlayerId) {
+  if (parsedCodePlayerId && parsedCodePlayerId !== sanitizedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -701,25 +734,32 @@ function handleAutoApproveEditorRequest(sheet, request) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+      emailMatchesLogin,
     };
   }
-
-  const columns = CONFIG.COLUMNS || {};
-  const updatedValues = record.values.slice();
-  const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
 
   if (!isPendingPlayerIdValue(currentPlayerIdValue)) {
     return {
       success: false,
       message: '申請中の情報が見つかりません。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
-  const pendingPlayerId = stripPendingPlayerId(currentPlayerIdValue);
   if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
     return {
       success: false,
       message: '承認情報に不整合があります。',
+      pendingPlayerIdMatches,
+      emailLookupPlayerId,
+      pendingPlayerId,
+      emailMatchesLogin,
     };
   }
 
@@ -743,6 +783,10 @@ function handleAutoApproveEditorRequest(sheet, request) {
     playerId: columns.playerId ? updatedValues[columns.playerId - 1] || sanitizedCodePlayerId : sanitizedCodePlayerId,
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
     authority: EDITOR_AUTHORITY_VALUE,
+    pendingPlayerIdMatches,
+    emailLookupPlayerId,
+    pendingPlayerId,
+    emailMatchesLogin,
   };
 }
 
@@ -841,15 +885,30 @@ function sanitizeLanguage(value) {
 }
 
 function sanitizePlayerId(value) {
-  return String(value || '')
-    .replace(/[^0-9]/g, '')
-    .trim();
+  if (value === null || value === undefined) {
+    return '';
+  }
+  let normalizedValue = String(value);
+  if (typeof normalizedValue.normalize === 'function') {
+    normalizedValue = normalizedValue.normalize('NFKC');
+  }
+  return normalizedValue
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[^0-9]/g, '');
 }
 
 function stripPendingPlayerId(value) {
-  return String(value || '')
-    .trim()
-    .replace(/^!+/, '');
+  if (value === null || value === undefined) {
+    return '';
+  }
+  let normalizedValue = String(value);
+  if (typeof normalizedValue.normalize === 'function') {
+    normalizedValue = normalizedValue.normalize('NFKC');
+  }
+  normalizedValue = normalizedValue.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  normalizedValue = normalizedValue.replace(/^[!！]+/, '');
+  return normalizedValue;
 }
 
 function sanitizeAuthority(value) {
