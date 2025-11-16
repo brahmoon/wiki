@@ -1166,10 +1166,31 @@ function resolveCorsRequestOrigin(e) {
   if (typeof getRequestOrigin === 'function') {
     return getRequestOrigin(e);
   }
-  if (!e || !e.headers) {
+
+  if (!e) {
     return '';
   }
-  return e.headers.origin || e.headers.Origin || '';
+
+  var headers = e.headers || {};
+  var originHeader = headers.origin || headers.Origin;
+  if (originHeader) {
+    return originHeader;
+  }
+
+  var refererHeader = headers.referer || headers.Referer;
+  if (refererHeader) {
+    try {
+      return new URL(refererHeader).origin;
+    } catch (error) {
+      // ignore invalid referer values
+    }
+  }
+
+  if (e.parameter && e.parameter.origin) {
+    return e.parameter.origin;
+  }
+
+  return '';
 }
 
 function createUserSettingsJsonOutput(data, requestOrigin) {
@@ -1198,9 +1219,9 @@ function createUserSettingsPreflightResponse(requestOrigin) {
   applyUserSettingsCorsHeaders(output, requestOrigin);
 
   output
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    .setHeader('Access-Control-Max-Age', '3600');
+    .appendHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .appendHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .appendHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
@@ -1223,26 +1244,26 @@ function applyUserSettingsCorsHeaders(output, requestOrigin) {
   }
 
   if (allowedOrigins.indexOf('*') !== -1) {
-    output.setHeader('Access-Control-Allow-Origin', '*');
+    output.appendHeader('Access-Control-Allow-Origin', '*');
     return output;
   }
 
   const normalizedOrigin = (requestOrigin || '').trim();
   if (normalizedOrigin && allowedOrigins.indexOf(normalizedOrigin) !== -1) {
     output
-      .setHeader('Access-Control-Allow-Origin', normalizedOrigin)
-      .setHeader('Vary', 'Origin');
+      .appendHeader('Access-Control-Allow-Origin', normalizedOrigin)
+      .appendHeader('Vary', 'Origin');
     return output;
   }
 
   if (!normalizedOrigin && allowedOrigins.length === 1) {
-    output.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
+    output.appendHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
   }
 
   output
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    .setHeader('Access-Control-Max-Age', '3600');
+    .appendHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .appendHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .appendHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
