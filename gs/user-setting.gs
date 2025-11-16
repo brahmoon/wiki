@@ -1189,29 +1189,32 @@ function createPreflightResponse(requestOrigin) {
 
 function applyCorsHeaders(output, requestOrigin) {
   const allowedOrigins = (CONFIG.ALLOWED_ORIGINS || [])
-    .map(function (origin) {
+    .map(function(origin) {
       return (origin || '').trim();
     })
-    .filter(function (origin) {
+    .filter(function(origin) {
       return origin;
     });
 
-  const normalizedRequestOrigin = (requestOrigin || '').trim();
-  var originToSet = '';
-
-  if (allowedOrigins.indexOf('*') !== -1) {
-    originToSet = '*';
-  } else if (normalizedRequestOrigin && allowedOrigins.indexOf(normalizedRequestOrigin) !== -1) {
-    originToSet = normalizedRequestOrigin;
-  } else if (!normalizedRequestOrigin && allowedOrigins.length === 1) {
-    originToSet = allowedOrigins[0];
+  if (!allowedOrigins.length) {
+    return output;
   }
 
-  if (originToSet) {
-    output.setHeader('Access-Control-Allow-Origin', originToSet);
-    if (originToSet !== '*') {
-      output.setHeader('Vary', 'Origin');
-    }
+  if (allowedOrigins.indexOf('*') !== -1) {
+    output.setHeader('Access-Control-Allow-Origin', '*');
+    return output;
+  }
+
+  const normalizedOrigin = (requestOrigin || '').trim();
+  if (normalizedOrigin && allowedOrigins.indexOf(normalizedOrigin) !== -1) {
+    output
+      .setHeader('Access-Control-Allow-Origin', normalizedOrigin)
+      .setHeader('Vary', 'Origin');
+    return output;
+  }
+
+  if (!normalizedOrigin && allowedOrigins.length === 1) {
+    output.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
   }
 
   output
