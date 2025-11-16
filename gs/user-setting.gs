@@ -1166,10 +1166,31 @@ function resolveCorsRequestOrigin(e) {
   if (typeof getRequestOrigin === 'function') {
     return getRequestOrigin(e);
   }
-  if (!e || !e.headers) {
+
+  if (!e) {
     return '';
   }
-  return e.headers.origin || e.headers.Origin || '';
+
+  var headers = e.headers || {};
+  var originHeader = headers.origin || headers.Origin;
+  if (originHeader) {
+    return originHeader;
+  }
+
+  var refererHeader = headers.referer || headers.Referer;
+  if (refererHeader) {
+    try {
+      return new URL(refererHeader).origin;
+    } catch (error) {
+      // ignore invalid referer values
+    }
+  }
+
+  if (e.parameter && e.parameter.origin) {
+    return e.parameter.origin;
+  }
+
+  return '';
 }
 
 function createUserSettingsJsonOutput(data, requestOrigin) {
