@@ -1007,8 +1007,8 @@ function findAccount(sheet, identifiers) {
         username: columns.username ? row[columns.username - 1] || '' : '',
         email:
           columns.email && row[columns.email - 1]
-            ? row[columns.email - 1]
-            : safeIdentifiers.email || '',
+          ? row[columns.email - 1]
+          : (identifiers.email || ''),
         kingdom: columns.kingdom ? row[columns.kingdom - 1] || '' : '',
         language: columns.language ? sanitizeLanguage(row[columns.language - 1]) : 'ja',
         authority: columns.authority ? sanitizeAuthority(row[columns.authority - 1]) : null,
@@ -1193,19 +1193,20 @@ function resolveCorsRequestOrigin(e) {
   return '';
 }
 
-function createUserSettingsJsonOutput(data, requestOrigin) {
-  if (typeof createJsonOutput === 'function') {
-    return createJsonOutput(data, requestOrigin);
+function createUserSettingsPreflightResponse(requestOrigin) {
+  if (typeof createPreflightResponse === 'function') {
+    return createPreflightResponse(requestOrigin);
   }
 
   const output = ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+    .createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
 
-  applyUserSettingsCorsHeaders(output, requestOrigin);
+  applyUserSettingsCorsHeaders(output, requestOrigin, true);
 
   return output;
 }
+
 
 function createUserSettingsPreflightResponse(requestOrigin) {
   if (typeof createPreflightResponse === 'function') {
@@ -1226,7 +1227,8 @@ function createUserSettingsPreflightResponse(requestOrigin) {
   return output;
 }
 
-function applyUserSettingsCorsHeaders(output, requestOrigin) {
+function applyUserSettingsCorsHeaders(output, requestOrigin, isPreflight) {
+  // すでに別ファイルに共通の applyCorsHeaders がある場合はそちらを利用
   if (typeof applyCorsHeaders === 'function') {
     return applyCorsHeaders(output, requestOrigin);
   }
@@ -1243,27 +1245,32 @@ function applyUserSettingsCorsHeaders(output, requestOrigin) {
     return output;
   }
 
+  var headers = {};
+
+  // Origin 判定
   if (allowedOrigins.indexOf('*') !== -1) {
-    output.appendHeader('Access-Control-Allow-Origin', '*');
-    return output;
+    headers['Access-Control-Allow-Origin'] = '*';
+  } else {
+    const normalizedOrigin = (requestOrigin || '').trim();
+    if (normalizedOrigin && allowedOrigins.indexOf(normalizedOrigin) !== -1) {
+      headers['Access-Control-Allow-Origin'] = normalizedOrigin;
+      headers['Vary'] = 'Origin';
+    } else if (!normalizedOrigin && allowedOrigins.length === 1) {
+      headers['Access-Control-Allow-Origin'] = allowedOrigins[0];
+    }
   }
 
-  const normalizedOrigin = (requestOrigin || '').trim();
-  if (normalizedOrigin && allowedOrigins.indexOf(normalizedOrigin) !== -1) {
-    output
-      .appendHeader('Access-Control-Allow-Origin', normalizedOrigin)
-      .appendHeader('Vary', 'Origin');
-    return output;
+  // プリフライトのときだけ追加するヘッダ
+  if (isPreflight) {
+    headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+    headers['Access-Control-Max-Age'] = '3600';
   }
 
-  if (!normalizedOrigin && allowedOrigins.length === 1) {
-    output.appendHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
+  if (Object.keys(headers).length > 0 && typeof output.setHeaders === 'function') {
+    output.setHeaders(headers);
   }
-
-  output
-    .appendHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .appendHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    .appendHeader('Access-Control-Max-Age', '3600');
 
   return output;
 }
+
