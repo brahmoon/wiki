@@ -716,14 +716,13 @@
                 const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
                     method: 'POST',
                     mode: 'cors',
-                    credentials: 'omit',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                     },
                     body: JSON.stringify(buildUserSettingsPayload(payload)),
-                    signal: controller.signal,
                 });
+
 
 
                 if (!response.ok) {
