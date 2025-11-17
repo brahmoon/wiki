@@ -674,8 +674,20 @@ function handleAutoApproveEditorRequest(sheet, request) {
   let pendingPlayerId = '';
   let emailMatchesLogin = false;
   let lookupEmail = normalizeId(lookupIdentifiers.email);
+  const sanitizedReceivedPlayerId = sanitizePlayerId(
+    request.playerId || request.currentPlayerId || '',
+  );
+  const playerIdMatchCell = findMatchingPlayerIdCell(sheet, sanitizedReceivedPlayerId);
 
   const record = findAccount(sheet, lookupIdentifiers);
+  const recordEmailValue = record ? record.email || '' : '';
+  const debugInfo = {
+    backendEmailSearchTarget: lookupIdentifiers.email || '',
+    backendFoundEmail: recordEmailValue,
+    backendReceivedPlayerId: request.playerId || request.currentPlayerId || '',
+    backendSanitizedReceivedPlayerId: sanitizedReceivedPlayerId || '',
+    backendPlayerIdMatchCell: playerIdMatchCell || '',
+  };
   if (!record) {
     return {
       success: false,
@@ -685,6 +697,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
+      debugInfo,
     };
   }
 
@@ -708,6 +721,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
+      debugInfo,
     });
   }
 
@@ -720,6 +734,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
+      debugInfo,
     };
   }
 
@@ -732,6 +747,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
+      debugInfo,
     };
   }
 
@@ -744,6 +760,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
+      debugInfo,
     };
   }
 
@@ -756,6 +773,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
+      debugInfo,
     };
   }
 
@@ -768,6 +786,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
+      debugInfo,
     };
   }
 
@@ -796,7 +815,40 @@ function handleAutoApproveEditorRequest(sheet, request) {
     pendingPlayerId,
     emailMatchesLogin,
     lookupEmail,
+    debugInfo,
   };
+}
+
+function findMatchingPlayerIdCell(sheet, playerId) {
+  const columns = CONFIG.COLUMNS;
+  if (!columns.playerId) {
+    return '';
+  }
+
+  const sanitizedTarget = sanitizePlayerId(playerId);
+  if (!sanitizedTarget) {
+    return '';
+  }
+
+  const firstDataRow = CONFIG.HEADER_ROW_INDEX + 1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < firstDataRow) {
+    return '';
+  }
+
+  const totalRows = lastRow - CONFIG.HEADER_ROW_INDEX;
+  const range = sheet.getRange(firstDataRow, columns.playerId, totalRows, 1);
+  const values = range.getValues();
+
+  for (let i = 0; i < values.length; i++) {
+    const cellValue = values[i][0];
+    const normalizedCellValue = sanitizePlayerId(stripPendingPlayerId(cellValue));
+    if (normalizedCellValue && normalizedCellValue === sanitizedTarget) {
+      return cellValue || '';
+    }
+  }
+
+  return '';
 }
 
 function parseRequest(e) {
