@@ -1162,6 +1162,20 @@ function buildResponse(result, origin) {
   return createUserSettingsJsonOutput(payload, origin);
 }
 
+function createUserSettingsJsonOutput(data, requestOrigin) {
+  if (typeof createJsonOutput === 'function') {
+    return createJsonOutput(data, requestOrigin);
+  }
+
+  const output = ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  applyUserSettingsCorsHeaders(output, requestOrigin);
+
+  return output;
+}
+
 function resolveCorsRequestOrigin(e) {
   if (typeof getRequestOrigin === 'function') {
     return getRequestOrigin(e);
@@ -1207,26 +1221,6 @@ function createUserSettingsPreflightResponse(requestOrigin) {
   return output;
 }
 
-
-function createUserSettingsPreflightResponse(requestOrigin) {
-  if (typeof createPreflightResponse === 'function') {
-    return createPreflightResponse(requestOrigin);
-  }
-
-  const output = ContentService
-    .createTextOutput('')
-    .setMimeType(ContentService.MimeType.TEXT);
-
-  applyUserSettingsCorsHeaders(output, requestOrigin);
-
-  output
-    .appendHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .appendHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    .appendHeader('Access-Control-Max-Age', '3600');
-
-  return output;
-}
-
 function applyUserSettingsCorsHeaders(output, requestOrigin, isPreflight) {
   // すでに別ファイルに共通の applyCorsHeaders がある場合はそちらを利用
   if (typeof applyCorsHeaders === 'function') {
@@ -1267,8 +1261,14 @@ function applyUserSettingsCorsHeaders(output, requestOrigin, isPreflight) {
     headers['Access-Control-Max-Age'] = '3600';
   }
 
-  if (Object.keys(headers).length > 0 && typeof output.setHeaders === 'function') {
-    output.setHeaders(headers);
+  if (Object.keys(headers).length > 0) {
+    if (typeof output.setHeaders === 'function') {
+      output.setHeaders(headers);
+    } else if (typeof output.setHeader === 'function') {
+      Object.keys(headers).forEach(function(name) {
+        output.setHeader(name, headers[name]);
+      });
+    }
   }
 
   return output;
