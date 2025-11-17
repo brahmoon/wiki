@@ -1112,7 +1112,7 @@
                     googleEmail: resolvedPayload.googleEmail || '',
                 });
                 console.debug('DEBUG: Sending payload to API =', resolvedPayload);
-                const result = await callUserSettingsApi(payload);
+                const result = await callUserSettingsApi(resolvedPayload);
                 console.debug('DEBUG: backend playerId comparison result', {
                     pendingPlayerIdMatches: Boolean(result?.pendingPlayerIdMatches),
                     backendPendingPlayerId: result?.pendingPlayerId || '',

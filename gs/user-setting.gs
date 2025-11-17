@@ -901,6 +901,9 @@ function sanitizePlayerId(value) {
   if (typeof normalizedValue.normalize === 'function') {
     normalizedValue = normalizedValue.normalize('NFKC');
   }
+  normalizedValue = normalizedValue.replace(/[０-９]/g, function toHalfWidthDigit(fullWidth) {
+    return String.fromCharCode(fullWidth.charCodeAt(0) - 0xFEE0);
+  });
   return normalizedValue
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/\s+/g, '')
