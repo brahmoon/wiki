@@ -1109,8 +1109,11 @@
                     email: resolvedPayload.email || '',
                     googleEmail: resolvedPayload.googleEmail || '',
                 });
+                console.log('AUTO_APPROVE FINAL REQUEST PAYLOAD =', JSON.stringify(resolvedPayload, null, 2));
                 console.log('DEBUG: Sending payload to API =', resolvedPayload);
                 const result = await callUserSettingsApi(resolvedPayload);
+                console.log('AUTO_APPROVE RAW RESPONSE =', result);
+                console.log('AUTO_APPROVE RAW RESPONSE JSON =', JSON.stringify(result, null, 2));
                 console.log('DEBUG: backend playerId comparison result', {
                     pendingPlayerIdMatches: Boolean(result?.pendingPlayerIdMatches),
                     backendPendingPlayerId: result?.pendingPlayerId || '',
