@@ -677,61 +677,29 @@
             return url.toString();
         };
 
-        const resolveUserIdentity = () => {
+        const buildUserIdentityContext = () => {
             const storedState = getStoredLoginState();
-            const storedUser = storedState?.user;
-            const fallbackUser = state.user;
-            const baseUser = storedUser || fallbackUser || {};
-            const resolvedEmail = (baseUser.email || '').toString().trim();
-            const resolvedGoogleEmail = (baseUser.googleEmail || resolvedEmail).toString().trim();
-            const resolvedPlayerId = stripPendingPrefix(baseUser.playerId || '');
+            const user = storedState?.user || state.user || {};
             return {
-                email: resolvedEmail,
-                googleEmail: resolvedGoogleEmail,
-                playerId: resolvedPlayerId,
+                email: user.email || '',
+                googleEmail: user.email || '',
+                playerId: user.playerId || '',
+                origin: window.location.origin,
             };
         };
 
         const buildUserSettingsPayload = (payload = {}) => {
-            const identity = resolveUserIdentity();
+            const context = buildUserIdentityContext();
+            const sanitized = {};
 
-            // Apps Script が text/plain の JSON を確実に解釈できるよう、
-            // すべての値をプリミティブな文字列に正規化する
-            const normalizeScalar = (value) => {
-                if (value === null || value === undefined) return '';
-                if (typeof value === 'object') return '';
-                return value.toString().trim();
-            };
-
-            const normalizeIdValue = (value) => {
-                const normalized = normalizeScalar(value);
-                return sanitizeNumberInput(normalized);
-            };
-
-            const resolvedPayload = {
-                ...payload,
-                email: normalizeScalar(payload.email) || normalizeScalar(identity.email),
-                googleEmail:
-                    normalizeScalar(payload.googleEmail) ||
-                    normalizeScalar(identity.googleEmail) ||
-                    normalizeScalar(identity.email),
-                playerId: normalizeIdValue(payload.playerId || identity.playerId),
-                currentPlayerId: normalizeIdValue(
-                    payload.currentPlayerId || payload.playerId || identity.playerId,
-                ),
-                requestedPlayerId: normalizeIdValue(payload.requestedPlayerId),
-                charId: normalizeIdValue(payload.charId),
-            };
-
-            const sanitizedPayload = {};
-            Object.keys(resolvedPayload).forEach((key) => {
-                const value = resolvedPayload[key];
+            Object.keys(context).forEach((key) => {
+                const value = context[key];
                 if (value !== undefined && value !== null && value !== '') {
-                    sanitizedPayload[key] = value;
+                    sanitized[key] = value;
                 }
             });
 
-            return sanitizedPayload;
+            return { ...sanitized, ...(payload || {}) };
         };
 
         const callUserSettingsApi = async (payload) => {
@@ -1129,14 +1097,14 @@
                     email: storedLoginIdentity?.user?.email || '',
                     googleEmail: storedLoginIdentity?.user?.googleEmail || '',
                 });
-                const payload = {
+                const payload = buildUserSettingsPayload({
                     action: 'autoApproveEditorRequest',
                     code: rawCode,
-                    playerId: stripPendingPrefix(state.user?.playerId || ''),
+                    playerId: state.user?.playerId || '',
                     charId: requestedCharId,
-                    currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
-                };
-                const resolvedPayload = buildUserSettingsPayload(payload);
+                    currentPlayerId: state.user?.playerId || '',
+                });
+                const resolvedPayload = payload;
                 console.log('DEBUG: email/googleEmail in request payload =', {
                     email: resolvedPayload.email || '',
                     googleEmail: resolvedPayload.googleEmail || '',
