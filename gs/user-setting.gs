@@ -96,16 +96,13 @@ const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminThreshold() {
 
 const EDITOR_AUTHORITY_VALUE = 2;
 
-function doGet(e) {
-  return createUserSettingsJsonOutput(
-    {
+  function doGet(e) {
+    return createUserSettingsJsonOutput({
       success: true,
       message: 'User directory endpoint is running',
       timestamp: new Date().toISOString(),
-    },
-    resolveCorsRequestOrigin(e),
-  );
-}
+    }, resolveCorsRequestOrigin(e));
+  }
 
 function doPost(e) {
   const origin = resolveCorsRequestOrigin(e);
@@ -114,15 +111,12 @@ function doPost(e) {
     const action = (request.action || 'listMembers').toString();
     const sheet = getAccountsSheet();
 
-    if (!sheet) {
-      return buildResponse(
-        {
+      if (!sheet) {
+        return buildResponse({
           success: false,
           message: `シート「${CONFIG.SHEET_NAME}」が見つかりません。`,
-        },
-        origin,
-      );
-    }
+        }, origin);
+      }
 
     switch (action) {
       case 'listMembers':
@@ -139,25 +133,19 @@ function doPost(e) {
         return buildResponse(handleCancelEditorRequest(sheet, request), origin);
       case 'autoApproveEditorRequest':
         return buildResponse(handleAutoApproveEditorRequest(sheet, request), origin);
-      default:
-        return buildResponse(
-          {
+        default:
+          return buildResponse({
             success: false,
             message: `Unknown action: ${action}`,
-          },
-          origin,
-        );
-    }
-  } catch (error) {
-    return buildResponse(
-      {
+          }, origin);
+      }
+    } catch (error) {
+      return buildResponse({
         success: false,
         message: `処理中にエラーが発生しました: ${error && error.message ? error.message : error}`,
-      },
-      origin,
-    );
+      }, origin);
+    }
   }
-}
 
 function doOptions(e) {
   return createUserSettingsPreflightResponse(resolveCorsRequestOrigin(e));
@@ -768,15 +756,6 @@ function handleAutoApproveEditorRequest(sheet, request) {
   emailLookupPlayerId = record.playerId || currentPlayerIdValue || '';
   pendingPlayerId = currentPlayerIdValue || '';
   pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === codePlayerId;
-
-  const context = Object.assign({}, contextBase, {
-    sanitizedCodePlayerId,
-    sanitizedCharId,
-    parsedCodePlayerId,
-    currentPlayerIdValue,
-    pendingPlayerId,
-    pendingPlayerIdMatches,
-  });
 
   const accessCheck = verifyRequestAccessToEmail(request, record);
   emailMatchesLogin = Boolean(accessCheck && accessCheck.emailMatchesLogin);
