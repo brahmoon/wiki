@@ -684,39 +684,54 @@
             const baseUser = storedUser || fallbackUser || {};
             const resolvedEmail = (baseUser.email || '').toString().trim();
             const resolvedGoogleEmail = (baseUser.googleEmail || resolvedEmail).toString().trim();
+            const resolvedPlayerId = stripPendingPrefix(baseUser.playerId || '');
             return {
                 email: resolvedEmail,
                 googleEmail: resolvedGoogleEmail,
+                playerId: resolvedPlayerId,
             };
         };
 
         const buildUserSettingsPayload = (payload = {}) => {
             const identity = resolveUserIdentity();
 
-            // identity.email/googleEmail が Object だった場合に破壊されるのを防ぐためのガード
-            const safeNormalize = (value) => {
-                if (!value) return '';
+            // Apps Script が text/plain の JSON を確実に解釈できるよう、
+            // すべての値をプリミティブな文字列に正規化する
+            const normalizeScalar = (value) => {
+                if (value === null || value === undefined) return '';
                 if (typeof value === 'object') return '';
                 return value.toString().trim();
             };
 
-            // payload.email が空 → identity.email を採用するが Object の場合は無視
-            const normalizedEmail = safeNormalize(payload.email) || safeNormalize(identity.email);
-            const normalizedGoogleEmail =
-                safeNormalize(payload.googleEmail) ||
-                safeNormalize(identity.googleEmail) ||
-                normalizedEmail;
+            const normalizeIdValue = (value) => {
+                const normalized = normalizeScalar(value);
+                return sanitizeNumberInput(normalized);
+            };
 
-            const resolvedIdentity = {};
+            const resolvedPayload = {
+                ...payload,
+                email: normalizeScalar(payload.email) || normalizeScalar(identity.email),
+                googleEmail:
+                    normalizeScalar(payload.googleEmail) ||
+                    normalizeScalar(identity.googleEmail) ||
+                    normalizeScalar(identity.email),
+                playerId: normalizeIdValue(payload.playerId || identity.playerId),
+                currentPlayerId: normalizeIdValue(
+                    payload.currentPlayerId || payload.playerId || identity.playerId,
+                ),
+                requestedPlayerId: normalizeIdValue(payload.requestedPlayerId),
+                charId: normalizeIdValue(payload.charId),
+            };
 
-            if (normalizedEmail) {
-                resolvedIdentity.email = normalizedEmail;
-            }
-            if (normalizedGoogleEmail) {
-                resolvedIdentity.googleEmail = normalizedGoogleEmail;
-            }
+            const sanitizedPayload = {};
+            Object.keys(resolvedPayload).forEach((key) => {
+                const value = resolvedPayload[key];
+                if (value !== undefined && value !== null && value !== '') {
+                    sanitizedPayload[key] = value;
+                }
+            });
 
-            return { ...payload, ...resolvedIdentity };
+            return sanitizedPayload;
         };
 
         const callUserSettingsApi = async (payload) => {
