@@ -553,20 +553,6 @@
             isCancelling: false,
         };
 
-        const sanitizeNumberInput = (value) => {
-            if (value === null || value === undefined) {
-                return '';
-            }
-            let normalizedValue = value.toString();
-            if (typeof normalizedValue.normalize === 'function') {
-                normalizedValue = normalizedValue.normalize('NFKC');
-            }
-            return normalizedValue
-                .replace(/[\u200B-\u200D\uFEFF]/g, '')
-                .replace(/\s+/g, '')
-                .replace(/[^0-9]/g, '');
-        };
-
         const safeBase64Decode = (value) => {
             if (!value) {
                 return '';
@@ -586,36 +572,22 @@
         const params = new URLSearchParams(window.location.search);
         const requestedPageId = (params.get('page') || '').trim();
         const authorizationCodeState = (() => {
-            const rawCode = (params.get('code') || '').trim();
+            const rawCode = params.get('code') || '';
             if (!rawCode) {
                 return { hasCode: false };
             }
             const decodedPlayerId = safeBase64Decode(rawCode);
-            const sanitizedDecodedPlayerId = sanitizeNumberInput(decodedPlayerId);
             return {
                 hasCode: true,
                 rawCode,
-                playerId: sanitizedDecodedPlayerId,
-                charId: sanitizeNumberInput(params.get('char_id') || ''),
+                playerId: decodedPlayerId,
+                charId: params.get('char_id') || '',
                 completed: false,
             };
         })();
 
         const isPendingPlayerId = (value) => {
-            return typeof value === 'string' && value.trim().startsWith('!');
-        };
-
-        const stripPendingPrefix = (value) => {
-            if (!value) {
-                return '';
-            }
-            let normalizedValue = value.toString();
-            if (typeof normalizedValue.normalize === 'function') {
-                normalizedValue = normalizedValue.normalize('NFKC');
-            }
-            normalizedValue = normalizedValue.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-            normalizedValue = normalizedValue.replace(/^[!！]+/, '');
-            return sanitizeNumberInput(normalizedValue);
+            return typeof value === 'string' && value.startsWith('!');
         };
 
         const parseAuthority = (value) => {
@@ -677,29 +649,16 @@
             return url.toString();
         };
 
-        const buildUserIdentityContext = () => {
+        const getUserIdentity = () => {
             const storedState = getStoredLoginState();
             const user = storedState?.user || state.user || {};
             return {
-                email: user.email || '',
-                googleEmail: user.email || '',
-                playerId: user.playerId || '',
+                email: user.email ?? '',
+                googleEmail: user.googleEmail ?? '',
+                playerId: user.playerId ?? '',
+                currentPlayerId: user.playerId ?? '',
                 origin: window.location.origin,
             };
-        };
-
-        const buildUserSettingsPayload = (payload = {}) => {
-            const context = buildUserIdentityContext();
-            const sanitized = {};
-
-            Object.keys(context).forEach((key) => {
-                const value = context[key];
-                if (value !== undefined && value !== null && value !== '') {
-                    sanitized[key] = value;
-                }
-            });
-
-            return { ...sanitized, ...(payload || {}) };
         };
 
         const callUserSettingsApi = async (payload) => {
@@ -719,7 +678,7 @@
                         'Content-Type': 'text/plain',
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify(buildUserSettingsPayload(payload)),
+                    body: JSON.stringify(payload),
                     signal: controller.signal,
                 });
 
@@ -817,8 +776,8 @@
                 elements.pendingPlayer.textContent = '-';
                 return;
             }
-            const kingdomValue = String(user.kingdom || '').trim();
-            const playerValue = stripPendingPrefix(user.playerId || '');
+            const kingdomValue = user.kingdom ?? '';
+            const playerValue = user.playerId ?? '';
             elements.pendingKingdom.textContent = kingdomValue || '-';
             elements.pendingPlayer.textContent = playerValue || '-';
         };
@@ -830,10 +789,13 @@
                 return null;
             }
 
+            const identity = getUserIdentity();
             const payload = {
+                ...identity,
                 action: 'getUserSettings',
-                playerId: loginState.user.playerId || '',
-                email: loginState.user.email || '',
+                playerId: identity.playerId,
+                email: identity.email,
+                googleEmail: identity.googleEmail,
             };
 
             const result = await callUserSettingsApi(payload);
@@ -921,8 +883,8 @@
                 return;
             }
 
-            const kingdom = sanitizeNumberInput(elements.kingdomInput?.value);
-            const playerId = sanitizeNumberInput(elements.playerInput?.value);
+            const kingdom = elements.kingdomInput?.value ?? '';
+            const playerId = elements.playerInput?.value ?? '';
 
             if (!kingdom) {
                 setFormStatus('Kingdom番号を入力してください。', 'error');
@@ -941,12 +903,14 @@
             setFormStatus('申請を送信しています…');
 
             try {
+                const identity = getUserIdentity();
                 const payload = {
+                    ...identity,
                     action: 'requestEditorAccess',
                     kingdom,
                     requestedPlayerId: playerId,
-                    currentPlayerId: state.user?.playerId || '',
-                    playerId: state.user?.playerId || '',
+                    currentPlayerId: identity.currentPlayerId,
+                    playerId: identity.playerId,
                 };
                 const result = await callUserSettingsApi(payload);
                 if (!result.success) {
@@ -1024,7 +988,10 @@
             elements.pendingCancel?.setAttribute('disabled', 'true');
             setPendingStatus('申請をキャンセルしています…');
             try {
-                const payload = { action: 'cancelEditorRequest' };
+                const payload = {
+                    ...getUserIdentity(),
+                    action: 'cancelEditorRequest',
+                };
                 const result = await callUserSettingsApi(payload);
                 if (!result.success) {
                     if (result.requiresReauthentication) {
@@ -1089,7 +1056,6 @@
             try {
                 const storedPlayerId = state.user?.playerId || '';
                 console.log('DEBUG: current stored playerId =', storedPlayerId);
-                console.log('DEBUG: stripped pending playerId =', stripPendingPrefix(storedPlayerId));
                 console.log('DEBUG: email in state.user.email =', state.user?.email || '');
                 console.log('DEBUG: email in state.user.googleEmail =', state.user?.googleEmail || '');
                 const storedLoginIdentity = getStoredLoginState();
@@ -1097,13 +1063,15 @@
                     email: storedLoginIdentity?.user?.email || '',
                     googleEmail: storedLoginIdentity?.user?.googleEmail || '',
                 });
-                const payload = buildUserSettingsPayload({
+                const identity = getUserIdentity();
+                const payload = {
+                    ...identity,
                     action: 'autoApproveEditorRequest',
                     code: rawCode,
-                    playerId: state.user?.playerId || '',
+                    playerId: identity.playerId,
                     charId: requestedCharId,
-                    currentPlayerId: state.user?.playerId || '',
-                });
+                    currentPlayerId: identity.currentPlayerId,
+                };
                 const resolvedPayload = payload;
                 console.log('DEBUG: email/googleEmail in request payload =', {
                     email: resolvedPayload.email || '',
