@@ -952,6 +952,8 @@ function parseRequest(e) {
     username: data.username || data.name || '',
     kingdom: data.kingdom,
     language: data.language,
+    charId: data.charId || data.char_id || '',
+    code: data.code || '',
   };
 }
 
