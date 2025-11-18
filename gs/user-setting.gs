@@ -96,13 +96,16 @@ const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminThreshold() {
 
 const EDITOR_AUTHORITY_VALUE = 2;
 
-  function doGet(e) {
-    return createUserSettingsJsonOutput({
+function doGet(e) {
+  return createUserSettingsJsonOutput(
+    {
       success: true,
       message: 'User directory endpoint is running',
       timestamp: new Date().toISOString(),
-    }, resolveCorsRequestOrigin(e));
-  }
+    },
+    resolveCorsRequestOrigin(e),
+  );
+}
 
 function doPost(e) {
   const origin = resolveCorsRequestOrigin(e);
@@ -111,12 +114,15 @@ function doPost(e) {
     const action = (request.action || 'listMembers').toString();
     const sheet = getAccountsSheet();
 
-      if (!sheet) {
-        return buildResponse({
+    if (!sheet) {
+      return buildResponse(
+        {
           success: false,
           message: `シート「${CONFIG.SHEET_NAME}」が見つかりません。`,
-        }, origin);
-      }
+        },
+        origin,
+      );
+    }
 
     switch (action) {
       case 'listMembers':
@@ -133,19 +139,25 @@ function doPost(e) {
         return buildResponse(handleCancelEditorRequest(sheet, request), origin);
       case 'autoApproveEditorRequest':
         return buildResponse(handleAutoApproveEditorRequest(sheet, request), origin);
-        default:
-          return buildResponse({
+      default:
+        return buildResponse(
+          {
             success: false,
             message: `Unknown action: ${action}`,
-          }, origin);
-      }
-    } catch (error) {
-      return buildResponse({
+          },
+          origin,
+        );
+    }
+  } catch (error) {
+    return buildResponse(
+      {
         success: false,
         message: `処理中にエラーが発生しました: ${error && error.message ? error.message : error}`,
-      }, origin);
-    }
+      },
+      origin,
+    );
   }
+}
 
 function doOptions(e) {
   return createUserSettingsPreflightResponse(resolveCorsRequestOrigin(e));
@@ -183,7 +195,9 @@ function runAdminVerification(sheet, request) {
 }
 
 function fallbackVerifyAdminAccess(sheet, request) {
-  const lookupEmail = (request && (request.googleEmail || request.email)) || '';
+  const normalizedGoogleEmail = normalizeId(request && request.googleEmail);
+  const normalizedEmail = normalizeId(request && request.email);
+  const lookupEmail = normalizedGoogleEmail || normalizedEmail;
 
   if (!lookupEmail) {
     return {
@@ -245,10 +259,10 @@ function verifyRequestAccessToEmail(request, account) {
     return { success: true, emailMatchesLogin: true };
   }
 
-  const accountEmail = account && account.email;
-  const requestEmail = request.googleEmail || request.email;
+  const normalizedAccountEmail = normalizeId(account && account.email);
+  const normalizedRequestEmail = normalizeId(request.googleEmail || request.email);
 
-  if (!requestEmail) {
+  if (!normalizedRequestEmail) {
     return {
       success: false,
       message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
@@ -257,7 +271,7 @@ function verifyRequestAccessToEmail(request, account) {
     };
   }
 
-  if (accountEmail && accountEmail === requestEmail) {
+  if (normalizedAccountEmail && normalizedAccountEmail === normalizedRequestEmail) {
     return { success: true, emailMatchesLogin: true };
   }
 
@@ -325,7 +339,7 @@ function handleListMembers(sheet, request) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const searchTerm = (request.search || '').toString();
+  const normalizedSearch = (request.search || '').toString().trim().toLowerCase();
   const matches = [];
 
   const columns = CONFIG.COLUMNS;
@@ -341,21 +355,21 @@ function handleListMembers(sheet, request) {
       updatedAt: formatDateValue(getColumnValue(row, columns.updatedAt)),
     };
 
-    if (!searchTerm) {
+    if (!normalizedSearch) {
       matches.push(record);
       return;
     }
 
     const haystacks = [record.playerId, record.username, record.email]
       .map(function (value) {
-        return value === null || value === undefined ? '' : value.toString();
+        return (value || '').toString().trim().toLowerCase();
       })
       .filter(function (value) {
-        return value !== '';
+        return value;
       });
 
     if (haystacks.some(function (value) {
-      return value.indexOf(searchTerm) !== -1;
+      return value.indexOf(normalizedSearch) !== -1;
     })) {
       matches.push(record);
     }
@@ -457,7 +471,7 @@ function handleUpdateUserSettings(sheet, request) {
     updatedValues[columns.username - 1] = normalizedUsername;
   }
   if (columns.email) {
-    updatedValues[columns.email - 1] = request.email ? request.email : record.email;
+    updatedValues[columns.email - 1] = request.email ? request.email.toString().trim() : record.email;
   }
   if (columns.kingdom) {
     updatedValues[columns.kingdom - 1] = kingdomValue;
@@ -490,7 +504,7 @@ function handleRegisterUser(sheet, request) {
     return adminVerification;
   }
 
-  const email = request.email || '';
+  const email = (request.email || '').toString().trim();
   if (!email) {
     return {
       success: false,
@@ -498,10 +512,11 @@ function handleRegisterUser(sheet, request) {
     };
   }
 
-  const googleEmail = request.googleEmail || '';
+  const normalizedGoogleEmail = normalizeId(request.googleEmail);
+  const normalizedEmail = normalizeId(email);
 
   if (!(adminVerification && adminVerification.success)) {
-    if (!googleEmail) {
+    if (!normalizedGoogleEmail) {
       return {
         success: false,
         message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
@@ -509,7 +524,7 @@ function handleRegisterUser(sheet, request) {
       };
     }
 
-    if (email && googleEmail && email !== googleEmail) {
+    if (normalizedEmail && normalizedGoogleEmail && normalizedEmail !== normalizedGoogleEmail) {
       return {
         success: false,
         message: 'Googleアカウントと異なるメールアドレスは登録できません。',
@@ -526,7 +541,7 @@ function handleRegisterUser(sheet, request) {
     };
   }
 
-  const playerId = request.playerId || '';
+  const playerId = (request.playerId || '').toString().trim();
 
   const existingAccount = findAccount(sheet, {
     playerId: playerId,
@@ -592,7 +607,7 @@ function handleRequestEditorAccess(sheet, request) {
     return adminVerification;
   }
 
-  const desiredPlayerId = request.requestedPlayerId || request.playerId;
+  const desiredPlayerId = sanitizePlayerId(request.requestedPlayerId || request.playerId);
   if (!desiredPlayerId) {
     return {
       success: false,
@@ -715,9 +730,11 @@ function handleCancelEditorRequest(sheet, request) {
 }
 
 function handleAutoApproveEditorRequest(sheet, request) {
-  const currentPlayerId = request.currentPlayerId || request.playerId || '';
+  debugAutoApprove(request, sheet); // これは今あるやつそのままでもOK
+
+  const normalizedCurrentPlayerId = String(request.currentPlayerId || request.playerId || '');
   const lookupIdentifiers = {
-    playerId: currentPlayerId,
+    playerId: normalizedCurrentPlayerId,
     email: request.email || request.googleEmail || '',
   };
 
@@ -725,13 +742,30 @@ function handleAutoApproveEditorRequest(sheet, request) {
   let emailLookupPlayerId = '';
   let pendingPlayerId = '';
   let emailMatchesLogin = false;
-  const lookupEmail = lookupIdentifiers.email || '';
+  let lookupEmail = normalizeId(lookupIdentifiers.email);
+
+  const sanitizedReceivedPlayerId = sanitizePlayerId(
+    request.playerId || request.currentPlayerId || ''
+  );
+  const playerIdMatchCell = findMatchingPlayerIdCell(sheet, sanitizedReceivedPlayerId);
+
   const record = findAccount(sheet, lookupIdentifiers);
   const recordEmailValue = record ? record.email || '' : '';
-  const debugInfo = {
-    backendEmailSearchTarget: lookupIdentifiers.email || '',
-    backendFoundEmail: recordEmailValue,
-    backendReceivedPlayerId: request.playerId || request.currentPlayerId || '',
+
+  // ★ここで共通コンテキストを作っておく
+  const contextBase = {
+    requestSnapshot: request,
+    lookupIdentifiers,
+    sheetHasRecord: !!record,
+    recordSnapshot: record ? {
+      rowNumber: record.rowNumber,
+      playerId: record.playerId,
+      email: record.email,
+      authority: record.authority
+    } : null,
+    sanitizedReceivedPlayerId,
+    playerIdMatchCell,
+    lookupEmail,
   };
 
   if (!record) {
@@ -746,16 +780,27 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, contextBase);
   }
 
-  const codePlayerId = request.playerId || '';
-  const charId = request.charId || '';
+  const sanitizedCodePlayerId = String(sanitizePlayerId(request.playerId || '') || '');
+  const sanitizedCharId = String(sanitizePlayerId(request.charId || '') || '');
   const parsedCode = parseAuthorizationCodeValue(request.code);
-  const parsedCodePlayerId = parsedCode.playerId || '';
+  const parsedCodePlayerId = String(sanitizePlayerId(parsedCode.playerId || '') || '');
+
   const columns = CONFIG.COLUMNS || {};
   const updatedValues = record.values.slice();
   const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
-  emailLookupPlayerId = record.playerId || currentPlayerIdValue || '';
-  pendingPlayerId = currentPlayerIdValue || '';
-  pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === codePlayerId;
+
+  emailLookupPlayerId = String(sanitizePlayerId(record.playerId || currentPlayerIdValue) || '');
+  pendingPlayerId = String(sanitizePlayerId(stripPendingPlayerId(currentPlayerIdValue)) || '');
+  pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === sanitizedCodePlayerId;
+
+  const context = Object.assign({}, contextBase, {
+    sanitizedCodePlayerId,
+    sanitizedCharId,
+    parsedCodePlayerId,
+    currentPlayerIdValue,
+    pendingPlayerId,
+    pendingPlayerIdMatches,
+  });
 
   const accessCheck = verifyRequestAccessToEmail(request, record);
   emailMatchesLogin = Boolean(accessCheck && accessCheck.emailMatchesLogin);
@@ -771,9 +816,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }), context);
   }
 
-  if (!codePlayerId || !charId || !parsedCodePlayerId) {
-    return {
-      success: false,
+  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCodePlayerId) {
+    return autoApproveFail('CODE_OR_CHARID_EMPTY', {
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -784,9 +828,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, context);
   }
 
-  if (parsedCodePlayerId && parsedCodePlayerId !== codePlayerId) {
-    return {
-      success: false,
+  if (parsedCodePlayerId && parsedCodePlayerId !== sanitizedCodePlayerId) {
+    return autoApproveFail('CODE_PLAYERID_MISMATCH', {
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -797,9 +840,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, context);
   }
 
-  if (charId !== codePlayerId) {
-    return {
-      success: false,
+  if (sanitizedCharId !== sanitizedCodePlayerId) {
+    return autoApproveFail('CHARID_MISMATCH', {
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -822,9 +864,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, context);
   }
 
-  if (!pendingPlayerIdMatches) {
-    return {
-      success: false,
+  if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
+    return autoApproveFail('PENDING_PLAYERID_MISMATCH', {
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -837,7 +878,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
 
   // ★ここに到達したら成功確定
   if (columns.playerId) {
-    updatedValues[columns.playerId - 1] = codePlayerId;
+    updatedValues[columns.playerId - 1] = sanitizedCodePlayerId;
   }
   if (columns.authority) {
     updatedValues[columns.authority - 1] = EDITOR_AUTHORITY_VALUE;
@@ -851,7 +892,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
 
   return autoApproveSuccess({
     message: '申請を承認しました。',
-    playerId: columns.playerId ? updatedValues[columns.playerId - 1] || codePlayerId : codePlayerId,
+    playerId: columns.playerId ? updatedValues[columns.playerId - 1] || sanitizedCodePlayerId : sanitizedCodePlayerId,
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
     authority: EDITOR_AUTHORITY_VALUE,
     pendingPlayerIdMatches,
@@ -869,8 +910,8 @@ function findMatchingPlayerIdCell(sheet, playerId) {
     return '';
   }
 
-  const target = playerId;
-  if (!target) {
+  const sanitizedTarget = sanitizePlayerId(playerId);
+  if (!sanitizedTarget) {
     return '';
   }
 
@@ -886,7 +927,8 @@ function findMatchingPlayerIdCell(sheet, playerId) {
 
   for (let i = 0; i < values.length; i++) {
     const cellValue = values[i][0];
-    if (cellValue === target) {
+    const normalizedCellValue = sanitizePlayerId(stripPendingPlayerId(cellValue));
+    if (normalizedCellValue && normalizedCellValue === sanitizedTarget) {
       return cellValue || '';
     }
   }
@@ -901,17 +943,15 @@ function parseRequest(e) {
     search: data.search || data.query || '',
     limit: parsePositiveInteger(data.limit),
     offset: parsePositiveInteger(data.offset),
-    playerId: data.playerId || '',
+    playerId: data.playerId || data.loginId || data.email || '',
     currentPlayerId: data.currentPlayerId || '',
     requestedPlayerId: data.requestedPlayerId || data.pendingPlayerId || '',
     email: data.email || '',
-    googleEmail: data.googleEmail || data.googleAccountEmail || '',
+    googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
     adminToken: data.adminToken || data.adminSessionToken || data.token || '',
     username: data.username || data.name || '',
     kingdom: data.kingdom,
     language: data.language,
-    charId: data.charId || '',
-    code: data.code || '',
   };
 }
 
@@ -929,37 +969,34 @@ function parsePositiveInteger(value) {
 function parseRequestData(e) {
   const data = {};
 
-  // ★ URL パラメータ（GET）は優先
   if (e && e.parameter) {
-    Object.keys(e.parameter).forEach(key => {
+    Object.keys(e.parameter).forEach(function (key) {
       const value = e.parameter[key];
       data[key] = Array.isArray(value) ? value[0] : value;
     });
   }
 
-  // ★ POST 本体がある場合（text/plainでもJSONとして扱う）
   if (e && e.postData) {
-    let raw = '';
+    const rawBody = (e.postData.contents || '').trim() ||
+      (typeof e.postData.getDataAsString === 'function' ? e.postData.getDataAsString() : '');
 
-    if (e.postData.contents) {
-      raw = e.postData.contents;
-    } else if (typeof e.postData.getDataAsString === 'function') {
-      raw = e.postData.getDataAsString();
-    }
-
-    raw = (raw || '').trim();
-    if (!raw) return data;
-
-    // ★ JSONとして確実にパース（破壊しない）
-    try {
-      const json = JSON.parse(raw);
-      Object.assign(data, json);
-      return data;
-    } catch (err) {
-      // JSONでない場合は決して破壊しない
-      Logger.log("WARN: Failed JSON parse in parseRequestData: " + err);
-      Logger.log("WARN: Raw POST body = " + raw);
-      return data;
+    if (rawBody) {
+      try {
+        const parsed = JSON.parse(rawBody);
+        Object.keys(parsed || {}).forEach(function (key) {
+          data[key] = parsed[key];
+        });
+      } catch (error) {
+        try {
+          const params = new URLSearchParams(rawBody);
+          params.forEach(function (value, key) {
+            data[key] = value;
+          });
+        } catch (parseError) {
+          data.rawBody = rawBody;
+          throw new Error('リクエストの解析に失敗しました。');
+        }
+      }
     }
   }
 
@@ -1040,11 +1077,12 @@ function sanitizeAuthority(value) {
 }
 
 function isPendingPlayerIdValue(value) {
-  return typeof value === 'string' && value.indexOf('!') === 0;
+  return typeof value === 'string' && value.toString().trim().indexOf('!') === 0;
 }
 
 function buildPendingPlayerId(value) {
-  return '!' + (value === null || value === undefined ? '' : value);
+  const sanitized = sanitizePlayerId(value);
+  return sanitized ? '!' + sanitized : '!';
 }
 
 function parseAuthorizationCodeValue(code) {
@@ -1054,7 +1092,7 @@ function parseAuthorizationCodeValue(code) {
     };
   }
 
-  const stringValue = code.toString();
+  const stringValue = code.toString().trim();
   if (!stringValue) {
     return {
       playerId: '',
@@ -1065,13 +1103,25 @@ function parseAuthorizationCodeValue(code) {
     const decodedBytes = Utilities.base64Decode(stringValue);
     const decodedText = Utilities.newBlob(decodedBytes).getDataAsString('UTF-8');
     return {
-      playerId: decodedText,
+      playerId: sanitizePlayerId(decodedText),
     };
   } catch (error) {
     return {
       playerId: '',
     };
   }
+}
+
+function normalizeId(value) {
+  let v = String(value || '').trim();
+
+  if (v.normalize) {
+    v = v.normalize('NFKC');
+  }
+
+  v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+  return v.toLowerCase();
 }
 
 function findAccount(sheet, identifiers) {
@@ -1085,18 +1135,23 @@ function findAccount(sheet, identifiers) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
+  const normalizedPlayerId = normalizeId(identifiers.playerId);
+  const normalizedSanitizedPlayerId = normalizeId(sanitizePlayerId(identifiers.playerId));
+  const normalizedEmail = normalizeId(identifiers.email);
   const columns = CONFIG.COLUMNS;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
     const rawRowPlayerId = columns.playerId ? row[columns.playerId - 1] : '';
-    const rowEmail = columns.email ? row[columns.email - 1] : '';
+    const rowPlayerId = normalizeId(rawRowPlayerId);
+    const rowSanitizedPlayerId = normalizeId(sanitizePlayerId(rawRowPlayerId));
+    const rowEmail = columns.email ? normalizeId(row[columns.email - 1]) : '';
 
-    const playerMatch =
-      identifiers.playerId !== undefined && identifiers.playerId !== null && rawRowPlayerId === identifiers.playerId;
-    const emailMatch = identifiers.email && rowEmail && rowEmail === identifiers.email;
+    const playerMatch = normalizedPlayerId && rowPlayerId && rowPlayerId === normalizedPlayerId;
+    const sanitizedPlayerMatch = normalizedSanitizedPlayerId && rowSanitizedPlayerId && rowSanitizedPlayerId === normalizedSanitizedPlayerId;
+    const emailMatch = normalizedEmail && rowEmail && rowEmail === normalizedEmail;
 
-    if (playerMatch || emailMatch) {
+    if (playerMatch || sanitizedPlayerMatch || emailMatch) {
       return {
         rowNumber: firstDataRow + i,
         values: row,
@@ -1370,4 +1425,3 @@ function applyUserSettingsCorsHeaders(output, requestOrigin, isPreflight) {
 
   return output;
 }
-
