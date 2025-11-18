@@ -692,28 +692,15 @@
 
         const buildUserSettingsPayload = (payload = {}) => {
             const identity = resolveUserIdentity();
-
-            const safeNormalize = (value) => {
-                if (!value) return '';
-                if (typeof value === 'object') return '';
-                return value.toString().trim();
-            };
-
-            const normalizedEmail = safeNormalize(payload.email) || safeNormalize(identity.email);
-            const normalizedGoogleEmail =
-                safeNormalize(payload.googleEmail) ||
-                safeNormalize(identity.googleEmail) ||
-                normalizedEmail;
-
+            const normalizedEmail = (payload.email || identity.email || '').toString().trim();
+            const normalizedGoogleEmail = (payload.googleEmail || identity.googleEmail || normalizedEmail || '').toString().trim();
             const resolvedIdentity = {};
-
             if (normalizedEmail) {
                 resolvedIdentity.email = normalizedEmail;
             }
             if (normalizedGoogleEmail) {
                 resolvedIdentity.googleEmail = normalizedGoogleEmail;
             }
-
             return { ...payload, ...resolvedIdentity };
         };
 
