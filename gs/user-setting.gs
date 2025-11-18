@@ -1,3 +1,64 @@
+function debugAutoApprove(request, sheet) {
+  try {
+    const dataRange = sheet.getDataRange().getValues();
+    const headers = dataRange[0];
+    const rows = dataRange.slice(1);
+
+    const emailCol = headers.indexOf('email') + 1;
+    const playerCol = headers.indexOf('playerId') + 1;
+
+    console.log("=== AUTO APPROVE DEBUG ===");
+    console.log(JSON.stringify({
+      request: request,
+      sheetHeaders: headers,
+      emailColumnIndex: emailCol,
+      playerColumnIndex: playerCol,
+      sampleFirst5Rows: rows.slice(0, 5),
+      searchingEmail: request.email,
+      searchingPlayerId: request.playerId,
+    }, null, 2));
+  } catch (error) {
+    console.error("debugAutoApprove failed", error);
+  }
+}
+
+function autoApproveFail(reason, base, context) {
+  var result = base || {};
+  result.success = false;
+  result.reason = reason;
+
+  try {
+    console.log(JSON.stringify({
+      level: 'DEBUG',
+      scope: 'AUTO_APPROVE_FAIL',
+      timestamp: new Date().toISOString(),
+      reason: reason,
+      context: context || {}
+    }));
+  } catch (loggingError) {
+    // ログの JSON 化に失敗しても本体の動作は止めない
+  }
+
+  return result;
+}
+
+function autoApproveSuccess(base, context) {
+  var result = base || {};
+  result.success = true;
+  result.autoApproved = true;
+
+  try {
+    console.log(JSON.stringify({
+      level: 'DEBUG',
+      scope: 'AUTO_APPROVE_SUCCESS',
+      timestamp: new Date().toISOString(),
+      context: context || {}
+    }));
+  } catch (loggingError) {}
+
+  return result;
+}
+
 const CONFIG = {
   SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
   SHEET_NAME: 'Accounts',
@@ -17,6 +78,11 @@ const CONFIG = {
     'http://localhost:4173',
   ],
 };
+
+function findColumnIndex(headers, name) {
+  const lower = name.toString().toLowerCase().trim();
+  return headers.findIndex(h => h.toString().toLowerCase().trim() === lower) + 1;
+}
 
 const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminThreshold() {
   if (typeof ADMIN_AUTHORITY_VALUE !== 'undefined') {
@@ -666,6 +732,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
     playerId: currentPlayerId,
     email: request.email || request.googleEmail || '',
   };
+
   let pendingPlayerIdMatches = false;
   let emailLookupPlayerId = '';
   let pendingPlayerId = '';
@@ -680,16 +747,15 @@ function handleAutoApproveEditorRequest(sheet, request) {
   };
 
   if (!record) {
-    return {
-      success: false,
+    return autoApproveFail('NO_RECORD_FOUND', {
       message: 'ユーザー情報が見つかりません。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
-      debugInfo,
-    };
+      debugInfo: contextBase,
+    }, contextBase);
   }
 
   const codePlayerId = request.playerId || '';
@@ -703,17 +769,27 @@ function handleAutoApproveEditorRequest(sheet, request) {
   pendingPlayerId = currentPlayerIdValue || '';
   pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === codePlayerId;
 
+  const context = Object.assign({}, contextBase, {
+    sanitizedCodePlayerId,
+    sanitizedCharId,
+    parsedCodePlayerId,
+    currentPlayerIdValue,
+    pendingPlayerId,
+    pendingPlayerIdMatches,
+  });
+
   const accessCheck = verifyRequestAccessToEmail(request, record);
   emailMatchesLogin = Boolean(accessCheck && accessCheck.emailMatchesLogin);
+
   if (!accessCheck.success) {
-    return Object.assign({}, accessCheck, {
+    return autoApproveFail('ACCESS_CHECK_FAILED', Object.assign({}, accessCheck, {
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
-      debugInfo,
-    });
+      debugInfo: context,
+    }), context);
   }
 
   if (!codePlayerId || !charId || !parsedCodePlayerId) {
@@ -725,8 +801,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
-      debugInfo,
-    };
+      debugInfo: context,
+    }, context);
   }
 
   if (parsedCodePlayerId && parsedCodePlayerId !== codePlayerId) {
@@ -738,8 +814,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
-      debugInfo,
-    };
+      debugInfo: context,
+    }, context);
   }
 
   if (charId !== codePlayerId) {
@@ -751,21 +827,20 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
-      debugInfo,
-    };
+      debugInfo: context,
+    }, context);
   }
 
   if (!isPendingPlayerIdValue(currentPlayerIdValue)) {
-    return {
-      success: false,
+    return autoApproveFail('NOT_PENDING_PLAYER', {
       message: '申請中の情報が見つかりません。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
-      debugInfo,
-    };
+      debugInfo: context,
+    }, context);
   }
 
   if (!pendingPlayerIdMatches) {
@@ -777,10 +852,11 @@ function handleAutoApproveEditorRequest(sheet, request) {
       pendingPlayerId,
       emailMatchesLogin,
       lookupEmail,
-      debugInfo,
-    };
+      debugInfo: context,
+    }, context);
   }
 
+  // ★ここに到達したら成功確定
   if (columns.playerId) {
     updatedValues[columns.playerId - 1] = codePlayerId;
   }
@@ -794,9 +870,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
   const rowRange = sheet.getRange(record.rowNumber, 1, 1, sheet.getLastColumn());
   rowRange.setValues([updatedValues]);
 
-  return {
-    success: true,
-    autoApproved: true,
+  return autoApproveSuccess({
     message: '申請を承認しました。',
     playerId: columns.playerId ? updatedValues[columns.playerId - 1] || codePlayerId : codePlayerId,
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
@@ -806,8 +880,8 @@ function handleAutoApproveEditorRequest(sheet, request) {
     pendingPlayerId,
     emailMatchesLogin,
     lookupEmail,
-    debugInfo,
-  };
+    debugInfo: context,
+  }, context);
 }
 
 function findMatchingPlayerIdCell(sheet, playerId) {
@@ -876,34 +950,37 @@ function parsePositiveInteger(value) {
 function parseRequestData(e) {
   const data = {};
 
+  // ★ URL パラメータ（GET）は優先
   if (e && e.parameter) {
-    Object.keys(e.parameter).forEach(function (key) {
+    Object.keys(e.parameter).forEach(key => {
       const value = e.parameter[key];
       data[key] = Array.isArray(value) ? value[0] : value;
     });
   }
 
+  // ★ POST 本体がある場合（text/plainでもJSONとして扱う）
   if (e && e.postData) {
-    const rawBody = (e.postData.contents || '').trim() ||
-      (typeof e.postData.getDataAsString === 'function' ? e.postData.getDataAsString() : '');
+    let raw = '';
 
-    if (rawBody) {
-      try {
-        const parsed = JSON.parse(rawBody);
-        Object.keys(parsed || {}).forEach(function (key) {
-          data[key] = parsed[key];
-        });
-      } catch (error) {
-        try {
-          const params = new URLSearchParams(rawBody);
-          params.forEach(function (value, key) {
-            data[key] = value;
-          });
-        } catch (parseError) {
-          data.rawBody = rawBody;
-          throw new Error('リクエストの解析に失敗しました。');
-        }
-      }
+    if (e.postData.contents) {
+      raw = e.postData.contents;
+    } else if (typeof e.postData.getDataAsString === 'function') {
+      raw = e.postData.getDataAsString();
+    }
+
+    raw = (raw || '').trim();
+    if (!raw) return data;
+
+    // ★ JSONとして確実にパース（破壊しない）
+    try {
+      const json = JSON.parse(raw);
+      Object.assign(data, json);
+      return data;
+    } catch (err) {
+      // JSONでない場合は決して破壊しない
+      Logger.log("WARN: Failed JSON parse in parseRequestData: " + err);
+      Logger.log("WARN: Raw POST body = " + raw);
+      return data;
     }
   }
 
