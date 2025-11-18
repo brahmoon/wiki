@@ -891,15 +891,27 @@ function parseRequestData(e) {
     });
   }
 
-  if (e && e.postData && e.postData.contents) {
-    try {
-      const parsed = JSON.parse(e.postData.contents);
-      Object.keys(parsed || {}).forEach(function (key) {
-        data[key] = parsed[key];
-      });
-    } catch (error) {
-      data.rawBody = e.postData.contents;
-      throw new Error('リクエストの解析に失敗しました。');
+  if (e && e.postData) {
+    const rawBody = (e.postData.contents || '').trim() ||
+      (typeof e.postData.getDataAsString === 'function' ? e.postData.getDataAsString() : '');
+
+    if (rawBody) {
+      try {
+        const parsed = JSON.parse(rawBody);
+        Object.keys(parsed || {}).forEach(function (key) {
+          data[key] = parsed[key];
+        });
+      } catch (error) {
+        try {
+          const params = new URLSearchParams(rawBody);
+          params.forEach(function (value, key) {
+            data[key] = value;
+          });
+        } catch (parseError) {
+          data.rawBody = rawBody;
+          throw new Error('リクエストの解析に失敗しました。');
+        }
+      }
     }
   }
 
