@@ -677,46 +677,29 @@
             return url.toString();
         };
 
-        const resolveUserIdentity = () => {
+        const buildUserIdentityContext = () => {
             const storedState = getStoredLoginState();
-            const storedUser = storedState?.user;
-            const fallbackUser = state.user;
-            const baseUser = storedUser || fallbackUser || {};
-            const resolvedEmail = (baseUser.email || '').toString().trim();
-            const resolvedGoogleEmail = (baseUser.googleEmail || resolvedEmail).toString().trim();
+            const user = storedState?.user || state.user || {};
             return {
-                email: resolvedEmail,
-                googleEmail: resolvedGoogleEmail,
+                email: user.email || '',
+                googleEmail: user.email || '',
+                playerId: user.playerId || '',
+                origin: window.location.origin,
             };
         };
 
         const buildUserSettingsPayload = (payload = {}) => {
-            const identity = resolveUserIdentity();
+            const context = buildUserIdentityContext();
+            const sanitized = {};
 
-            // identity.email/googleEmail が Object だった場合に破壊されるのを防ぐためのガード
-            const safeNormalize = (value) => {
-                if (!value) return '';
-                if (typeof value === 'object') return '';
-                return value.toString().trim();
-            };
+            Object.keys(context).forEach((key) => {
+                const value = context[key];
+                if (value !== undefined && value !== null && value !== '') {
+                    sanitized[key] = value;
+                }
+            });
 
-            // payload.email が空 → identity.email を採用するが Object の場合は無視
-            const normalizedEmail = safeNormalize(payload.email) || safeNormalize(identity.email);
-            const normalizedGoogleEmail =
-                safeNormalize(payload.googleEmail) ||
-                safeNormalize(identity.googleEmail) ||
-                normalizedEmail;
-
-            const resolvedIdentity = {};
-
-            if (normalizedEmail) {
-                resolvedIdentity.email = normalizedEmail;
-            }
-            if (normalizedGoogleEmail) {
-                resolvedIdentity.googleEmail = normalizedGoogleEmail;
-            }
-
-            return { ...payload, ...resolvedIdentity };
+            return { ...sanitized, ...(payload || {}) };
         };
 
         const callUserSettingsApi = async (payload) => {
@@ -1114,14 +1097,14 @@
                     email: storedLoginIdentity?.user?.email || '',
                     googleEmail: storedLoginIdentity?.user?.googleEmail || '',
                 });
-                const payload = {
+                const payload = buildUserSettingsPayload({
                     action: 'autoApproveEditorRequest',
                     code: rawCode,
-                    playerId: stripPendingPrefix(state.user?.playerId || ''),
+                    playerId: state.user?.playerId || '',
                     charId: requestedCharId,
-                    currentPlayerId: stripPendingPrefix(state.user?.playerId || ''),
-                };
-                const resolvedPayload = buildUserSettingsPayload(payload);
+                    currentPlayerId: state.user?.playerId || '',
+                });
+                const resolvedPayload = payload;
                 console.log('DEBUG: email/googleEmail in request payload =', {
                     email: resolvedPayload.email || '',
                     googleEmail: resolvedPayload.googleEmail || '',
