@@ -195,9 +195,7 @@ function runAdminVerification(sheet, request) {
 }
 
 function fallbackVerifyAdminAccess(sheet, request) {
-  const normalizedGoogleEmail = normalizeId(request && request.googleEmail);
-  const normalizedEmail = normalizeId(request && request.email);
-  const lookupEmail = normalizedGoogleEmail || normalizedEmail;
+  const lookupEmail = (request && (request.googleEmail || request.email)) || '';
 
   if (!lookupEmail) {
     return {
@@ -259,10 +257,10 @@ function verifyRequestAccessToEmail(request, account) {
     return { success: true, emailMatchesLogin: true };
   }
 
-  const normalizedAccountEmail = normalizeId(account && account.email);
-  const normalizedRequestEmail = normalizeId(request.googleEmail || request.email);
+  const accountEmail = account && account.email;
+  const requestEmail = request.googleEmail || request.email;
 
-  if (!normalizedRequestEmail) {
+  if (!requestEmail) {
     return {
       success: false,
       message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
@@ -271,7 +269,7 @@ function verifyRequestAccessToEmail(request, account) {
     };
   }
 
-  if (normalizedAccountEmail && normalizedAccountEmail === normalizedRequestEmail) {
+  if (accountEmail && accountEmail === requestEmail) {
     return { success: true, emailMatchesLogin: true };
   }
 
@@ -339,7 +337,7 @@ function handleListMembers(sheet, request) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const normalizedSearch = (request.search || '').toString().trim().toLowerCase();
+  const searchTerm = (request.search || '').toString();
   const matches = [];
 
   const columns = CONFIG.COLUMNS;
@@ -355,21 +353,21 @@ function handleListMembers(sheet, request) {
       updatedAt: formatDateValue(getColumnValue(row, columns.updatedAt)),
     };
 
-    if (!normalizedSearch) {
+    if (!searchTerm) {
       matches.push(record);
       return;
     }
 
     const haystacks = [record.playerId, record.username, record.email]
       .map(function (value) {
-        return (value || '').toString().trim().toLowerCase();
+        return value === null || value === undefined ? '' : value.toString();
       })
       .filter(function (value) {
-        return value;
+        return value !== '';
       });
 
     if (haystacks.some(function (value) {
-      return value.indexOf(normalizedSearch) !== -1;
+      return value.indexOf(searchTerm) !== -1;
     })) {
       matches.push(record);
     }
@@ -471,7 +469,7 @@ function handleUpdateUserSettings(sheet, request) {
     updatedValues[columns.username - 1] = normalizedUsername;
   }
   if (columns.email) {
-    updatedValues[columns.email - 1] = request.email ? request.email.toString().trim() : record.email;
+    updatedValues[columns.email - 1] = request.email ? request.email : record.email;
   }
   if (columns.kingdom) {
     updatedValues[columns.kingdom - 1] = kingdomValue;
@@ -504,7 +502,7 @@ function handleRegisterUser(sheet, request) {
     return adminVerification;
   }
 
-  const email = (request.email || '').toString().trim();
+  const email = request.email || '';
   if (!email) {
     return {
       success: false,
@@ -512,11 +510,10 @@ function handleRegisterUser(sheet, request) {
     };
   }
 
-  const normalizedGoogleEmail = normalizeId(request.googleEmail);
-  const normalizedEmail = normalizeId(email);
+  const googleEmail = request.googleEmail || '';
 
   if (!(adminVerification && adminVerification.success)) {
-    if (!normalizedGoogleEmail) {
+    if (!googleEmail) {
       return {
         success: false,
         message: 'Googleアカウントのメールアドレスが確認できませんでした。再度ログインしてください。',
@@ -524,7 +521,7 @@ function handleRegisterUser(sheet, request) {
       };
     }
 
-    if (normalizedEmail && normalizedGoogleEmail && normalizedEmail !== normalizedGoogleEmail) {
+    if (email && googleEmail && email !== googleEmail) {
       return {
         success: false,
         message: 'Googleアカウントと異なるメールアドレスは登録できません。',
@@ -541,7 +538,7 @@ function handleRegisterUser(sheet, request) {
     };
   }
 
-  const playerId = (request.playerId || '').toString().trim();
+  const playerId = request.playerId || '';
 
   const existingAccount = findAccount(sheet, {
     playerId: playerId,
@@ -607,7 +604,7 @@ function handleRequestEditorAccess(sheet, request) {
     return adminVerification;
   }
 
-  const desiredPlayerId = sanitizePlayerId(request.requestedPlayerId || request.playerId);
+  const desiredPlayerId = request.requestedPlayerId || request.playerId;
   if (!desiredPlayerId) {
     return {
       success: false,
@@ -730,11 +727,9 @@ function handleCancelEditorRequest(sheet, request) {
 }
 
 function handleAutoApproveEditorRequest(sheet, request) {
-  debugAutoApprove(request, sheet); // これは今あるやつそのままでもOK
-
-  const normalizedCurrentPlayerId = String(request.currentPlayerId || request.playerId || '');
+  const currentPlayerId = request.currentPlayerId || request.playerId || '';
   const lookupIdentifiers = {
-    playerId: normalizedCurrentPlayerId,
+    playerId: currentPlayerId,
     email: request.email || request.googleEmail || '',
   };
 
@@ -742,30 +737,13 @@ function handleAutoApproveEditorRequest(sheet, request) {
   let emailLookupPlayerId = '';
   let pendingPlayerId = '';
   let emailMatchesLogin = false;
-  let lookupEmail = normalizeId(lookupIdentifiers.email);
-
-  const sanitizedReceivedPlayerId = sanitizePlayerId(
-    request.playerId || request.currentPlayerId || ''
-  );
-  const playerIdMatchCell = findMatchingPlayerIdCell(sheet, sanitizedReceivedPlayerId);
-
+  const lookupEmail = lookupIdentifiers.email || '';
   const record = findAccount(sheet, lookupIdentifiers);
   const recordEmailValue = record ? record.email || '' : '';
-
-  // ★ここで共通コンテキストを作っておく
-  const contextBase = {
-    requestSnapshot: request,
-    lookupIdentifiers,
-    sheetHasRecord: !!record,
-    recordSnapshot: record ? {
-      rowNumber: record.rowNumber,
-      playerId: record.playerId,
-      email: record.email,
-      authority: record.authority
-    } : null,
-    sanitizedReceivedPlayerId,
-    playerIdMatchCell,
-    lookupEmail,
+  const debugInfo = {
+    backendEmailSearchTarget: lookupIdentifiers.email || '',
+    backendFoundEmail: recordEmailValue,
+    backendReceivedPlayerId: request.playerId || request.currentPlayerId || '',
   };
 
   if (!record) {
@@ -780,18 +758,16 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, contextBase);
   }
 
-  const sanitizedCodePlayerId = String(sanitizePlayerId(request.playerId || '') || '');
-  const sanitizedCharId = String(sanitizePlayerId(request.charId || '') || '');
+  const codePlayerId = request.playerId || '';
+  const charId = request.charId || '';
   const parsedCode = parseAuthorizationCodeValue(request.code);
-  const parsedCodePlayerId = String(sanitizePlayerId(parsedCode.playerId || '') || '');
-
+  const parsedCodePlayerId = parsedCode.playerId || '';
   const columns = CONFIG.COLUMNS || {};
   const updatedValues = record.values.slice();
   const currentPlayerIdValue = columns.playerId ? updatedValues[columns.playerId - 1] : '';
-
-  emailLookupPlayerId = String(sanitizePlayerId(record.playerId || currentPlayerIdValue) || '');
-  pendingPlayerId = String(sanitizePlayerId(stripPendingPlayerId(currentPlayerIdValue)) || '');
-  pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === sanitizedCodePlayerId;
+  emailLookupPlayerId = record.playerId || currentPlayerIdValue || '';
+  pendingPlayerId = currentPlayerIdValue || '';
+  pendingPlayerIdMatches = Boolean(pendingPlayerId) && pendingPlayerId === codePlayerId;
 
   const context = Object.assign({}, contextBase, {
     sanitizedCodePlayerId,
@@ -816,8 +792,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }), context);
   }
 
-  if (!sanitizedCodePlayerId || !sanitizedCharId || !parsedCodePlayerId) {
-    return autoApproveFail('CODE_OR_CHARID_EMPTY', {
+  if (!codePlayerId || !charId || !parsedCodePlayerId) {
+    return {
+      success: false,
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -828,8 +805,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, context);
   }
 
-  if (parsedCodePlayerId && parsedCodePlayerId !== sanitizedCodePlayerId) {
-    return autoApproveFail('CODE_PLAYERID_MISMATCH', {
+  if (parsedCodePlayerId && parsedCodePlayerId !== codePlayerId) {
+    return {
+      success: false,
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -840,8 +818,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, context);
   }
 
-  if (sanitizedCharId !== sanitizedCodePlayerId) {
-    return autoApproveFail('CHARID_MISMATCH', {
+  if (charId !== codePlayerId) {
+    return {
+      success: false,
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -864,8 +843,9 @@ function handleAutoApproveEditorRequest(sheet, request) {
     }, context);
   }
 
-  if (!pendingPlayerId || pendingPlayerId !== sanitizedCodePlayerId) {
-    return autoApproveFail('PENDING_PLAYERID_MISMATCH', {
+  if (!pendingPlayerIdMatches) {
+    return {
+      success: false,
       message: '承認情報に不整合があります。',
       pendingPlayerIdMatches,
       emailLookupPlayerId,
@@ -878,7 +858,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
 
   // ★ここに到達したら成功確定
   if (columns.playerId) {
-    updatedValues[columns.playerId - 1] = sanitizedCodePlayerId;
+    updatedValues[columns.playerId - 1] = codePlayerId;
   }
   if (columns.authority) {
     updatedValues[columns.authority - 1] = EDITOR_AUTHORITY_VALUE;
@@ -892,7 +872,7 @@ function handleAutoApproveEditorRequest(sheet, request) {
 
   return autoApproveSuccess({
     message: '申請を承認しました。',
-    playerId: columns.playerId ? updatedValues[columns.playerId - 1] || sanitizedCodePlayerId : sanitizedCodePlayerId,
+    playerId: columns.playerId ? updatedValues[columns.playerId - 1] || codePlayerId : codePlayerId,
     kingdom: columns.kingdom ? updatedValues[columns.kingdom - 1] || '' : '',
     authority: EDITOR_AUTHORITY_VALUE,
     pendingPlayerIdMatches,
@@ -910,8 +890,8 @@ function findMatchingPlayerIdCell(sheet, playerId) {
     return '';
   }
 
-  const sanitizedTarget = sanitizePlayerId(playerId);
-  if (!sanitizedTarget) {
+  const target = playerId;
+  if (!target) {
     return '';
   }
 
@@ -927,8 +907,7 @@ function findMatchingPlayerIdCell(sheet, playerId) {
 
   for (let i = 0; i < values.length; i++) {
     const cellValue = values[i][0];
-    const normalizedCellValue = sanitizePlayerId(stripPendingPlayerId(cellValue));
-    if (normalizedCellValue && normalizedCellValue === sanitizedTarget) {
+    if (cellValue === target) {
       return cellValue || '';
     }
   }
@@ -943,15 +922,17 @@ function parseRequest(e) {
     search: data.search || data.query || '',
     limit: parsePositiveInteger(data.limit),
     offset: parsePositiveInteger(data.offset),
-    playerId: data.playerId || data.loginId || data.email || '',
+    playerId: data.playerId || '',
     currentPlayerId: data.currentPlayerId || '',
     requestedPlayerId: data.requestedPlayerId || data.pendingPlayerId || '',
     email: data.email || '',
-    googleEmail: data.googleEmail || data.googleAccountEmail || data.email || '',
+    googleEmail: data.googleEmail || data.googleAccountEmail || '',
     adminToken: data.adminToken || data.adminSessionToken || data.token || '',
     username: data.username || data.name || '',
     kingdom: data.kingdom,
     language: data.language,
+    charId: data.charId || '',
+    code: data.code || '',
   };
 }
 
@@ -1080,12 +1061,11 @@ function sanitizeAuthority(value) {
 }
 
 function isPendingPlayerIdValue(value) {
-  return typeof value === 'string' && value.toString().trim().indexOf('!') === 0;
+  return typeof value === 'string' && value.indexOf('!') === 0;
 }
 
 function buildPendingPlayerId(value) {
-  const sanitized = sanitizePlayerId(value);
-  return sanitized ? '!' + sanitized : '!';
+  return '!' + (value === null || value === undefined ? '' : value);
 }
 
 function parseAuthorizationCodeValue(code) {
@@ -1095,7 +1075,7 @@ function parseAuthorizationCodeValue(code) {
     };
   }
 
-  const stringValue = code.toString().trim();
+  const stringValue = code.toString();
   if (!stringValue) {
     return {
       playerId: '',
@@ -1106,25 +1086,13 @@ function parseAuthorizationCodeValue(code) {
     const decodedBytes = Utilities.base64Decode(stringValue);
     const decodedText = Utilities.newBlob(decodedBytes).getDataAsString('UTF-8');
     return {
-      playerId: sanitizePlayerId(decodedText),
+      playerId: decodedText,
     };
   } catch (error) {
     return {
       playerId: '',
     };
   }
-}
-
-function normalizeId(value) {
-  let v = String(value || '').trim();
-
-  if (v.normalize) {
-    v = v.normalize('NFKC');
-  }
-
-  v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
-
-  return v.toLowerCase();
 }
 
 function findAccount(sheet, identifiers) {
@@ -1138,23 +1106,18 @@ function findAccount(sheet, identifiers) {
   const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
   const values = range.getValues();
 
-  const normalizedPlayerId = normalizeId(identifiers.playerId);
-  const normalizedSanitizedPlayerId = normalizeId(sanitizePlayerId(identifiers.playerId));
-  const normalizedEmail = normalizeId(identifiers.email);
   const columns = CONFIG.COLUMNS;
 
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
     const rawRowPlayerId = columns.playerId ? row[columns.playerId - 1] : '';
-    const rowPlayerId = normalizeId(rawRowPlayerId);
-    const rowSanitizedPlayerId = normalizeId(sanitizePlayerId(rawRowPlayerId));
-    const rowEmail = columns.email ? normalizeId(row[columns.email - 1]) : '';
+    const rowEmail = columns.email ? row[columns.email - 1] : '';
 
-    const playerMatch = normalizedPlayerId && rowPlayerId && rowPlayerId === normalizedPlayerId;
-    const sanitizedPlayerMatch = normalizedSanitizedPlayerId && rowSanitizedPlayerId && rowSanitizedPlayerId === normalizedSanitizedPlayerId;
-    const emailMatch = normalizedEmail && rowEmail && rowEmail === normalizedEmail;
+    const playerMatch =
+      identifiers.playerId !== undefined && identifiers.playerId !== null && rawRowPlayerId === identifiers.playerId;
+    const emailMatch = identifiers.email && rowEmail && rowEmail === identifiers.email;
 
-    if (playerMatch || sanitizedPlayerMatch || emailMatch) {
+    if (playerMatch || emailMatch) {
       return {
         rowNumber: firstDataRow + i,
         values: row,
