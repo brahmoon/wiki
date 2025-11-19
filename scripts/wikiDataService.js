@@ -36,12 +36,13 @@ function fetchWithoutPreflight(url, options = {}, timeout = DEFAULT_TIMEOUT) {
 }
 
 export class WikiDataService {
-  constructor({ endpoint, timeout = DEFAULT_TIMEOUT } = {}) {
+  constructor({ endpoint, timeout = DEFAULT_TIMEOUT, resolveCredentials = null } = {}) {
     if (!endpoint) {
       throw new Error('WikiDataService requires an endpoint URL');
     }
     this.endpoint = endpoint;
     this.timeout = timeout;
+    this.resolveCredentials = typeof resolveCredentials === 'function' ? resolveCredentials : null;
   }
 
   async getPages() {
@@ -92,9 +93,22 @@ export class WikiDataService {
   }
 
   async #apiCall(action, data = {}) {
+    let credentials = {};
+    if (this.resolveCredentials) {
+      try {
+        const resolved = this.resolveCredentials() || {};
+        if (resolved && typeof resolved === 'object') {
+          credentials = resolved;
+        }
+      } catch (error) {
+        console.warn('Failed to resolve WikiDataService credentials:', error);
+      }
+    }
+
     const payload = {
       action,
       origin: typeof window !== 'undefined' && window.location ? window.location.origin : '',
+      ...credentials,
       ...data,
     };
 

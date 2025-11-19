@@ -18,12 +18,49 @@
             color: #37352f;
         }
 
+        body.blocked-user {
+            overflow: hidden;
+        }
+
+        .blocked-warning-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 32px;
+            z-index: 1000;
+        }
+
+        .blocked-warning-overlay[hidden] {
+            display: none;
+        }
+
+        .blocked-warning-title {
+            font-size: 28px;
+            margin-bottom: 16px;
+            color: #c62828;
+        }
+
+        .blocked-warning-message {
+            font-size: 18px;
+            color: #c62828;
+            line-height: 1.6;
+        }
+
         .app-container {
             display: grid;
             grid-template-columns: 280px 1fr;
             min-height: 100vh;
             width: 100vw;
             transition: grid-template-columns 0.3s ease;
+        }
+
+        .app-container[hidden] {
+            display: none !important;
         }
 
         .app-container.sidebar-closed {
@@ -1330,6 +1367,10 @@
     </style>
 </head>
 <body>
+    <div id="blocked-warning" class="blocked-warning-overlay" role="alert" hidden>
+        <div class="blocked-warning-title">アクセスが制限されています</div>
+        <div class="blocked-warning-message">このアカウントには編集権限がありません</div>
+    </div>
     <div class="app-container" id="appContainer">
         <aside class="sidebar" id="pageSidebar">
             <div class="sidebar-header">
@@ -1684,6 +1725,7 @@
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
         const ADMIN_AUTHORITY_VALUE = 99;
         const EDITOR_AUTHORITY_VALUE = 2;
+        const BLOCKED_AUTHORITY_VALUE = -1;
 
         const DRIVE_IMAGE_PERMISSION_DEBUG = true;
 
@@ -1736,6 +1778,9 @@
         const pageMetaToggle = document.getElementById('page-meta-toggle');
         const pageMetaFields = document.getElementById('page-meta-fields');
         const pageMetaMobileMedia = window.matchMedia('(max-width: 600px)');
+        const blockedWarningOverlay = document.getElementById('blocked-warning');
+        const appContainerElement = document.getElementById('appContainer');
+        let isBlockedEditorUser = false;
 
         const applyPageMetaLayout = (isMobile) => {
             if (!pageMetaToggle || !pageMetaFields) {
@@ -2044,6 +2089,9 @@
                 return true;
             }
             const authorityValue = parseAuthority(user.authority);
+            if (authorityValue === BLOCKED_AUTHORITY_VALUE) {
+                return false;
+            }
             if (authorityValue === null) {
                 return true;
             }
@@ -2053,6 +2101,28 @@
         function redirectToAuthorizePage() {
             const targetPage = state.currentPageId || initialPageIdFromQuery || '';
             window.location.replace(buildAuthorizeUrl(targetPage));
+        }
+
+        function setBlockedUserState(isBlocked) {
+            isBlockedEditorUser = Boolean(isBlocked);
+            if (blockedWarningOverlay) {
+                blockedWarningOverlay.hidden = !isBlocked;
+                blockedWarningOverlay.setAttribute('aria-hidden', isBlocked ? 'false' : 'true');
+            }
+
+            if (appContainerElement) {
+                if (isBlocked) {
+                    appContainerElement.setAttribute('aria-hidden', 'true');
+                    appContainerElement.hidden = true;
+                } else {
+                    appContainerElement.hidden = false;
+                    appContainerElement.removeAttribute('aria-hidden');
+                }
+            }
+
+            if (document.body) {
+                document.body.classList.toggle('blocked-user', Boolean(isBlocked));
+            }
         }
 
         let driveImageExtensionInstance = null;
@@ -2283,15 +2353,36 @@
 
         const updateLoginUI = () => {
             const loginState = getStoredLoginState();
+            const authorityValue = parseAuthority(loginState?.user?.authority);
+            const isBlockedUser = authorityValue === BLOCKED_AUTHORITY_VALUE;
+            setBlockedUserState(isBlockedUser);
             const displayName = getDisplayName(loginState?.user);
 
             if (displayName) {
+                if (isBlockedUser) {
+                    loginStatusText.textContent = 'このアカウントには編集権限がありません';
+                    loginButton.hidden = true;
+                    logoutButton.hidden = false;
+                    settingsButton.hidden = true;
+                    settingsButton.disabled = true;
+                    if (wikiSettingsButton) {
+                        wikiSettingsButton.hidden = true;
+                        wikiSettingsButton.disabled = true;
+                    }
+                    userSettingsState.data = null;
+                    userSettingsState.playerId = null;
+                    setEditorPlayerId('');
+                    if (userSettingsState.isOpen) {
+                        closeUserSettingsDialog();
+                    }
+                    return;
+                }
+
                 loginStatusText.textContent = `${displayName} としてログイン中`;
                 loginButton.hidden = true;
                 logoutButton.hidden = false;
                 settingsButton.hidden = false;
                 settingsButton.disabled = false;
-                const authorityValue = parseAuthority(loginState?.user?.authority);
                 const isAdmin = authorityValue !== null && authorityValue >= ADMIN_AUTHORITY_VALUE;
                 if (wikiSettingsButton) {
                     wikiSettingsButton.hidden = !isAdmin;
@@ -2603,7 +2694,13 @@
           driveImage: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE
         };
 
-        const dataService = new WikiDataService({ endpoint: APPS_SCRIPT_ENDPOINT_WIKI });
+        const dataService = new WikiDataService({
+            endpoint: APPS_SCRIPT_ENDPOINT_WIKI,
+            resolveCredentials: () => {
+                const playerId = getEditorPlayerId();
+                return playerId ? { playerId } : {};
+            }
+        });
         const PAGE_LINK_CACHE_KEY = 'wiki.pageLinkCache';
 
         const elements = {
@@ -2642,6 +2739,15 @@
             pageLinkSuggestions: document.getElementById('page-link-suggestions'),
             pageLinkCancel: document.getElementById('page-link-cancel')
         };
+
+        function ensureEditorAccess(actionDescription = '操作') {
+            if (!isBlockedEditorUser) {
+                return true;
+            }
+            console.warn(`Blocked user attempted to ${actionDescription}.`);
+            setStatus('このアカウントには編集権限がありません', 'error');
+            return false;
+        }
 
         function applyToolbarConfigStates(states) {
             const defaults = createDefaultToolbarConfigStates();
@@ -4281,6 +4387,9 @@
         }
 
         async function loadPages(selectId, options = {}) {
+            if (!ensureEditorAccess('ページ一覧を読み込む')) {
+                return;
+            }
             const {
                 prefetchedPage = null,
                 updateHistory: shouldUpdateHistory = true
@@ -4312,6 +4421,9 @@
         }
 
         async function navigateToPage(id, { updateHistory: shouldUpdateHistory = true, prefetchedPage = null } = {}) {
+            if (!ensureEditorAccess('ページを開く')) {
+                return;
+            }
             if (!id) return;
             if (state.isNewPage && state.currentPageId === id) {
                 renderTree();
@@ -4377,6 +4489,9 @@
         }
 
         async function saveCurrentPage() {
+            if (!ensureEditorAccess('ページを保存する')) {
+                return;
+            }
             let slugInput = normalizeSlug(elements.pageName.value || '');
             const titleInput = elements.pageTitle.value.trim();
             if (!slugInput) {
@@ -4456,6 +4571,9 @@
         }
 
         function createNewPage(parentId = null) {
+            if (!ensureEditorAccess('新規ページを作成する')) {
+                return;
+            }
             if (state.isNewPage && state.currentPageId) {
                 removeNode(state.currentPageId);
             }
@@ -4725,6 +4843,9 @@
         }
 
         async function initialize() {
+            if (!ensureEditorAccess('Wikiエディタを初期化する')) {
+                return;
+            }
             const initialPageId = getPageIdFromQuery();
             let prefetchedPage = null;
 
