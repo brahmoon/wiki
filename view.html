@@ -83,6 +83,83 @@
       flex: 1;
     }
 
+    .settings-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .settings-overlay.visible {
+      display: flex;
+    }
+
+    .settings-dialog {
+      width: min(420px, 90vw);
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 24px 64px rgba(15, 23, 42, 0.25);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .settings-dialog h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .settings-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .settings-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .settings-field label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #55534e;
+    }
+
+    .settings-field input,
+    .settings-field select {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #d3d2ce;
+      font-size: 14px;
+    }
+
+    .settings-message {
+      font-size: 13px;
+      color: #6b6b67;
+      min-height: 18px;
+    }
+
+    .settings-message.error {
+      color: #c0352b;
+    }
+
+    .settings-message.success {
+      color: #0f7b6c;
+    }
+
+    .settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
     .sidebar-list,
     .sidebar-sublist {
       list-style: none;
@@ -715,6 +792,7 @@
           <div class="login-actions">
             <button id="sidebarLoginButton" class="btn btn-primary" type="button">ログイン</button>
             <button id="sidebarLogoutButton" class="btn" type="button" hidden>ログアウト</button>
+            <button id="sidebarSettingsButton" class="btn btn-secondary" type="button" hidden>設定</button>
           </div>
         </div>
       </div>
@@ -743,6 +821,33 @@
     </div>
   </div>
   <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
+  <div id="user-settings-overlay" class="settings-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="settings-dialog" role="document">
+      <h2>ユーザー設定</h2>
+      <form id="user-settings-form" class="settings-form">
+        <div class="settings-field">
+          <label for="settings-username">ユーザーネーム</label>
+          <input id="settings-username" name="username" type="text" autocomplete="name" required />
+        </div>
+        <div class="settings-field">
+          <label for="settings-kingdom">所属王国</label>
+          <input id="settings-kingdom" name="kingdom" type="number" inputmode="numeric" pattern="\\d*" min="0" step="1" placeholder="0" />
+        </div>
+        <div class="settings-field">
+          <label for="settings-language">言語</label>
+          <select id="settings-language" name="language">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div id="user-settings-message" class="settings-message" aria-live="polite"></div>
+        <div class="settings-actions">
+          <button id="user-settings-cancel" class="btn" type="button">キャンセル</button>
+          <button id="user-settings-submit" class="btn btn-primary" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script type="module">
     import {
@@ -755,8 +860,12 @@
     } from './scripts/heroSkillsetService.js';
     const DEFAULT_TIMEOUT = 25000;
     const LOGIN_STORAGE_KEY = 'wikiLoginState';
+    const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
+    const VIEWER_AUTHORITY_VALUE = 1;
+    const BLOCKED_AUTHORITY_VALUE = -1;
 
     const APPS_SCRIPT_ENDPOINT_WIKI = window.APPS_SCRIPT_ENDPOINT_WIKI;
+    const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
 
     const heroSkillsetInfoPopup = createHeroSkillsetInfoPopup();
 
@@ -1201,7 +1310,17 @@
       statusText: document.getElementById('sidebarLoginStatusText'),
       loginButton: document.getElementById('sidebarLoginButton'),
       logoutButton: document.getElementById('sidebarLogoutButton'),
+      settingsButton: document.getElementById('sidebarSettingsButton'),
     };
+
+    const userSettingsOverlay = document.getElementById('user-settings-overlay');
+    const userSettingsForm = document.getElementById('user-settings-form');
+    const settingsUsernameInput = document.getElementById('settings-username');
+    const settingsKingdomInput = document.getElementById('settings-kingdom');
+    const settingsLanguageSelect = document.getElementById('settings-language');
+    const userSettingsMessage = document.getElementById('user-settings-message');
+    const userSettingsCancel = document.getElementById('user-settings-cancel');
+    const userSettingsSubmit = document.getElementById('user-settings-submit');
 
     const normalizePageId = (pageId) => {
       const trimmed = (pageId || '').trim();
@@ -1209,6 +1328,16 @@
     };
 
     let currentPageId = getPageIdFromQuery();
+
+    const userSettingsState = {
+      isOpen: false,
+      isSaving: false,
+      isLoading: false,
+      playerId: null,
+      data: null,
+    };
+
+    let lastLoginIdentifier = null;
 
     function getStoredLoginState() {
       try {
@@ -1237,6 +1366,147 @@
         return email;
       }
       return '';
+    }
+
+    function resolveAdminToken(loginState) {
+      const directToken = (loginState?.adminToken || loginState?.user?.adminToken || '').toString().trim();
+      if (directToken) {
+        return directToken;
+      }
+
+      if (typeof window !== 'undefined' && 'sessionStorage' in window) {
+        const possibleKeys = ['wikiAdminToken', 'wikiAdminSession'];
+        for (const key of possibleKeys) {
+          let storedValue = null;
+          try {
+            storedValue = window.sessionStorage.getItem(key);
+          } catch (error) {
+            console.warn('Failed to access sessionStorage for admin token lookup.', error);
+            break;
+          }
+
+          if (!storedValue) {
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(storedValue);
+            const token = (parsed && (parsed.adminToken || parsed.token)) || '';
+            if (token) {
+              return token.toString().trim();
+            }
+          } catch (parseError) {
+            if (typeof storedValue === 'string' && storedValue.trim()) {
+              return storedValue.trim();
+            }
+          }
+        }
+      }
+
+      return '';
+    }
+
+    function resolveUserIdentity() {
+      const loginState = getStoredLoginState();
+      const user = loginState?.user || {};
+      const identity = {};
+
+      const email = (user.email || '').toString().trim();
+      const googleEmail = (user.googleEmail || email).toString().trim();
+      const adminToken = resolveAdminToken(loginState);
+
+      if (email) {
+        identity.email = email;
+      }
+      if (googleEmail) {
+        identity.googleEmail = googleEmail;
+      }
+      if (adminToken) {
+        identity.adminToken = adminToken;
+      }
+
+      return identity;
+    }
+
+    function buildUserSettingsRequest(basePayload = {}) {
+      const identity = resolveUserIdentity();
+      return Object.assign({}, basePayload || {}, identity);
+    }
+
+    async function callUserSettingsApi(payload) {
+      if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
+        throw new Error('ユーザー設定APIのエンドポイントが設定されていません。');
+      }
+
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), USER_SETTINGS_REQUEST_TIMEOUT);
+      const requestPayload = buildUserSettingsRequest(payload);
+
+      try {
+        const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            'Content-Type': 'text/plain',
+          },
+          body: JSON.stringify(requestPayload),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '');
+          throw new Error(`ユーザー設定の更新に失敗しました (HTTP ${response.status})${errorText ? `: ${errorText}` : ''}`);
+        }
+
+        const result = await response.json().catch(() => null);
+        if (!result) {
+          throw new Error('ユーザー設定の応答解析に失敗しました。');
+        }
+
+        return result;
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw new Error('ユーザー設定のリクエストがタイムアウトしました。');
+        }
+        if (error instanceof TypeError) {
+          throw new Error('ユーザー設定サービスに接続できませんでした。ネットワークまたはCORS設定を確認してください。');
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    function updateStoredLoginStateUser(updates) {
+      if (!updates || typeof updates !== 'object') {
+        return null;
+      }
+      const stored = getStoredLoginState();
+      if (!stored?.user) {
+        return null;
+      }
+      const updatedState = {
+        ...stored,
+        user: {
+          ...stored.user,
+          ...updates,
+        },
+      };
+      localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(updatedState));
+      return updatedState;
+    }
+
+    function sanitizeLanguage(value) {
+      return value === 'en' ? 'en' : 'ja';
+    }
+
+    function parseAuthority(value) {
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
     }
 
     async function revokeAccessToken(token) {
@@ -1271,16 +1541,248 @@
       }
     }
 
+    function setUserSettingsMessage(message, type = '') {
+      if (!userSettingsMessage) {
+        return;
+      }
+      userSettingsMessage.textContent = message || '';
+      userSettingsMessage.classList.remove('error', 'success');
+      if (type) {
+        userSettingsMessage.classList.add(type);
+      }
+    }
+
+    function fillUserSettingsForm(settings) {
+      const storedState = getStoredLoginState();
+      const storedUser = storedState?.user || {};
+      const effectiveSettings = {
+        username: settings?.username ?? storedUser.username ?? storedUser.name ?? '',
+        kingdom: settings?.kingdom ?? storedUser.kingdom ?? '',
+        language: sanitizeLanguage(settings?.language || storedUser.language || 'ja'),
+      };
+
+      if (settingsUsernameInput) {
+        settingsUsernameInput.value = effectiveSettings.username || '';
+      }
+      if (settingsKingdomInput) {
+        settingsKingdomInput.value = effectiveSettings.kingdom != null ? effectiveSettings.kingdom : '';
+      }
+      if (settingsLanguageSelect) {
+        settingsLanguageSelect.value = sanitizeLanguage(effectiveSettings.language);
+      }
+    }
+
+    function openUserSettingsDialog() {
+      if (!userSettingsOverlay) {
+        return;
+      }
+      const loginState = getStoredLoginState();
+      if (!loginState?.user) {
+        handleLoginClick();
+        return;
+      }
+      const authorityValue = parseAuthority(loginState.user.authority);
+      if (
+        authorityValue === null ||
+        authorityValue < VIEWER_AUTHORITY_VALUE ||
+        authorityValue === BLOCKED_AUTHORITY_VALUE
+      ) {
+        return;
+      }
+      fillUserSettingsForm(userSettingsState.data);
+      setUserSettingsMessage('');
+      userSettingsOverlay.classList.add('visible');
+      userSettingsOverlay.setAttribute('aria-hidden', 'false');
+      userSettingsState.isOpen = true;
+      window.setTimeout(() => {
+        settingsUsernameInput?.focus();
+      }, 0);
+    }
+
+    function closeUserSettingsDialog() {
+      if (!userSettingsOverlay) {
+        return;
+      }
+      userSettingsOverlay.classList.remove('visible');
+      userSettingsOverlay.setAttribute('aria-hidden', 'true');
+      userSettingsState.isOpen = false;
+      if (userSettingsState.isSaving) {
+        userSettingsState.isSaving = false;
+        userSettingsSubmit?.removeAttribute('disabled');
+      }
+    }
+
+    async function fetchAndApplyUserSettings(playerId, email, fallbackName) {
+      if (!playerId && !email) {
+        return;
+      }
+      if (userSettingsState.isLoading) {
+        return;
+      }
+      userSettingsState.isLoading = true;
+      try {
+        const result = await callUserSettingsApi(
+          buildUserSettingsRequest({
+            action: 'getUserSettings',
+            playerId: playerId || '',
+            email: email || '',
+          })
+        );
+
+        if (!result.success) {
+          throw new Error(result.message || 'ユーザー設定の取得に失敗しました。');
+        }
+
+        const settings = {
+          playerId: result.playerId || playerId || '',
+          username: result.username || fallbackName || '',
+          email: result.email || email,
+          kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : '',
+          language: sanitizeLanguage((result.language || '').trim().toLowerCase()),
+          authority: parseAuthority(result.authority),
+        };
+
+        userSettingsState.data = settings;
+        userSettingsState.playerId = settings.playerId;
+        if (!userSettingsState.isOpen) {
+          fillUserSettingsForm(settings);
+        }
+        updateStoredLoginStateUser({
+          username: settings.username,
+          playerId: settings.playerId,
+          email: settings.email,
+          kingdom: settings.kingdom,
+          language: settings.language,
+          authority: settings.authority,
+        });
+        updateLoginUI();
+      } catch (error) {
+        console.error('ユーザー設定の取得中にエラーが発生しました。', error);
+        if (userSettingsState.isOpen) {
+          setUserSettingsMessage(error.message || 'ユーザー設定の取得に失敗しました。', 'error');
+        }
+      } finally {
+        userSettingsState.isLoading = false;
+      }
+    }
+
+    function maybeLoadUserSettings(user, fallbackName) {
+      const currentPlayerId = user?.playerId || '';
+      const playerIdentifier = currentPlayerId || user?.email || '';
+      if (playerIdentifier && playerIdentifier !== lastLoginIdentifier) {
+        lastLoginIdentifier = playerIdentifier;
+        fetchAndApplyUserSettings(currentPlayerId, user?.email || '', fallbackName);
+      } else if (!playerIdentifier && lastLoginIdentifier) {
+        lastLoginIdentifier = null;
+      }
+    }
+
+    function resetUserSettingsState() {
+      userSettingsState.data = null;
+      userSettingsState.playerId = null;
+      lastLoginIdentifier = null;
+      if (userSettingsState.isOpen) {
+        closeUserSettingsDialog();
+      }
+      setUserSettingsMessage('');
+    }
+
+    const handleUserSettingsSubmit = async (event) => {
+      event.preventDefault();
+      if (userSettingsState.isSaving) {
+        return;
+      }
+
+      const loginState = getStoredLoginState();
+      const user = loginState?.user;
+      if (!user) {
+        setUserSettingsMessage('ログインが必要です。', 'error');
+        return;
+      }
+
+      const username = (settingsUsernameInput?.value || '').trim();
+      if (!username) {
+        setUserSettingsMessage('ユーザーネームを入力してください。', 'error');
+        settingsUsernameInput?.focus();
+        return;
+      }
+
+      const rawKingdom = (settingsKingdomInput?.value || '').trim();
+      const normalizedKingdom = rawKingdom ? rawKingdom.replace(/[^0-9]/g, '') : '';
+      const language = sanitizeLanguage(settingsLanguageSelect?.value || 'ja');
+
+      userSettingsState.isSaving = true;
+      userSettingsSubmit?.setAttribute('disabled', 'true');
+      setUserSettingsMessage('保存しています...');
+
+      try {
+        const payload = buildUserSettingsRequest({
+          action: 'updateUserSettings',
+          playerId: user.playerId || '',
+          email: user.email || '',
+          username,
+          kingdom: normalizedKingdom,
+          language,
+        });
+
+        const result = await callUserSettingsApi(payload);
+        if (!result.success) {
+          throw new Error(result.message || 'ユーザー設定の保存に失敗しました。');
+        }
+
+        const updatedSettings = {
+          playerId: result.playerId || payload.playerId,
+          username: result.username || username,
+          email: result.email || payload.email,
+          kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : normalizedKingdom,
+          language: sanitizeLanguage((result.language || language).toLowerCase()),
+          authority: parseAuthority(result.authority),
+        };
+
+        userSettingsState.data = updatedSettings;
+        userSettingsState.playerId = updatedSettings.playerId;
+        fillUserSettingsForm(updatedSettings);
+        updateStoredLoginStateUser({
+          username: updatedSettings.username,
+          playerId: updatedSettings.playerId,
+          email: updatedSettings.email,
+          language: updatedSettings.language,
+          kingdom: updatedSettings.kingdom,
+          authority: updatedSettings.authority,
+        });
+        setUserSettingsMessage('保存しました。', 'success');
+        updateLoginUI();
+      } catch (error) {
+        console.error('ユーザー設定の保存中にエラーが発生しました。', error);
+        setUserSettingsMessage(error.message || 'ユーザー設定の保存に失敗しました。', 'error');
+      } finally {
+        userSettingsState.isSaving = false;
+        userSettingsSubmit?.removeAttribute('disabled');
+      }
+    };
+
     function updateLoginUI() {
       const loginState = getStoredLoginState();
-      const displayName = getDisplayName(loginState?.user);
+      const user = loginState?.user;
+      const displayName = getDisplayName(user);
+      const authorityValue = parseAuthority(user?.authority);
+      const isBlockedUser = authorityValue === BLOCKED_AUTHORITY_VALUE;
+      const canUseSettings =
+        Boolean(displayName) &&
+        !isBlockedUser &&
+        authorityValue !== null &&
+        authorityValue >= VIEWER_AUTHORITY_VALUE;
+
       if (loginElements.statusText) {
-        if (displayName) {
+        if (displayName && isBlockedUser) {
+          loginElements.statusText.textContent = 'このアカウントには権限がありません';
+        } else if (displayName) {
           loginElements.statusText.textContent = `${displayName} としてログイン中`;
         } else {
           loginElements.statusText.textContent = '未ログイン';
         }
       }
+
       if (loginElements.loginButton) {
         const isLoggedIn = Boolean(displayName);
         loginElements.loginButton.hidden = isLoggedIn;
@@ -1289,6 +1791,19 @@
       if (loginElements.logoutButton) {
         loginElements.logoutButton.hidden = !Boolean(displayName);
       }
+      if (loginElements.settingsButton) {
+        loginElements.settingsButton.hidden = !canUseSettings;
+        loginElements.settingsButton.disabled = !canUseSettings;
+      }
+
+      if (!displayName) {
+        resetUserSettingsState();
+      } else if (isBlockedUser || !canUseSettings) {
+        resetUserSettingsState();
+      } else {
+        maybeLoadUserSettings(user, displayName);
+      }
+
       updateLoginRedirectTarget();
     }
 
@@ -1304,14 +1819,26 @@
       const loginState = getStoredLoginState();
       await revokeAccessToken(loginState?.accessToken);
       localStorage.removeItem(LOGIN_STORAGE_KEY);
+      resetUserSettingsState();
       updateLoginUI();
     }
 
     loginElements.loginButton?.addEventListener('click', handleLoginClick);
     loginElements.logoutButton?.addEventListener('click', handleLogoutClick);
+    loginElements.settingsButton?.addEventListener('click', openUserSettingsDialog);
+    userSettingsCancel?.addEventListener('click', () => {
+      closeUserSettingsDialog();
+    });
+    userSettingsOverlay?.addEventListener('click', (event) => {
+      if (event.target === userSettingsOverlay) {
+        closeUserSettingsDialog();
+      }
+    });
+    userSettingsForm?.addEventListener('submit', handleUserSettingsSubmit);
 
     window.addEventListener('storage', (event) => {
       if (event.key === LOGIN_STORAGE_KEY) {
+        resetUserSettingsState();
         updateLoginUI();
       }
     });
