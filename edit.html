@@ -201,8 +201,10 @@
 
         .page-header-top {
             display: flex;
-            align-items: center;
-            gap: 16px;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
         }
 
         .page-header.is-scrolled {
@@ -210,11 +212,37 @@
             border-bottom-color: transparent;
         }
 
+        .page-header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+            min-width: 0;
+        }
+
         .page-header-row {
             display: flex;
             flex-wrap: wrap;
             gap: 16px;
             align-items: center;
+            justify-content: flex-end;
+            flex: 1;
+            min-width: 280px;
+        }
+
+        @media (min-width: 961px) {
+            .page-header-row {
+                flex-wrap: nowrap;
+            }
+
+            .page-meta {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .header-actions {
+                flex-shrink: 0;
+            }
         }
 
         .page-meta {
@@ -1232,6 +1260,11 @@
         }
 
         @media (max-width: 600px) {
+            .page-header-left,
+            .page-header-row {
+                width: 100%;
+            }
+
             .page-header-row {
                 flex-direction: column;
                 align-items: stretch;
@@ -1317,19 +1350,20 @@
         <main class="main-area">
             <div class="page-header">
                 <div class="page-header-top">
-                    <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="ページ一覧" aria-expanded="false" aria-controls="pageSidebar">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </button>
-                    <div class="breadcrumb" id="breadcrumb"></div>
-                </div>
-                <div class="page-header-row">
-                    <div class="page-meta">
-                        <button id="page-meta-toggle" class="page-meta-toggle" type="button" aria-expanded="false">
-                            <span class="sr-only">Page IDとページタイトルを開閉</span>
-                            <span class="page-meta-toggle-icon" aria-hidden="true"></span>
+                    <div class="page-header-left">
+                        <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="ページ一覧" aria-expanded="false" aria-controls="pageSidebar">
+                            <span></span>
+                            <span></span>
+                            <span></span>
                         </button>
+                        <div class="breadcrumb" id="breadcrumb"></div>
+                    </div>
+                    <div class="page-header-row">
+                        <div class="page-meta">
+                            <button id="page-meta-toggle" class="page-meta-toggle" type="button" aria-expanded="false">
+                                <span class="sr-only">Page IDとページタイトルを開閉</span>
+                                <span class="page-meta-toggle-icon" aria-hidden="true"></span>
+                            </button>
                         <div id="page-meta-fields" class="page-meta-fields" hidden>
                             <div class="input-group">
                                 <label class="input-label" for="page-name">Page ID</label>
@@ -1341,9 +1375,10 @@
                             </div>
                         </div>
                     </div>
-                    <div class="header-actions">
-                        <button id="save-page" class="btn btn-primary" type="button">保存</button>
-                        <button id="view-page" class="btn" type="button">ページを表示</button>
+                        <div class="header-actions">
+                            <button id="save-page" class="btn btn-primary" type="button">保存</button>
+                            <button id="view-page" class="btn" type="button">ページを表示</button>
+                        </div>
                     </div>
                 </div>
                 <div class="toolbar" id="toolbar"></div>
