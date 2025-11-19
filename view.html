@@ -1214,6 +1214,25 @@
       }
     }
 
+    function getDisplayName(user) {
+      if (!user) {
+        return '';
+      }
+      const username = (user.username || '').trim();
+      if (username) {
+        return username;
+      }
+      const name = (user.name || '').trim();
+      if (name) {
+        return name;
+      }
+      const email = (user.email || '').trim();
+      if (email) {
+        return email;
+      }
+      return '';
+    }
+
     async function revokeAccessToken(token) {
       if (!token) {
         return;
@@ -1248,20 +1267,21 @@
 
     function updateLoginUI() {
       const loginState = getStoredLoginState();
+      const displayName = getDisplayName(loginState?.user);
       if (loginElements.statusText) {
-        if (loginState?.user?.name) {
-          loginElements.statusText.textContent = `${loginState.user.name} としてログイン中`;
+        if (displayName) {
+          loginElements.statusText.textContent = `${displayName} としてログイン中`;
         } else {
           loginElements.statusText.textContent = '未ログイン';
         }
       }
       if (loginElements.loginButton) {
-        const isLoggedIn = Boolean(loginState?.user?.name);
+        const isLoggedIn = Boolean(displayName);
         loginElements.loginButton.hidden = isLoggedIn;
         loginElements.loginButton.disabled = false;
       }
       if (loginElements.logoutButton) {
-        loginElements.logoutButton.hidden = !Boolean(loginState?.user?.name);
+        loginElements.logoutButton.hidden = !Boolean(displayName);
       }
       updateLoginRedirectTarget();
     }
