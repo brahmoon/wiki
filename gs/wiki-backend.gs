@@ -12,6 +12,15 @@ const CONFIG = {
   ALLOWED_ORIGINS: ['https://brahmoon.github.io']
 };
 
+const ACCOUNT_CONFIG = {
+  SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
+  SHEET_NAME: 'Accounts',
+  HEADER_ROW_INDEX: 1,
+  PLAYER_ID_COLUMN: 1,
+  AUTHORITY_COLUMN: 6,
+  MIN_EDITOR_AUTHORITY: 2,
+};
+
 function doGet(e) {
   const origin = getRequestOrigin(e);
   const data = parseRequestData(e);
@@ -115,9 +124,9 @@ function routeAction(data) {
         order: data.order,
       });
     case 'getPages':
-      return getPages();
+      return executeWithEditorAuthority(data.playerId, () => getPages());
     case 'getPage':
-      return getPage(data.id);
+      return executeWithEditorAuthority(data.playerId, () => getPage(data.id));
     case 'renamePageTree':
       return renamePageTree({
         originalId: data.originalId,
@@ -135,6 +144,110 @@ function routeAction(data) {
         message: 'Unknown action: ' + action,
       };
   }
+}
+
+function executeWithEditorAuthority(playerId, handler) {
+  const verification = requireEditorAuthority(playerId);
+  if (!verification.allowed) {
+    return verification.response;
+  }
+  return handler(verification);
+}
+
+function requireEditorAuthority(playerId) {
+  const normalizedPlayerId = normalizePlayerId(playerId);
+  if (!normalizedPlayerId) {
+    return {
+      allowed: false,
+      response: { success: false, message: 'Player IDが指定されていません。' },
+    };
+  }
+
+  const sheet = getAccountsSheet();
+  if (!sheet) {
+    return {
+      allowed: false,
+      response: { success: false, message: 'Accountsシートが見つかりません。' },
+    };
+  }
+
+  const record = findAccountAuthority(sheet, normalizedPlayerId);
+  if (!record) {
+    return {
+      allowed: false,
+      response: { success: false, message: '指定されたアカウントが見つかりません。' },
+    };
+  }
+
+  const minimumAuthority = Number(ACCOUNT_CONFIG.MIN_EDITOR_AUTHORITY) || 2;
+  const authorityValue = parseAuthorityValue(record.authority);
+  if (authorityValue === null || authorityValue < minimumAuthority) {
+    return {
+      allowed: false,
+      response: { success: false, message: '編集権限がありません。' },
+    };
+  }
+
+  return {
+    allowed: true,
+    authority: authorityValue,
+    playerId: record.playerId,
+  };
+}
+
+function parseAuthorityValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function findAccountAuthority(sheet, normalizedPlayerId) {
+  const headerRowIndex = Number(ACCOUNT_CONFIG.HEADER_ROW_INDEX) || 1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= headerRowIndex) {
+    return null;
+  }
+
+  const firstDataRow = headerRowIndex + 1;
+  const playerColumn = Number(ACCOUNT_CONFIG.PLAYER_ID_COLUMN) || 1;
+  const authorityColumn = Number(ACCOUNT_CONFIG.AUTHORITY_COLUMN) || 6;
+  const width = Math.max(playerColumn, authorityColumn, 1);
+  const totalRows = lastRow - headerRowIndex;
+  const range = sheet.getRange(firstDataRow, 1, totalRows, width);
+  const values = range.getValues();
+
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var rowPlayerId = normalizePlayerId(row[playerColumn - 1]);
+    if (rowPlayerId && rowPlayerId === normalizedPlayerId) {
+      return {
+        playerId: row[playerColumn - 1] || '',
+        authority: row[authorityColumn - 1],
+      };
+    }
+  }
+
+  return null;
+}
+
+function normalizePlayerId(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase();
+}
+
+function getAccountsSpreadsheet() {
+  if (ACCOUNT_CONFIG.SHEET_ID) {
+    return SpreadsheetApp.openById(ACCOUNT_CONFIG.SHEET_ID);
+  }
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function getAccountsSheet() {
+  var spreadsheet = getAccountsSpreadsheet();
+  return spreadsheet ? spreadsheet.getSheetByName(ACCOUNT_CONFIG.SHEET_NAME) : null;
 }
 
 function getParentIdFromPageId(id) {

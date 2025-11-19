@@ -59,6 +59,10 @@
             transition: grid-template-columns 0.3s ease;
         }
 
+        .app-container[hidden] {
+            display: none !important;
+        }
+
         .app-container.sidebar-closed {
             grid-template-columns: 0 1fr;
         }
@@ -1776,6 +1780,7 @@
         const pageMetaMobileMedia = window.matchMedia('(max-width: 600px)');
         const blockedWarningOverlay = document.getElementById('blocked-warning');
         const appContainerElement = document.getElementById('appContainer');
+        let isBlockedEditorUser = false;
 
         const applyPageMetaLayout = (isMobile) => {
             if (!pageMetaToggle || !pageMetaFields) {
@@ -2099,6 +2104,7 @@
         }
 
         function setBlockedUserState(isBlocked) {
+            isBlockedEditorUser = Boolean(isBlocked);
             if (blockedWarningOverlay) {
                 blockedWarningOverlay.hidden = !isBlocked;
                 blockedWarningOverlay.setAttribute('aria-hidden', isBlocked ? 'false' : 'true');
@@ -2107,7 +2113,9 @@
             if (appContainerElement) {
                 if (isBlocked) {
                     appContainerElement.setAttribute('aria-hidden', 'true');
+                    appContainerElement.hidden = true;
                 } else {
+                    appContainerElement.hidden = false;
                     appContainerElement.removeAttribute('aria-hidden');
                 }
             }
@@ -2686,7 +2694,13 @@
           driveImage: APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE
         };
 
-        const dataService = new WikiDataService({ endpoint: APPS_SCRIPT_ENDPOINT_WIKI });
+        const dataService = new WikiDataService({
+            endpoint: APPS_SCRIPT_ENDPOINT_WIKI,
+            resolveCredentials: () => {
+                const playerId = getEditorPlayerId();
+                return playerId ? { playerId } : {};
+            }
+        });
         const PAGE_LINK_CACHE_KEY = 'wiki.pageLinkCache';
 
         const elements = {
@@ -2725,6 +2739,15 @@
             pageLinkSuggestions: document.getElementById('page-link-suggestions'),
             pageLinkCancel: document.getElementById('page-link-cancel')
         };
+
+        function ensureEditorAccess(actionDescription = '操作') {
+            if (!isBlockedEditorUser) {
+                return true;
+            }
+            console.warn(`Blocked user attempted to ${actionDescription}.`);
+            setStatus('このアカウントには編集権限がありません', 'error');
+            return false;
+        }
 
         function applyToolbarConfigStates(states) {
             const defaults = createDefaultToolbarConfigStates();
@@ -4364,6 +4387,9 @@
         }
 
         async function loadPages(selectId, options = {}) {
+            if (!ensureEditorAccess('ページ一覧を読み込む')) {
+                return;
+            }
             const {
                 prefetchedPage = null,
                 updateHistory: shouldUpdateHistory = true
@@ -4395,6 +4421,9 @@
         }
 
         async function navigateToPage(id, { updateHistory: shouldUpdateHistory = true, prefetchedPage = null } = {}) {
+            if (!ensureEditorAccess('ページを開く')) {
+                return;
+            }
             if (!id) return;
             if (state.isNewPage && state.currentPageId === id) {
                 renderTree();
@@ -4460,6 +4489,9 @@
         }
 
         async function saveCurrentPage() {
+            if (!ensureEditorAccess('ページを保存する')) {
+                return;
+            }
             let slugInput = normalizeSlug(elements.pageName.value || '');
             const titleInput = elements.pageTitle.value.trim();
             if (!slugInput) {
@@ -4539,6 +4571,9 @@
         }
 
         function createNewPage(parentId = null) {
+            if (!ensureEditorAccess('新規ページを作成する')) {
+                return;
+            }
             if (state.isNewPage && state.currentPageId) {
                 removeNode(state.currentPageId);
             }
@@ -4808,6 +4843,9 @@
         }
 
         async function initialize() {
+            if (!ensureEditorAccess('Wikiエディタを初期化する')) {
+                return;
+            }
             const initialPageId = getPageIdFromQuery();
             let prefetchedPage = null;
 
