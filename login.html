@@ -199,10 +199,12 @@
         const params = new URLSearchParams(window.location.search);
         const redirectPathParam = (params.get('redirect') || '').trim();
         const redirectPageParam = (params.get('page') || '').trim();
+        const redirectQueryParam = (params.get('redirectQuery') || '').trim();
 
         const redirectTarget = {
             path: redirectPathParam || CONFIG.DEFAULT_REDIRECT_PATH,
-            page: redirectPageParam
+            page: redirectPageParam,
+            query: redirectQueryParam
         };
 
         const elements = {
@@ -306,7 +308,12 @@
 
         const buildRedirectUrl = () => {
             const url = new URL(redirectTarget.path, window.location.href);
-            if (redirectTarget.page) {
+            if (redirectTarget.query) {
+                const redirectParams = new URLSearchParams(redirectTarget.query);
+                redirectParams.forEach((value, key) => {
+                    url.searchParams.set(key, value);
+                });
+            } else if (redirectTarget.page) {
                 url.searchParams.set('page', redirectTarget.page);
             }
             return url.toString();

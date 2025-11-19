@@ -630,6 +630,9 @@
             if (requestedPageId) {
                 url.searchParams.set('page', requestedPageId);
             }
+            if (window.location.search.length > 1) {
+                url.searchParams.set('redirectQuery', window.location.search.slice(1));
+            }
             return url.toString();
         };
 
