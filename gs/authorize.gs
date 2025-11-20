@@ -7,7 +7,7 @@ const AUTH_CONFIG = {
   EMAIL_COLUMN: 3,
   AUTHORITY_COLUMN: 6,
   UPDATED_AT_COLUMN: 7,
-  ALLOWED_UPDATE_AUTHORITY_VALUES: [-1, 1, 2, 3],
+  ALLOWED_UPDATE_AUTHORITY_VALUES: [-1, 1, 2, 3, 4],
   ALLOWED_ORIGINS: [
     'https://brahmoon.github.io',
     'http://localhost:3000',
