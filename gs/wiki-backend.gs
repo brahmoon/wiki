@@ -116,17 +116,17 @@ function routeAction(data) {
 
   switch (action) {
     case 'savePage':
-      return savePage({
+      return executeWithEditorAuthority(data.playerId, () => savePage({
         id: data.id,
         title: data.title,
         content: data.content,
         updatedBy: data.updatedBy,
         order: data.order,
-      });
+      }));
     case 'getPages':
-      return executeWithEditorAuthority(data.playerId, () => getPages());
+      return getPages();
     case 'getPage':
-      return executeWithEditorAuthority(data.playerId, () => getPage(data.id));
+      return getPage(data.id);
     case 'renamePageTree':
       return renamePageTree({
         originalId: data.originalId,
