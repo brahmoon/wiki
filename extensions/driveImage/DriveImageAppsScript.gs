@@ -180,23 +180,24 @@ function clearExistingDriveImageAuthorityRows(sheet, config) {
  * @return {GoogleAppsScript.Content.TextOutput}
  */
 function doGet(e) {
+  const requestOrigin = resolveDriveImageRequestOrigin(e);
   const action = (e && e.parameter && e.parameter.action || '').toString().toLowerCase();
 
   if (action === 'gallery') {
     const folders = listImageFolders({ includeImages: true });
-    return createJsonOutput({ success: true, folders });
+    return createJsonOutput({ success: true, folders }, requestOrigin);
   }
 
   if (action === 'folders') {
     const folders = listImageFolders({ includeImages: false });
-    return createJsonOutput({ success: true, folders });
+    return createJsonOutput({ success: true, folders }, requestOrigin);
   }
 
   return createJsonOutput({
     success: false,
     error: 'Unsupported action',
     action
-  });
+  }, requestOrigin);
 }
 
 /**
@@ -205,6 +206,7 @@ function doGet(e) {
  * @return {GoogleAppsScript.Content.TextOutput}
  */
 function doPost(e) {
+  const requestOrigin = resolveDriveImageRequestOrigin(e);
   const data = parseRequestData(e);
   const rawMethod = data.method || data.action || '';
   const method = rawMethod.toString().toLowerCase();
@@ -227,7 +229,7 @@ function doPost(e) {
       break;
   }
 
-  return createJsonOutput(result);
+  return createJsonOutput(result, requestOrigin);
 }
 
 /**
@@ -516,8 +518,78 @@ function getThumbnailUrl(fileId) {
  * @param {Object} payload
  * @return {GoogleAppsScript.Content.TextOutput}
  */
-function createJsonOutput(payload) {
-  return ContentService
+function createJsonOutput(payload, requestOrigin) {
+  const output = ContentService
     .createTextOutput(JSON.stringify(payload || {}))
     .setMimeType(ContentService.MimeType.JSON);
+
+  applyDriveImageCorsHeaders(output, requestOrigin);
+
+  return output;
+}
+
+/**
+ * Resolves the request origin from the incoming event.
+ * Falls back to a shared helper if it exists.
+ * @param {GoogleAppsScript.Events.DoGet|GoogleAppsScript.Events.DoPost} e
+ * @return {string}
+ */
+function resolveDriveImageRequestOrigin(e) {
+  if (typeof getRequestOrigin === 'function') {
+    return getRequestOrigin(e);
+  }
+
+  if (!e || !e.headers) {
+    return '';
+  }
+
+  return e.headers.origin || e.headers.Origin || '';
+}
+
+/**
+ * Applies CORS headers so the Drive image API can be called from the wiki UI.
+ * Delegates to the shared applyCorsHeaders helper when available.
+ * @param {GoogleAppsScript.Content.TextOutput} output
+ * @param {string} requestOrigin
+ * @return {GoogleAppsScript.Content.TextOutput}
+ */
+function applyDriveImageCorsHeaders(output, requestOrigin) {
+  if (!output) {
+    return output;
+  }
+
+  if (typeof applyCorsHeaders === 'function') {
+    return applyCorsHeaders(output, requestOrigin);
+  }
+
+  const allowedOrigins = (typeof AUTH_CONFIG !== 'undefined' && AUTH_CONFIG && AUTH_CONFIG.ALLOWED_ORIGINS)
+    ? AUTH_CONFIG.ALLOWED_ORIGINS
+    : [];
+
+  const normalizedOrigins = (allowedOrigins || [])
+    .map(function(origin) { return (origin || '').trim(); })
+    .filter(function(origin) { return origin; });
+
+  if (!normalizedOrigins.length) {
+    return output;
+  }
+
+  if (normalizedOrigins.indexOf('*') !== -1) {
+    output.setHeader('Access-Control-Allow-Origin', '*');
+    return output;
+  }
+
+  const origin = (requestOrigin || '').trim();
+  if (origin && normalizedOrigins.indexOf(origin) !== -1) {
+    output
+      .setHeader('Access-Control-Allow-Origin', origin)
+      .setHeader('Vary', 'Origin');
+    return output;
+  }
+
+  if (!origin && normalizedOrigins.length === 1) {
+    output.setHeader('Access-Control-Allow-Origin', normalizedOrigins[0]);
+  }
+
+  return output;
 }
