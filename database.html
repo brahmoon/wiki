@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>データベース管理</title>
+  <script src="./scripts/appsScriptEndpoints.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #37352f;
+      min-height: 100vh;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+      width: 100vw;
+    }
+
+    .sidebar {
+      background: #f7f6f3;
+      border-right: 1px solid #e9e9e7;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+
+    .sidebar-header {
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid #e9e9e7;
+    }
+
+    .sidebar-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .sidebar-subtitle {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #6b6a67;
+    }
+
+    .sidebar-actions {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e9e9e7;
+    }
+
+    .sidebar-actions .btn {
+      flex: 1;
+    }
+
+    .record-list {
+      list-style: none;
+      margin: 0;
+      padding: 10px 8px 20px 14px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .record-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #37352f;
+    }
+
+    .record-item:hover {
+      background: #ecebe8;
+    }
+
+    .record-item.active {
+      background: #2383e2;
+      color: #fff;
+    }
+
+    .record-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #e3e2df;
+    }
+
+    .record-empty {
+      padding: 24px;
+      font-size: 14px;
+      color: #6b6a67;
+    }
+
+    .main {
+      padding: 28px 32px;
+      max-width: 1080px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .page-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #eef4ff;
+      color: #1a62c2;
+      border: 1px solid #d7e5ff;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #e9e9e7;
+      box-shadow: 0 12px 30px rgba(15, 15, 15, 0.06);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .icon-picker {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .icon-slot {
+      width: 96px;
+      height: 96px;
+      border-radius: 16px;
+      background: #f7f6f3;
+      border: 2px dashed #c8c6c0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .icon-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .icon-slot .placeholder {
+      font-size: 13px;
+      color: #6b6a67;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .icon-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px 16px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 13px;
+      color: #55534e;
+      font-weight: 600;
+    }
+
+    input[type="text"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #d7d6d2;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .talent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .talent-card {
+      border: 1px solid #e9e9e7;
+      border-radius: 12px;
+      padding: 12px;
+      background: #faf9f7;
+    }
+
+    .talent-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+
+    .btn {
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+      background: #f7f6f3;
+      color: #37352f;
+      border-color: #e9e9e7;
+    }
+
+    .btn-primary {
+      background: #2383e2;
+      color: #fff;
+      border-color: #1d70c4;
+    }
+
+    .btn-primary:hover { background: #1a6bc2; }
+
+    .btn-danger {
+      background: #fff4f2;
+      color: #c0352b;
+      border-color: #f0b8b2;
+    }
+
+    .helper-text {
+      font-size: 12px;
+      color: #8a8883;
+      line-height: 1.4;
+    }
+
+    .status-area {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #55534e;
+    }
+
+    .status-area.error { color: #c0352b; }
+    .status-area.success { color: #0f7b6c; }
+
+    .blocked-panel {
+      margin: 80px auto;
+      max-width: 640px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      border: 1px solid #f2d7d5;
+      text-align: center;
+      color: #c0352b;
+      box-shadow: 0 14px 40px rgba(192, 53, 43, 0.15);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-backdrop.active { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 14px;
+      padding: 18px;
+      max-width: 880px;
+      width: min(880px, 90vw);
+      max-height: 80vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #e9e9e7;
+      box-shadow: 0 18px 46px rgba(0,0,0,0.12);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .modal-title { font-weight: 700; }
+
+    .modal-body {
+      overflow-y: auto;
+      padding: 4px;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+    }
+
+    .gallery-item {
+      border: 1px solid #e9e9e7;
+      border-radius: 12px;
+      background: #faf9f7;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .gallery-item:hover {
+      border-color: #2383e2;
+      box-shadow: 0 6px 18px rgba(35, 131, 226, 0.15);
+    }
+
+    .gallery-thumb {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      object-fit: cover;
+      background: #e3e2df;
+    }
+
+    .gallery-label { font-size: 13px; color: #55534e; }
+    .upload-tile { align-items: center; justify-content: center; text-align: center; gap: 6px; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">データベース</div>
+        <div class="sidebar-subtitle" id="sidebarSubtitle"></div>
+      </div>
+      <div class="sidebar-actions">
+        <button class="btn btn-primary" id="newRecordButton">新規作成</button>
+        <button class="btn" id="reloadButton">再読込</button>
+      </div>
+      <ul class="record-list" id="recordList"></ul>
+    </aside>
+
+    <main class="main">
+      <div id="blockedPanel" class="blocked-panel" hidden>
+        <h2>アクセス権限がありません</h2>
+        <p>このページは権限レベル4以上のユーザのみが利用できます。<br>ログイン情報を確認してください。</p>
+      </div>
+
+      <div id="editorArea" hidden>
+        <div class="page-heading">
+          <div>
+            <div class="page-title" id="pageTitle"></div>
+            <div class="sidebar-subtitle" id="pageSubtitle"></div>
+          </div>
+          <div class="status-badge" id="authorityBadge"></div>
+        </div>
+
+        <div class="card">
+          <div class="icon-picker">
+            <div class="icon-slot" id="iconSlot">
+              <div class="placeholder">アイコンを選択</div>
+            </div>
+            <div class="icon-actions">
+              <button class="btn" id="selectIconButton">Driveから選択</button>
+              <div class="helper-text">Hero / Skill フォルダの画像を利用できます。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="heroFields" hidden>
+          <h3>英雄情報</h3>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="heroId">ID</label>
+              <input type="text" id="heroId" placeholder="hero id">
+            </div>
+            <div class="form-field">
+              <label for="heroName">名前</label>
+              <input type="text" id="heroName" placeholder="英雄名">
+            </div>
+            <div class="form-field">
+              <label for="heroUrl">URL</label>
+              <input type="text" id="heroUrl" placeholder="ページURL">
+            </div>
+            <div class="form-field">
+              <label for="heroTroop">兵種</label>
+              <input type="text" id="heroTroop" placeholder="槍兵/歩兵/弓兵...">
+            </div>
+            <div class="form-field">
+              <label for="fixedSkills">固定スキルID</label>
+              <textarea id="fixedSkills" placeholder="heroA_skill1, heroA_skill2"></textarea>
+              <div class="helper-text">カンマ区切りで入力してください。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="talentFields" hidden>
+          <h3>天賦</h3>
+          <div class="talent-grid" id="talentGrid"></div>
+        </div>
+
+        <div class="card" id="skillFields" hidden>
+          <h3>スキル情報</h3>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="skillId">ID</label>
+              <input type="text" id="skillId" placeholder="skill id">
+            </div>
+            <div class="form-field">
+              <label for="skillName">名前</label>
+              <input type="text" id="skillName" placeholder="スキル名">
+            </div>
+            <div class="form-field">
+              <label for="skillUrl">URL</label>
+              <input type="text" id="skillUrl" placeholder="ページURL">
+            </div>
+            <div class="form-field">
+              <label for="skillCategory">カテゴリ</label>
+              <input type="text" id="skillCategory" placeholder="hero/user など">
+            </div>
+            <div class="form-field">
+              <label for="skillType">スキル種別</label>
+              <input type="text" id="skillType" placeholder="指揮/連携/反撃 ...">
+            </div>
+            <div class="form-field" style="grid-column: 1 / -1;">
+              <label for="skillDescription">説明</label>
+              <textarea id="skillDescription" placeholder="スキルの効果"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-danger" id="deleteButton">削除</button>
+          <button class="btn btn-primary" id="saveButton">保存</button>
+        </div>
+
+        <div class="status-area" id="statusArea"></div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="galleryModal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">アイコンを選択</div>
+        <button class="btn" id="closeModalButton">閉じる</button>
+      </div>
+      <div class="modal-body">
+        <div class="gallery-grid" id="galleryGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" accept="image/*" id="uploadInput" style="display:none;">
+
+  <script type="module">
+    const params = new URLSearchParams(window.location.search);
+    const dataType = (params.get('data') || '').toLowerCase();
+    const targetIdParam = params.get('id') || '';
+
+    const ENDPOINT = window.APPS_SCRIPT_ENDPOINT_DATABASE;
+    const DRIVE_ENDPOINT = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
+    const LOGIN_STORAGE_KEY = 'wikiLoginState';
+    const TALENT_COUNT = 6;
+
+    const elements = {
+      blockedPanel: document.getElementById('blockedPanel'),
+      editorArea: document.getElementById('editorArea'),
+      sidebarSubtitle: document.getElementById('sidebarSubtitle'),
+      pageTitle: document.getElementById('pageTitle'),
+      pageSubtitle: document.getElementById('pageSubtitle'),
+      authorityBadge: document.getElementById('authorityBadge'),
+      iconSlot: document.getElementById('iconSlot'),
+      selectIconButton: document.getElementById('selectIconButton'),
+      heroFields: document.getElementById('heroFields'),
+      talentFields: document.getElementById('talentFields'),
+      skillFields: document.getElementById('skillFields'),
+      recordList: document.getElementById('recordList'),
+      newRecordButton: document.getElementById('newRecordButton'),
+      reloadButton: document.getElementById('reloadButton'),
+      saveButton: document.getElementById('saveButton'),
+      deleteButton: document.getElementById('deleteButton'),
+      statusArea: document.getElementById('statusArea'),
+      galleryModal: document.getElementById('galleryModal'),
+      galleryGrid: document.getElementById('galleryGrid'),
+      closeModalButton: document.getElementById('closeModalButton'),
+      uploadInput: document.getElementById('uploadInput'),
+      fixedSkills: document.getElementById('fixedSkills'),
+      heroId: document.getElementById('heroId'),
+      heroName: document.getElementById('heroName'),
+      heroUrl: document.getElementById('heroUrl'),
+      heroTroop: document.getElementById('heroTroop'),
+      skillId: document.getElementById('skillId'),
+      skillName: document.getElementById('skillName'),
+      skillUrl: document.getElementById('skillUrl'),
+      skillCategory: document.getElementById('skillCategory'),
+      skillType: document.getElementById('skillType'),
+      skillDescription: document.getElementById('skillDescription'),
+      talentGrid: document.getElementById('talentGrid'),
+    };
+
+    const state = {
+      authority: null,
+      account: null,
+      records: [],
+      currentRecord: null,
+      selectedImage: '',
+      galleryFolders: [],
+    };
+
+    function setStatus(message, type = '') {
+      elements.statusArea.textContent = message || '';
+      elements.statusArea.classList.toggle('error', type === 'error');
+      elements.statusArea.classList.toggle('success', type === 'success');
+    }
+
+    function getLoginState() {
+      try {
+        const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (error) {
+        console.error('Failed to parse login state', error);
+        return null;
+      }
+    }
+
+    function buildRequestPayload(extra = {}) {
+      const loginState = getLoginState();
+      const user = loginState?.user || {};
+      return {
+        playerId: user.playerId || '',
+        email: user.email || '',
+        ...extra,
+      };
+    }
+
+    async function callDatabaseApi(payload) {
+      if (!ENDPOINT || ENDPOINT.includes('YOUR_DATABASE_DEPLOYMENT_ID')) {
+        throw new Error('Apps Scriptエンドポイントが設定されていません。');
+      }
+      const response = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Apps Script呼び出しに失敗しました (HTTP ${response.status}) ${text}`);
+      }
+      return await response.json();
+    }
+
+    function renderTalentFields() {
+      const fragments = document.createDocumentFragment();
+      for (let i = 1; i <= TALENT_COUNT; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'talent-card';
+        wrapper.innerHTML = `
+          <div class="talent-title">天賦${i}</div>
+          <div class="form-field">
+            <label>名前</label>
+            <input type="text" data-talent="name" data-index="${i}">
+          </div>
+          <div class="form-field">
+            <label>タイプ</label>
+            <input type="text" data-talent="type" data-index="${i}">
+          </div>
+          <div class="form-field">
+            <label>説明</label>
+            <textarea data-talent="description" data-index="${i}" rows="3"></textarea>
+          </div>
+        `;
+        fragments.appendChild(wrapper);
+      }
+      elements.talentGrid.innerHTML = '';
+      elements.talentGrid.appendChild(fragments);
+    }
+
+    function createEmptyHeroRecord() {
+      const record = {
+        id: '',
+        name: '',
+        image: '',
+        url: '',
+        troopType: '',
+        fixedSkillIds: [],
+      };
+      for (let i = 1; i <= TALENT_COUNT; i++) {
+        record[`talent${i}`] = { name: '', type: '', description: '' };
+      }
+      return record;
+    }
+
+    function createEmptySkillRecord() {
+      return {
+        id: '',
+        name: '',
+        image: '',
+        description: '',
+        url: '',
+        category: '',
+        skillType: '',
+      };
+    }
+
+    function setIcon(url) {
+      state.selectedImage = url || '';
+      elements.iconSlot.innerHTML = '';
+      if (url) {
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'icon';
+        elements.iconSlot.appendChild(img);
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'placeholder';
+        placeholder.textContent = 'アイコンを選択';
+        elements.iconSlot.appendChild(placeholder);
+      }
+    }
+
+    function fillForm(record) {
+      if (dataType === 'hero') {
+        elements.heroId.value = record.id || '';
+        elements.heroName.value = record.name || '';
+        elements.heroUrl.value = record.url || '';
+        elements.heroTroop.value = record.troopType || '';
+        elements.fixedSkills.value = Array.isArray(record.fixedSkillIds)
+          ? record.fixedSkillIds.join(', ')
+          : (record.fixedSkillIds || '');
+
+        document.querySelectorAll('[data-talent]').forEach((el) => {
+          const index = el.getAttribute('data-index');
+          const key = `talent${index}`;
+          const talent = record[key] || {};
+          const field = el.getAttribute('data-talent');
+          if (field === 'description') {
+            el.value = talent.description || '';
+          } else if (field === 'type') {
+            el.value = talent.type || '';
+          } else {
+            el.value = talent.name || '';
+          }
+        });
+      } else {
+        elements.skillId.value = record.id || '';
+        elements.skillName.value = record.name || '';
+        elements.skillUrl.value = record.url || '';
+        elements.skillCategory.value = record.category || '';
+        elements.skillType.value = record.skillType || '';
+        elements.skillDescription.value = record.description || '';
+      }
+      setIcon(record.image || '');
+    }
+
+    function collectFormData() {
+      if (dataType === 'hero') {
+        const record = createEmptyHeroRecord();
+        record.id = elements.heroId.value.trim();
+        record.name = elements.heroName.value.trim();
+        record.url = elements.heroUrl.value.trim();
+        record.troopType = elements.heroTroop.value.trim();
+        record.image = state.selectedImage || '';
+
+        const fixed = elements.fixedSkills.value.split(',').map(v => v.trim()).filter(Boolean);
+        record.fixedSkillIds = fixed;
+
+        document.querySelectorAll('[data-talent]').forEach((el) => {
+          const index = el.getAttribute('data-index');
+          const key = `talent${index}`;
+          const field = el.getAttribute('data-talent');
+          const talent = record[key] || { name: '', type: '', description: '' };
+          if (field === 'description') {
+            talent.description = el.value.trim();
+          } else if (field === 'type') {
+            talent.type = el.value.trim();
+          } else {
+            talent.name = el.value.trim();
+          }
+          record[key] = talent;
+        });
+        return record;
+      }
+
+      const record = createEmptySkillRecord();
+      record.id = elements.skillId.value.trim();
+      record.name = elements.skillName.value.trim();
+      record.url = elements.skillUrl.value.trim();
+      record.category = elements.skillCategory.value.trim();
+      record.skillType = elements.skillType.value.trim();
+      record.description = elements.skillDescription.value.trim();
+      record.image = state.selectedImage || '';
+      return record;
+    }
+
+    function renderRecords() {
+      elements.recordList.innerHTML = '';
+      if (!state.records.length) {
+        const empty = document.createElement('div');
+        empty.className = 'record-empty';
+        empty.textContent = 'データがありません';
+        elements.recordList.appendChild(empty);
+        return;
+      }
+      state.records.forEach((record) => {
+        const item = document.createElement('li');
+        item.className = 'record-item';
+        item.dataset.id = record.id;
+        if (state.currentRecord && state.currentRecord.id === record.id) {
+          item.classList.add('active');
+        }
+        const img = document.createElement('img');
+        img.className = 'record-avatar';
+        img.src = record.image || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+        img.alt = record.name || record.id;
+        item.appendChild(img);
+
+        const text = document.createElement('div');
+        text.innerHTML = `<div>${record.name || record.id}</div><div class="helper-text">${record.id}</div>`;
+        item.appendChild(text);
+
+        item.addEventListener('click', () => {
+          if (record.id) {
+            loadRecord(record.id);
+          }
+        });
+        elements.recordList.appendChild(item);
+      });
+    }
+
+    function applyDataTypeLabels() {
+      const title = dataType === 'skill' ? 'スキルDB編集' : '英雄DB編集';
+      elements.sidebarSubtitle.textContent = dataType === 'skill' ? 'DB_Skill を編集' : 'DB_Hero を編集';
+      elements.pageTitle.textContent = title;
+      elements.pageSubtitle.textContent = `クエリ: data=${dataType}`;
+      elements.heroFields.hidden = dataType !== 'hero';
+      elements.talentFields.hidden = dataType !== 'hero';
+      elements.skillFields.hidden = dataType !== 'skill';
+    }
+
+    async function verifyAuthority() {
+      try {
+        const result = await callDatabaseApi(buildRequestPayload({
+          action: 'getAuthority',
+          dataType,
+        }));
+        state.authority = result.authority;
+        state.account = result.account || null;
+        const allowed = !!result.allowed;
+        elements.authorityBadge.textContent = allowed
+          ? `Authority ${result.authority} / Access Granted`
+          : `Authority ${result.authority || '-'} / Access Denied`;
+        elements.blockedPanel.hidden = allowed;
+        elements.editorArea.hidden = !allowed;
+        return allowed;
+      } catch (error) {
+        setStatus(error.message, 'error');
+        elements.authorityBadge.textContent = '権限確認に失敗';
+        elements.blockedPanel.hidden = false;
+        elements.editorArea.hidden = true;
+        return false;
+      }
+    }
+
+    async function loadRecords() {
+      setStatus('データを読み込み中...');
+      try {
+        const result = await callDatabaseApi(buildRequestPayload({
+          action: 'listRecords',
+          dataType,
+        }));
+        state.records = result.records || [];
+        renderRecords();
+        setStatus('データを取得しました。', 'success');
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message, 'error');
+      }
+    }
+
+    async function loadRecord(id) {
+      setStatus(`ID: ${id} を取得中...`);
+      try {
+        const result = await callDatabaseApi(buildRequestPayload({
+          action: 'getRecord',
+          dataType,
+          id,
+        }));
+        state.currentRecord = result.record || (dataType === 'hero' ? createEmptyHeroRecord() : createEmptySkillRecord());
+        fillForm(state.currentRecord);
+        renderRecords();
+        setStatus(`ID: ${id} を読み込みました。`, 'success');
+        const url = new URL(window.location.href);
+        url.searchParams.set('id', id);
+        window.history.replaceState({}, '', url.toString());
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message, 'error');
+      }
+    }
+
+    async function saveRecord() {
+      const record = collectFormData();
+      if (!record.id) {
+        setStatus('IDは必須です。', 'error');
+        return;
+      }
+      setStatus('保存中...');
+      try {
+        const result = await callDatabaseApi(buildRequestPayload({
+          action: 'saveRecord',
+          dataType,
+          record,
+        }));
+        setStatus(result.message || '保存しました。', 'success');
+        await loadRecords();
+        state.currentRecord = record;
+        renderRecords();
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message, 'error');
+      }
+    }
+
+    async function deleteRecord() {
+      const record = collectFormData();
+      if (!record.id) {
+        setStatus('削除するIDがありません。', 'error');
+        return;
+      }
+      if (!confirm(`ID: ${record.id} を削除しますか？`)) {
+        return;
+      }
+      setStatus('削除中...');
+      try {
+        const result = await callDatabaseApi(buildRequestPayload({
+          action: 'deleteRecord',
+          dataType,
+          id: record.id,
+        }));
+        setStatus(result.message || '削除しました。', 'success');
+        state.currentRecord = dataType === 'hero' ? createEmptyHeroRecord() : createEmptySkillRecord();
+        fillForm(state.currentRecord);
+        await loadRecords();
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message, 'error');
+      }
+    }
+
+    async function openGallery() {
+      if (!DRIVE_ENDPOINT) {
+        setStatus('DriveImageのWebApp URLが設定されていません。', 'error');
+        return;
+      }
+      elements.galleryGrid.innerHTML = '<div class="helper-text">読み込み中...</div>';
+      elements.galleryModal.classList.add('active');
+
+      try {
+        const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
+        const result = await DriveImageHandler.loadGallery({
+          webAppUrl: DRIVE_ENDPOINT,
+          debug: false,
+        });
+        const folders = (result?.folders || []).filter((folder) => {
+          const label = (folder.displayName || folder.name || '').toLowerCase();
+          return dataType === 'hero' ? label.includes('hero') : label.includes('skill');
+        });
+        state.galleryFolders = folders;
+        renderGallery();
+      } catch (error) {
+        console.error(error);
+        elements.galleryGrid.innerHTML = `<div class="status-area error">${error.message}</div>`;
+      }
+    }
+
+    function renderGallery() {
+      elements.galleryGrid.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+
+      const uploadTile = document.createElement('div');
+      uploadTile.className = 'gallery-item upload-tile';
+      uploadTile.innerHTML = '<div>画像をアップロード</div>';
+      uploadTile.addEventListener('click', () => elements.uploadInput.click());
+      fragment.appendChild(uploadTile);
+
+      state.galleryFolders.forEach((folder) => {
+        folder.images.forEach((image) => {
+          const item = document.createElement('div');
+          item.className = 'gallery-item';
+          item.title = image.name || '';
+          const img = document.createElement('img');
+          img.className = 'gallery-thumb';
+          img.src = image.thumbnail || image.url;
+          img.alt = image.name || '';
+          item.appendChild(img);
+          const label = document.createElement('div');
+          label.className = 'gallery-label';
+          label.textContent = image.name || folder.displayName;
+          item.appendChild(label);
+          item.addEventListener('click', () => {
+            setIcon(image.url);
+            elements.galleryModal.classList.remove('active');
+          });
+          fragment.appendChild(item);
+        });
+      });
+
+      if (!state.galleryFolders.length) {
+        const empty = document.createElement('div');
+        empty.className = 'status-area';
+        empty.textContent = '対象フォルダの画像が見つかりません。';
+        fragment.appendChild(empty);
+      }
+
+      elements.galleryGrid.appendChild(fragment);
+    }
+
+    async function handleUpload(files) {
+      const file = files?.[0];
+      if (!file) return;
+      if (!DRIVE_ENDPOINT) {
+        setStatus('DriveImageのWebApp URLが設定されていません。', 'error');
+        return;
+      }
+      setStatus('アップロード中...');
+      try {
+        const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
+        const result = await DriveImageHandler.uploadImage(file, null, {
+          webAppUrl: DRIVE_ENDPOINT,
+        }, dataType === 'hero' ? 'Hero' : 'Skill');
+        if (result?.driveUrl) {
+          setIcon(result.driveUrl);
+          setStatus('アップロードしました。', 'success');
+          await openGallery();
+        }
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message, 'error');
+      }
+    }
+
+    function resetForm() {
+      state.currentRecord = dataType === 'hero' ? createEmptyHeroRecord() : createEmptySkillRecord();
+      fillForm(state.currentRecord);
+      setStatus('新規データを作成中');
+    }
+
+    async function initialize() {
+      renderTalentFields();
+      applyDataTypeLabels();
+
+      if (dataType !== 'hero' && dataType !== 'skill') {
+        elements.blockedPanel.hidden = false;
+        elements.blockedPanel.innerHTML = '<h2>不正なクエリ</h2><p>data=hero または data=skill を指定してください。</p>';
+        return;
+      }
+
+      const allowed = await verifyAuthority();
+      if (!allowed) return;
+
+      await loadRecords();
+      resetForm();
+      if (targetIdParam) {
+        loadRecord(targetIdParam);
+      }
+    }
+
+    elements.selectIconButton.addEventListener('click', openGallery);
+    elements.iconSlot.addEventListener('click', openGallery);
+    elements.closeModalButton.addEventListener('click', () => elements.galleryModal.classList.remove('active'));
+    elements.galleryModal.addEventListener('click', (event) => {
+      if (event.target === elements.galleryModal) {
+        elements.galleryModal.classList.remove('active');
+      }
+    });
+    elements.uploadInput.addEventListener('change', (event) => handleUpload(event.target.files));
+    elements.newRecordButton.addEventListener('click', resetForm);
+    elements.reloadButton.addEventListener('click', () => loadRecords());
+    elements.saveButton.addEventListener('click', saveRecord);
+    elements.deleteButton.addEventListener('click', deleteRecord);
+
+    initialize();
+  </script>
+</body>
+</html>
