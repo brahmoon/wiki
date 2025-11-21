@@ -10,7 +10,7 @@
     ADMIN_AUTH: 'https://script.google.com/macros/s/AKfycbwMdxSp7hBE9cvvoz3BwLgD3J6d6ScSu3JqdEAdD60N8V3_IUMg_TDv5wYlg1ZBR0dw1w/exec',
     USER_SETTINGS: 'https://script.google.com/macros/s/AKfycbxcXErh3Q-F8ARTpznVQ7hgyLu5-IxWefS_63K_K8AwKmDGcqLa3Fiip44OeF1cMWKGRw/exec',
     TOOLBAR_PLUGIN: 'https://script.google.com/macros/s/AKfycbwMdxSp7hBE9cvvoz3BwLgD3J6d6ScSu3JqdEAdD60N8V3_IUMg_TDv5wYlg1ZBR0dw1w/exec',
-    DATABASE: 'https://script.google.com/macros/s/YOUR_DATABASE_DEPLOYMENT_ID/exec',
+    DATABASE: 'https://script.google.com/macros/s/AKfycbwobpejdVTQflbERk_hWqzouxd3U3wImjxuXSjjdLjSvyabW7xVVOGnqR96W3GopFDtUw/exec',
   });
 
   globalObject.APPS_SCRIPT_ENDPOINTS = endpoints;
