@@ -341,18 +341,19 @@
 
     .gallery-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+      gap: 10px;
     }
 
     .gallery-item {
       border: 1px solid #e9e9e7;
-      border-radius: 12px;
+      border-radius: 10px;
       background: #faf9f7;
-      padding: 10px;
+      padding: 6px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      align-items: center;
+      gap: 6px;
       cursor: pointer;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
@@ -363,15 +364,47 @@
     }
 
     .gallery-thumb {
-      width: 100%;
-      aspect-ratio: 1;
+      width: 48px;
+      height: 48px;
       border-radius: 10px;
       object-fit: cover;
       background: #e3e2df;
     }
 
-    .gallery-label { font-size: 13px; color: #55534e; }
-    .upload-tile { align-items: center; justify-content: center; text-align: center; gap: 6px; }
+    .gallery-label { font-size: 11px; color: #55534e; text-align: center; }
+    .upload-tile { align-items: center; justify-content: center; text-align: center; gap: 4px; }
+
+    .grade-selector {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .grade-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .grade-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      box-shadow: 0 0 0 1px #d7d6d2 inset;
+    }
+
+    .grade-option input { display: none; }
+
+    .grade-option input:checked + .grade-dot {
+      box-shadow: 0 0 0 2px #2383e2;
+    }
+
+    .grade-rare { background: #3a86ff; }
+    .grade-epic { background: #9b59b6; }
+    .grade-legendary { background: #f7c843; }
   </style>
 </head>
 <body>
@@ -432,13 +465,33 @@
             </div>
             <div class="form-field">
               <label for="heroTroop">兵種</label>
-              <input type="text" id="heroTroop" placeholder="槍兵/歩兵/弓兵...">
+              <select id="heroTroop">
+                <option value="">選択してください</option>
+                <option value="槍兵">槍兵</option>
+                <option value="歩兵">歩兵</option>
+                <option value="弓兵">弓兵</option>
+                <option value="運搬兵">運搬兵</option>
+              </select>
             </div>
             <div class="form-field">
               <label for="fixedSkills">固定スキルID</label>
               <textarea id="fixedSkills" placeholder="heroA_skill1, heroA_skill2"></textarea>
               <div class="helper-text">カンマ区切りで入力してください。</div>
             </div>
+          </div>
+          <div class="grade-selector" id="heroGradeGroup">
+            <label class="grade-option" title="レア">
+              <input type="radio" name="heroGrade" value="Rare">
+              <span class="grade-dot grade-rare"></span>
+            </label>
+            <label class="grade-option" title="エピック">
+              <input type="radio" name="heroGrade" value="Epic">
+              <span class="grade-dot grade-epic"></span>
+            </label>
+            <label class="grade-option" title="レジェンダリ">
+              <input type="radio" name="heroGrade" value="Legendary">
+              <span class="grade-dot grade-legendary"></span>
+            </label>
           </div>
         </div>
 
@@ -468,12 +521,32 @@
             </div>
             <div class="form-field">
               <label for="skillType">スキル種別</label>
-              <input type="text" id="skillType" placeholder="指揮/連携/反撃 ...">
+              <select id="skillType">
+                <option value="">選択してください</option>
+                <option value="パッシブ">パッシブ</option>
+                <option value="連携">連携</option>
+                <option value="指揮">指揮</option>
+                <option value="反撃">反撃</option>
+              </select>
             </div>
             <div class="form-field" style="grid-column: 1 / -1;">
               <label for="skillDescription">説明</label>
               <textarea id="skillDescription" placeholder="スキルの効果"></textarea>
             </div>
+          </div>
+          <div class="grade-selector" id="skillGradeGroup">
+            <label class="grade-option" title="レア">
+              <input type="radio" name="skillGrade" value="Rare">
+              <span class="grade-dot grade-rare"></span>
+            </label>
+            <label class="grade-option" title="エピック">
+              <input type="radio" name="skillGrade" value="Epic">
+              <span class="grade-dot grade-epic"></span>
+            </label>
+            <label class="grade-option" title="レジェンダリ">
+              <input type="radio" name="skillGrade" value="Legendary">
+              <span class="grade-dot grade-legendary"></span>
+            </label>
           </div>
         </div>
 
@@ -545,6 +618,8 @@
       skillType: document.getElementById('skillType'),
       skillDescription: document.getElementById('skillDescription'),
       talentGrid: document.getElementById('talentGrid'),
+      heroGradeRadios: document.querySelectorAll('input[name="heroGrade"]'),
+      skillGradeRadios: document.querySelectorAll('input[name="skillGrade"]'),
     };
 
     const state = {
@@ -570,6 +645,27 @@
         console.error('Failed to parse login state', error);
         return null;
       }
+    }
+
+    function getDriveThumbnailUrl(value) {
+      if (!value) return '';
+      const idMatch =
+        /id=([\w-]+)/.exec(value) ||
+        /\/d\/([\w-]+)/.exec(value) ||
+        /\/folders\/([\w-]+)/.exec(value);
+      const fileId = idMatch?.[1];
+      return fileId ? `https://drive.google.com/thumbnail?sz=w100&id=${fileId}` : value;
+    }
+
+    function getSelectedGrade(radios) {
+      const selected = Array.from(radios).find((radio) => radio.checked);
+      return selected ? selected.value : '';
+    }
+
+    function setSelectedGrade(radios, value) {
+      Array.from(radios).forEach((radio) => {
+        radio.checked = radio.value === value;
+      });
     }
 
     function buildRequestPayload(extra = {}) {
@@ -632,6 +728,7 @@
         url: '',
         troopType: '',
         fixedSkillIds: [],
+        grade: '',
       };
       for (let i = 1; i <= TALENT_COUNT; i++) {
         record[`talent${i}`] = { name: '', type: '', description: '' };
@@ -648,15 +745,17 @@
         url: '',
         category: '',
         skillType: '',
+        grade: '',
       };
     }
 
     function setIcon(url) {
-      state.selectedImage = url || '';
+      const thumbnailUrl = getDriveThumbnailUrl(url);
+      state.selectedImage = thumbnailUrl || '';
       elements.iconSlot.innerHTML = '';
-      if (url) {
+      if (thumbnailUrl) {
         const img = document.createElement('img');
-        img.src = url;
+        img.src = thumbnailUrl;
         img.alt = 'icon';
         elements.iconSlot.appendChild(img);
       } else {
@@ -673,6 +772,7 @@
         elements.heroName.value = record.name || '';
         elements.heroUrl.value = record.url || '';
         elements.heroTroop.value = record.troopType || '';
+        setSelectedGrade(elements.heroGradeRadios, record.grade || '');
         elements.fixedSkills.value = Array.isArray(record.fixedSkillIds)
           ? record.fixedSkillIds.join(', ')
           : (record.fixedSkillIds || '');
@@ -697,6 +797,7 @@
         elements.skillCategory.value = record.category || '';
         elements.skillType.value = record.skillType || '';
         elements.skillDescription.value = record.description || '';
+        setSelectedGrade(elements.skillGradeRadios, record.grade || '');
       }
       setIcon(record.image || '');
     }
@@ -708,6 +809,7 @@
         record.name = elements.heroName.value.trim();
         record.url = elements.heroUrl.value.trim();
         record.troopType = elements.heroTroop.value.trim();
+        record.grade = getSelectedGrade(elements.heroGradeRadios);
         record.image = state.selectedImage || '';
 
         const fixed = elements.fixedSkills.value.split(',').map(v => v.trim()).filter(Boolean);
@@ -737,6 +839,7 @@
       record.category = elements.skillCategory.value.trim();
       record.skillType = elements.skillType.value.trim();
       record.description = elements.skillDescription.value.trim();
+      record.grade = getSelectedGrade(elements.skillGradeRadios);
       record.image = state.selectedImage || '';
       return record;
     }
@@ -759,7 +862,7 @@
         }
         const img = document.createElement('img');
         img.className = 'record-avatar';
-        img.src = record.image || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+        img.src = getDriveThumbnailUrl(record.image) || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
         img.alt = record.name || record.id;
         item.appendChild(img);
 
@@ -947,7 +1050,7 @@
           label.textContent = image.name || folder.displayName;
           item.appendChild(label);
           item.addEventListener('click', () => {
-            setIcon(image.url);
+            setIcon(image.thumbnail || image.url);
             elements.galleryModal.classList.remove('active');
           });
           fragment.appendChild(item);

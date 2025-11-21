@@ -31,6 +31,7 @@ const HERO_HEADERS = [
   'image',
   'url',
   'troopType',
+  'grade',
   'fixedSkillIds',
   'talent1',
   'talent2',
@@ -47,7 +48,8 @@ const SKILL_HEADERS = [
   'description',
   'url',
   'category',
-  'skillType'
+  'skillType',
+  'grade'
 ];
 
 function doGet(e) {
