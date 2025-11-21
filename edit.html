@@ -990,6 +990,23 @@
             margin-top: 16px;
             display: flex;
             justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .hero-skillset-overlay__action {
+            border: 1px solid #e2e1de;
+            border-radius: 12px;
+            background: #fafafa;
+            padding: 10px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .hero-skillset-overlay__action:hover {
+            border-color: #c5c4c0;
+            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1);
         }
 
         @media (max-width: 720px) {

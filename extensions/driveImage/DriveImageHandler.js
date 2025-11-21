@@ -7,6 +7,24 @@ export class DriveImageHandler {
   static ROOT_FOLDER_KEY = '__root__';
   static DEFAULT_PERMISSION_CACHE_TTL = 5 * 60 * 1000;
 
+  static getDefaultOptions() {
+    return {
+      webAppUrl: '',
+      maxFileSize: 5 * 1024 * 1024,
+      allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
+      uploadTimeout: 30000,
+      galleryTimeout: 15000,
+      maxConcurrentUploads: 2,
+      defaultFolderName: '',
+      permissionCacheTimeout: this.DEFAULT_PERMISSION_CACHE_TTL,
+      debug: false
+    };
+  }
+
+  static applyDefaultOptions(options = {}) {
+    return { ...this.getDefaultOptions(), ...(options || {}) };
+  }
+
   /**
    * 画像ファイルをGoogle Driveにアップロード（CORS対応版）
    * @param {File} file - アップロードするファイル
@@ -15,10 +33,11 @@ export class DriveImageHandler {
    * @returns {Promise<Object>} アップロード結果
    */
   static async uploadImage(file, editor, options, folderName = null) {
+    const resolvedOptions = this.applyDefaultOptions(options);
     const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     try {
-      if (!this.validateFile(file, options)) {
+      if (!this.validateFile(file, resolvedOptions)) {
         throw new Error(`ファイル検証に失敗: ${file.name}`);
       }
 
@@ -27,7 +46,7 @@ export class DriveImageHandler {
       // Base64に変換（プリフライトリクエストを回避するため）
       const base64Data = await this.fileToBase64(file);
 
-      const normalizedFolder = this.normalizeFolderName(folderName, options);
+      const normalizedFolder = this.normalizeFolderName(folderName, resolvedOptions);
 
       // リクエストデータを作成
       const requestData = {
@@ -43,13 +62,13 @@ export class DriveImageHandler {
       const startTime = Date.now();
       
       // Content-Type: text/plain でPOSTリクエストを送信（プリフライト回避）
-      const response = await this.fetchWithoutPreflight(options.webAppUrl, {
+      const response = await this.fetchWithoutPreflight(resolvedOptions.webAppUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain', // 重要: application/jsonではなくtext/plain
         },
         body: JSON.stringify(requestData), // JSONを文字列として送信
-      }, options.uploadTimeout || 30000);
+      }, resolvedOptions.uploadTimeout || 30000);
       
       const uploadTime = Date.now() - startTime;
       
@@ -111,6 +130,7 @@ export class DriveImageHandler {
    * @returns {Promise<Object>} 削除結果
    */
   static async deleteImage(imageId, options) {
+    const resolvedOptions = this.applyDefaultOptions(options);
     try {
       if (!imageId) {
         throw new Error('画像IDが指定されていません');
@@ -120,7 +140,7 @@ export class DriveImageHandler {
       
       // プリフライトを発生させない text/plain POST を使用して削除リクエストを送信
       const response = await this.fetchWithoutPreflight(
-        options.webAppUrl,
+        resolvedOptions.webAppUrl,
         {
           method: 'POST',
           body: JSON.stringify({
@@ -129,7 +149,7 @@ export class DriveImageHandler {
             imageId
           })
         },
-        options.uploadTimeout || 15000
+        resolvedOptions.uploadTimeout || 15000
       );
       
       if (!response.ok) {
@@ -274,15 +294,16 @@ export class DriveImageHandler {
   static async uploadMultipleImages(files, editor, options, progressCallback = null, folderName = null) {
     if (!files || files.length === 0) return { success: [], errors: [] };
 
+    const resolvedOptions = this.applyDefaultOptions(options);
     const results = { success: [], errors: [] };
-    const maxConcurrent = Math.min(options.maxConcurrentUploads || 2, 2); // CORS回避のため最大2並列
+    const maxConcurrent = Math.min(resolvedOptions.maxConcurrentUploads || 2, 2); // CORS回避のため最大2並列
 
     // ファイルをチャンクに分割して並列処理
     for (let i = 0; i < files.length; i += maxConcurrent) {
       const chunk = files.slice(i, i + maxConcurrent);
       const promises = chunk.map(async (file) => {
         try {
-          const result = await this.uploadImage(file, editor, options, folderName);
+          const result = await this.uploadImage(file, editor, resolvedOptions, folderName);
           results.success.push(result);
           
           if (progressCallback) {
@@ -367,27 +388,35 @@ export class DriveImageHandler {
    * @returns {boolean} バリデーション結果
    */
   static validateFile(file, options) {
+    const defaults = this.getDefaultOptions();
+    const allowedMimeTypes = Array.isArray(options?.allowedMimeTypes)
+      ? options.allowedMimeTypes
+      : defaults.allowedMimeTypes;
+    const maxFileSize = typeof options?.maxFileSize === 'number'
+      ? options.maxFileSize
+      : defaults.maxFileSize;
+
     if (!file || !file.type) {
       this.showMessage(`"${file?.name || '不明なファイル'}": ファイルタイプを取得できません`, 'error');
       return false;
     }
-    
-    if (!options.allowedMimeTypes.includes(file.type)) {
-      const allowedFormats = options.allowedMimeTypes
+
+    if (!allowedMimeTypes.includes(file.type)) {
+      const allowedFormats = allowedMimeTypes
         .map(type => type.split('/')[1].toUpperCase())
         .join(', ');
       this.showMessage(
-        `"${file.name}": サポートされていない形式です (対応: ${allowedFormats})`, 
+        `"${file.name}": サポートされていない形式です (対応: ${allowedFormats})`,
         'error'
       );
       return false;
     }
-    
-    if (file.size > options.maxFileSize) {
-      const maxSizeMB = (options.maxFileSize / (1024 * 1024)).toFixed(1);
+
+    if (file.size > maxFileSize) {
+      const maxSizeMB = (maxFileSize / (1024 * 1024)).toFixed(1);
       const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
       this.showMessage(
-        `"${file.name}": ファイルサイズが制限を超えています (${fileSizeMB}MB > ${maxSizeMB}MB)`, 
+        `"${file.name}": ファイルサイズが制限を超えています (${fileSizeMB}MB > ${maxSizeMB}MB)`,
         'error'
       );
       return false;
@@ -457,20 +486,21 @@ export class DriveImageHandler {
    * @returns {Promise<Array>} 画像リスト
    */
   static async loadGallery(options) {
+    const resolvedOptions = this.applyDefaultOptions(options);
     try {
-      if (options.debug) {
+      if (resolvedOptions.debug) {
         console.log('Loading gallery from Drive...');
       }
       
       // 毎回新しいデータを取得（キャッシュ回避）
       const response = await this.fetchWithTimeout(
-        `${options.webAppUrl}?action=gallery&_t=${Date.now()}`,
-        { 
+        `${resolvedOptions.webAppUrl}?action=gallery&_t=${Date.now()}`,
+        {
           method: 'GET',
           mode: 'cors',
           credentials: 'omit'
         },
-        options.galleryTimeout || 15000
+        resolvedOptions.galleryTimeout || 15000
       );
       
       if (!response.ok) {
@@ -483,7 +513,7 @@ export class DriveImageHandler {
       if (result.success) {
         const folders = this.extractGalleryFolders(result);
 
-        if (options.debug) {
+        if (resolvedOptions.debug) {
           const totalImages = folders.reduce((sum, folder) => sum + folder.images.length, 0);
           console.log(`Loaded ${folders.length} folders and ${totalImages} images from gallery`);
         }

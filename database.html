@@ -377,7 +377,7 @@
     .grade-selector {
       display: flex;
       gap: 12px;
-      margin-top: 12px;
+      margin: 8px 0 12px;
     }
 
     .grade-option {
@@ -450,6 +450,20 @@
 
         <div class="card" id="heroFields" hidden>
           <h3>英雄情報</h3>
+          <div class="grade-selector" id="heroGradeGroup">
+            <label class="grade-option" title="レア">
+              <input type="radio" name="heroGrade" value="Rare">
+              <span class="grade-dot grade-rare"></span>
+            </label>
+            <label class="grade-option" title="エピック">
+              <input type="radio" name="heroGrade" value="Epic">
+              <span class="grade-dot grade-epic"></span>
+            </label>
+            <label class="grade-option" title="レジェンダリ">
+              <input type="radio" name="heroGrade" value="Legendary">
+              <span class="grade-dot grade-legendary"></span>
+            </label>
+          </div>
           <div class="form-grid">
             <div class="form-field">
               <label for="heroId">ID</label>
@@ -479,20 +493,6 @@
               <div class="helper-text">カンマ区切りで入力してください。</div>
             </div>
           </div>
-          <div class="grade-selector" id="heroGradeGroup">
-            <label class="grade-option" title="レア">
-              <input type="radio" name="heroGrade" value="Rare">
-              <span class="grade-dot grade-rare"></span>
-            </label>
-            <label class="grade-option" title="エピック">
-              <input type="radio" name="heroGrade" value="Epic">
-              <span class="grade-dot grade-epic"></span>
-            </label>
-            <label class="grade-option" title="レジェンダリ">
-              <input type="radio" name="heroGrade" value="Legendary">
-              <span class="grade-dot grade-legendary"></span>
-            </label>
-          </div>
         </div>
 
         <div class="card" id="talentFields" hidden>
@@ -502,6 +502,20 @@
 
         <div class="card" id="skillFields" hidden>
           <h3>スキル情報</h3>
+          <div class="grade-selector" id="skillGradeGroup">
+            <label class="grade-option" title="レア">
+              <input type="radio" name="skillGrade" value="Rare">
+              <span class="grade-dot grade-rare"></span>
+            </label>
+            <label class="grade-option" title="エピック">
+              <input type="radio" name="skillGrade" value="Epic">
+              <span class="grade-dot grade-epic"></span>
+            </label>
+            <label class="grade-option" title="レジェンダリ">
+              <input type="radio" name="skillGrade" value="Legendary">
+              <span class="grade-dot grade-legendary"></span>
+            </label>
+          </div>
           <div class="form-grid">
             <div class="form-field">
               <label for="skillId">ID</label>
@@ -533,20 +547,6 @@
               <label for="skillDescription">説明</label>
               <textarea id="skillDescription" placeholder="スキルの効果"></textarea>
             </div>
-          </div>
-          <div class="grade-selector" id="skillGradeGroup">
-            <label class="grade-option" title="レア">
-              <input type="radio" name="skillGrade" value="Rare">
-              <span class="grade-dot grade-rare"></span>
-            </label>
-            <label class="grade-option" title="エピック">
-              <input type="radio" name="skillGrade" value="Epic">
-              <span class="grade-dot grade-epic"></span>
-            </label>
-            <label class="grade-option" title="レジェンダリ">
-              <input type="radio" name="skillGrade" value="Legendary">
-              <span class="grade-dot grade-legendary"></span>
-            </label>
           </div>
         </div>
 
