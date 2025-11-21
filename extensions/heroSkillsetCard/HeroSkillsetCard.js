@@ -10,6 +10,27 @@ import {
 } from '../../scripts/heroSkillsetService.js';
 
 let selectionOverlayInstance = null;
+const LOGIN_STORAGE_KEY = 'wikiLoginState';
+const DEVELOPER_AUTHORITY_VALUE = 4;
+
+function getUserAuthorityLevel() {
+  if (typeof localStorage === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    const authority = parsed?.user?.authority;
+    const number = Number(authority);
+    return Number.isFinite(number) ? number : null;
+  } catch (error) {
+    console.warn('[HeroSkillsetCard] Failed to read login authority from storage.', error);
+    return null;
+  }
+}
 
 function createEmptyUserSkills() {
   return USER_SKILL_KEYS.reduce((acc, key) => {
@@ -117,11 +138,16 @@ function getSelectionOverlay() {
   grid.className = 'hero-skillset-overlay__grid';
   const footer = document.createElement('div');
   footer.className = 'hero-skillset-overlay__footer';
+  const databaseButton = document.createElement('button');
+  databaseButton.type = 'button';
+  databaseButton.className = 'hero-skillset-overlay__action hero-skillset-overlay__db';
+  databaseButton.textContent = 'DB編集';
+  databaseButton.hidden = true;
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.className = 'hero-skillset-overlay__close';
+  closeButton.className = 'hero-skillset-overlay__close hero-skillset-overlay__action';
   closeButton.textContent = '閉じる';
-  footer.appendChild(closeButton);
+  footer.append(databaseButton, closeButton);
   panel.append(title, message, grid, footer);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
@@ -130,6 +156,8 @@ function getSelectionOverlay() {
     overlay.classList.remove('is-visible');
     grid.innerHTML = '';
     message.textContent = '';
+    databaseButton.hidden = true;
+    databaseButton.onclick = null;
   }
 
   closeButton.addEventListener('click', hide);
@@ -145,10 +173,22 @@ function getSelectionOverlay() {
   });
 
   selectionOverlayInstance = {
-    open({ title: overlayTitle, items, allowClear, onSelect, onClear, emptyMessage }) {
+    open({ title: overlayTitle, items, allowClear, onSelect, onClear, emptyMessage, databaseType }) {
       title.textContent = overlayTitle || '';
       grid.innerHTML = '';
       message.textContent = '';
+      databaseButton.hidden = true;
+      databaseButton.onclick = null;
+
+      const authority = getUserAuthorityLevel();
+      const canEditDatabase = databaseType && authority !== null && authority >= DEVELOPER_AUTHORITY_VALUE;
+      if (canEditDatabase) {
+        const type = databaseType === 'skill' ? 'skill' : 'hero';
+        databaseButton.hidden = false;
+        databaseButton.onclick = () => {
+          window.open(`./database.html?data=${type}`, '_blank', 'noopener');
+        };
+      }
       if (allowClear) {
         const clearButton = document.createElement('button');
         clearButton.type = 'button';
@@ -279,7 +319,8 @@ class HeroSkillsetCardNodeView {
       allowClear: Boolean(currentHeroId),
       onSelect: heroId => this.setHero(rowKey, heroId),
       onClear: () => this.clearHero(rowKey),
-      emptyMessage: '選択できる英雄がありません。'
+      emptyMessage: '選択できる英雄がありません。',
+      databaseType: 'hero'
     });
   }
 
@@ -318,7 +359,8 @@ class HeroSkillsetCardNodeView {
       allowClear: Boolean(currentSkillId),
       onSelect: skillId => this.setUserSkill(rowKey, slotKey, skillId),
       onClear: () => this.clearUserSkill(rowKey, slotKey),
-      emptyMessage: '選択できるスキルがありません。'
+      emptyMessage: '選択できるスキルがありません。',
+      databaseType: 'skill'
     });
   }
 
