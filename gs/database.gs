@@ -41,6 +41,8 @@ const HERO_HEADERS = [
   'talent6'
 ];
 
+const HERO_TALENT_KEYS = ['talent1', 'talent2', 'talent3', 'talent4', 'talent5', 'talent6'];
+
 const SKILL_HEADERS = [
   'id',
   'name',
