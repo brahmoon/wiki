@@ -25,6 +25,69 @@ export class DriveImageHandler {
     return { ...this.getDefaultOptions(), ...(options || {}) };
   }
 
+  static extractFolderInfo(folderName) {
+    const text = (folderName || '').toString().trim();
+    const match = text.match(/^(.*)@([0-9]+)$/);
+    const baseName = match ? (match[1] || '').trim() : text;
+    const sizeLimit = match ? Number(match[2]) : null;
+    return {
+      baseName,
+      sizeLimit: Number.isFinite(sizeLimit) ? sizeLimit : null
+    };
+  }
+
+  static async resizeImageFile(file, maxSize) {
+    if (!maxSize || !Number.isFinite(maxSize)) {
+      return file;
+    }
+
+    try {
+      const dataUrl = await this.fileToBase64(file);
+      const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+        img.src = dataUrl;
+      });
+
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+
+      if (!width || !height) {
+        return file;
+      }
+
+      const largerSide = Math.max(width, height);
+      if (largerSide <= maxSize) {
+        return file;
+      }
+
+      const scale = maxSize / largerSide;
+      const targetWidth = Math.round(width * scale);
+      const targetHeight = Math.round(height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+      const blob = await new Promise((resolve) => {
+        const mime = file.type || 'image/jpeg';
+        canvas.toBlob(resolve, mime, 0.92);
+      });
+
+      if (!blob) {
+        return file;
+      }
+
+      return new File([blob], file.name, { type: blob.type || file.type, lastModified: Date.now() });
+    } catch (error) {
+      console.warn('画像のリサイズに失敗したため、元のファイルを使用します。', error);
+      return file;
+    }
+  }
+
   /**
    * 画像ファイルをGoogle Driveにアップロード（CORS対応版）
    * @param {File} file - アップロードするファイル
@@ -41,19 +104,22 @@ export class DriveImageHandler {
         throw new Error(`ファイル検証に失敗: ${file.name}`);
       }
 
+      const folderInfo = this.extractFolderInfo(folderName);
+      const resizedFile = await this.resizeImageFile(file, folderInfo.sizeLimit);
+
       this.showLoading(`"${file.name}" をアップロード中...`);
 
       // Base64に変換（プリフライトリクエストを回避するため）
-      const base64Data = await this.fileToBase64(file);
+      const base64Data = await this.fileToBase64(resizedFile);
 
       const normalizedFolder = this.normalizeFolderName(folderName, resolvedOptions);
 
       // リクエストデータを作成
       const requestData = {
         file: base64Data,
-        filename: file.name,
-        mimetype: file.type,
-        size: file.size.toString(),
+        filename: resizedFile.name,
+        mimetype: resizedFile.type,
+        size: resizedFile.size.toString(),
         uploadId: uploadId,
         method: 'base64',
         folderName: normalizedFolder || undefined
@@ -592,19 +658,22 @@ export class DriveImageHandler {
       return null;
     }
     const rawName = typeof folder.name === 'string' ? folder.name : '';
-    const label = this.sanitizeFolderLabel(folder.displayName || folder.label || rawName);
-    const key = folder.key ? this.getFolderKey(folder.key) : this.getFolderKey(rawName || label);
+    const folderInfo = this.extractFolderInfo(rawName);
+    const label = this.sanitizeFolderLabel(folder.displayName || folder.label || folderInfo.baseName);
+    const displayName = label || folderInfo.baseName || rawName || '未分類';
+    const key = folder.key ? this.getFolderKey(folder.key) : this.getFolderKey(rawName || displayName);
     const images = Array.isArray(folder.images)
       ? folder.images
-          .map((image) => this.normalizeImageRecord(image, label || rawName || '', key, rawName))
+          .map((image) => this.normalizeImageRecord(image, displayName, key, rawName))
           .filter(Boolean)
       : [];
     return {
       id: folder.id || key,
       name: rawName,
-      displayName: label || rawName || '未分類',
+      displayName,
       key,
       path: folder.path || '',
+      sizeLimit: folderInfo.sizeLimit,
       imageCount: typeof folder.imageCount === 'number' ? folder.imageCount : images.length,
       images
     };

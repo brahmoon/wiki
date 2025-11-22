@@ -1208,9 +1208,12 @@
       setStatus('アップロード中...');
       try {
         const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
+        const preferredFolder = Array.isArray(state.galleryFolders) && state.galleryFolders.length
+          ? state.galleryFolders[0]
+          : null;
         const result = await DriveImageHandler.uploadImage(file, null, {
           webAppUrl: DRIVE_ENDPOINT,
-        }, dataType === 'hero' ? 'Hero' : 'Skill');
+        }, preferredFolder?.name || (dataType === 'hero' ? 'Hero' : 'Skill'));
         if (result?.driveUrl) {
           setIcon(result.driveUrl);
           setStatus('アップロードしました。', 'success');

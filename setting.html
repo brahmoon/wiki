@@ -1081,6 +1081,7 @@
                             <div id="authority-role-toggle" class="authority-role-toggle" role="radiogroup" aria-label="権限対象">
                                 <button type="button" class="authority-role-button" data-authority-role="Editor" aria-pressed="false">Editor</button>
                                 <button type="button" class="authority-role-button" data-authority-role="Moderator" aria-pressed="false">Moderator</button>
+                                <button type="button" class="authority-role-button" data-authority-role="Developer" aria-pressed="false">Developer</button>
                                 <button type="button" class="authority-role-button" data-authority-role="Administrator" aria-pressed="false">Administrator</button>
                             </div>
                         </div>
@@ -1199,7 +1200,7 @@
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
         const APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE_PERMISSION = APPS_SCRIPT_ENDPOINT_ADMIN_AUTH;
         const DRIVE_IMAGE_ADMIN_ROLE = 'Administrator';
-        const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator', DRIVE_IMAGE_ADMIN_ROLE];
+        const DRIVE_IMAGE_ROLES = ['Editor', 'Moderator', 'Developer', DRIVE_IMAGE_ADMIN_ROLE];
         const DRIVE_IMAGE_MUTABLE_ROLES = DRIVE_IMAGE_ROLES.filter((role) => role !== DRIVE_IMAGE_ADMIN_ROLE);
         const DRIVE_IMAGE_READ_ONLY_ROLES = new Set([DRIVE_IMAGE_ADMIN_ROLE]);
         const DRIVE_IMAGE_ROOT_KEY = '__root__';
@@ -1409,6 +1410,7 @@
             permissionsByRole: {
                 Editor: {},
                 Moderator: {},
+                Developer: {},
                 [DRIVE_IMAGE_ADMIN_ROLE]: {}
             }
         };
@@ -1627,6 +1629,9 @@
                 if (value >= ADMIN_AUTHORITY_VALUE) {
                     return DRIVE_IMAGE_ADMIN_ROLE;
                 }
+                if (value >= 4) {
+                    return 'Developer';
+                }
                 if (value >= 3) {
                     return 'Moderator';
                 }
@@ -1644,6 +1649,9 @@
             const lower = text.toLowerCase();
             if (lower === 'administrator' || lower === 'admin') {
                 return DRIVE_IMAGE_ADMIN_ROLE;
+            }
+            if (lower === 'developer') {
+                return 'Developer';
             }
             if (lower === 'moderator') {
                 return 'Moderator';

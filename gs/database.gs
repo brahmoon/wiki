@@ -71,6 +71,11 @@ function doPost(e) {
       return createJsonOutput(authority, origin);
     }
 
+    if (action === 'getHeroSkillsetData') {
+      const result = getHeroSkillsetData();
+      return createJsonOutput(result, origin);
+    }
+
     const verification = requireDeveloperAuthority(data);
     if (!verification.allowed) {
       return createJsonOutput(verification.response, origin);
@@ -339,6 +344,106 @@ function listRecords(dataType) {
         image: record.image || '',
       };
     }),
+  };
+}
+
+function normalizeStringValue(value) {
+  if (value === null || typeof value === 'undefined') {
+    return '';
+  }
+  return typeof value === 'string' ? value : value.toString();
+}
+
+function normalizeFixedSkillIds(value) {
+  if (!value) {
+    return [];
+  }
+
+  const list = Array.isArray(value) ? value : [value];
+  return list
+    .map(function(entry) {
+      if (typeof entry === 'string') {
+        return entry;
+      }
+      if (entry && typeof entry === 'object') {
+        if (typeof entry.id === 'string') {
+          return entry.id;
+        }
+        if (typeof entry.name === 'string') {
+          return entry.name;
+        }
+      }
+      return '';
+    })
+    .filter(function(text) {
+      return !!text;
+    });
+}
+
+function normalizeTalentCell(value) {
+  if (!value || typeof value !== 'object') {
+    return '';
+  }
+
+  const name = typeof value.name === 'string' ? value.name : '';
+  const type = typeof value.type === 'string' ? value.type : '';
+  const description = typeof value.description === 'string' ? value.description : '';
+
+  if (!name && !description) {
+    return '';
+  }
+
+  return { name, type, description };
+}
+
+function normalizeHeroSkillsetRecord(record) {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+
+  const normalized = {
+    id: normalizeStringValue(record.id),
+    name: normalizeStringValue(record.name),
+    image: normalizeStringValue(record.image),
+    url: normalizeStringValue(record.url),
+    troopType: normalizeStringValue(record.troopType),
+    grade: normalizeStringValue(record.grade),
+    fixedSkillIds: normalizeFixedSkillIds(record.fixedSkillIds || record.fixedSkills)
+  };
+
+  HERO_TALENT_KEYS.forEach(function(key) {
+    normalized[key] = normalizeTalentCell(record[key]);
+  });
+
+  return normalized;
+}
+
+function normalizeSkillRecordForHeroCard(record) {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+
+  return {
+    id: normalizeStringValue(record.id),
+    name: normalizeStringValue(record.name),
+    image: normalizeStringValue(record.image),
+    description: normalizeStringValue(record.description),
+    url: normalizeStringValue(record.url),
+    category: normalizeStringValue(record.category),
+    skillType: normalizeStringValue(record.skillType),
+    grade: normalizeStringValue(record.grade)
+  };
+}
+
+function getHeroSkillsetData() {
+  const heroes = readRecords('hero').map(normalizeHeroSkillsetRecord).filter(Boolean);
+  const skills = readRecords('skill').map(normalizeSkillRecordForHeroCard).filter(Boolean);
+
+  return {
+    success: true,
+    heroes,
+    skills,
+    updatedAt: new Date().toISOString()
   };
 }
 
