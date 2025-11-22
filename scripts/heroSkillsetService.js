@@ -1,5 +1,7 @@
 const HERO_DB_PATH = './database/hero_db.json';
 const SKILL_DB_PATH = './database/skill_db.json';
+const DATABASE_ENDPOINT = typeof window !== 'undefined' ? window.APPS_SCRIPT_ENDPOINT_DATABASE : '';
+const LOGIN_STORAGE_KEY = 'wikiLoginState';
 const ROW_KEYS = ['row1', 'row2'];
 const USER_SKILL_KEYS = ['skill3', 'skill4'];
 const HERO_TALENT_KEYS = ['talent1', 'talent2', 'talent3', 'talent4', 'talent5', 'talent6'];
@@ -56,32 +58,149 @@ async function fetchJson(path) {
   return await response.json();
 }
 
+function getLoginState() {
+  if (typeof localStorage === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function normalizeString(value) {
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeFixedSkillIds(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(entry => {
+      if (typeof entry === 'string') {
+        return entry;
+      }
+      if (entry && typeof entry === 'object') {
+        if (typeof entry.id === 'string') {
+          return entry.id;
+        }
+        if (typeof entry.name === 'string') {
+          return entry.name;
+        }
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function normalizeHeroRecord(record) {
+  const normalized = {
+    id: normalizeString(record?.id),
+    name: normalizeString(record?.name),
+    image: normalizeString(record?.image),
+    url: normalizeString(record?.url),
+    troopType: normalizeString(record?.troopType),
+    grade: normalizeString(record?.grade),
+    fixedSkillIds: normalizeFixedSkillIds(record?.fixedSkillIds || record?.fixedSkills || [])
+  };
+
+  HERO_TALENT_KEYS.forEach(key => {
+    normalized[key] = normalizeTalentEntry(record?.[key]);
+  });
+
+  return normalized;
+}
+
+function normalizeSkillRecord(record) {
+  return {
+    id: normalizeString(record?.id),
+    name: normalizeString(record?.name),
+    image: normalizeString(record?.image),
+    description: normalizeString(record?.description),
+    url: normalizeString(record?.url),
+    category: normalizeString(record?.category),
+    skillType: normalizeString(record?.skillType),
+    grade: normalizeString(record?.grade)
+  };
+}
+
+async function loadFromDatabaseEndpoint() {
+  if (!DATABASE_ENDPOINT || DATABASE_ENDPOINT.includes('YOUR_DATABASE_DEPLOYMENT_ID')) {
+    return null;
+  }
+
+  const loginState = getLoginState();
+  const user = loginState?.user || {};
+  const payload = {
+    action: 'getHeroSkillsetData',
+    playerId: user.playerId || '',
+    email: user.email || ''
+  };
+
+  const response = await fetch(DATABASE_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load hero skillset data (HTTP ${response.status})`);
+  }
+
+  const result = await response.json();
+  if (!result?.success || !Array.isArray(result.heroes) || !Array.isArray(result.skills)) {
+    throw new Error(result?.message || 'Unexpected response from database endpoint');
+  }
+
+  const heroes = result.heroes.map(normalizeHeroRecord);
+  const skills = result.skills.map(normalizeSkillRecord);
+  return buildDataStore(heroes, skills);
+}
+
+async function loadFromLocalFiles() {
+  const [heroes, skills] = await Promise.all([
+    fetchJson(HERO_DB_PATH),
+    fetchJson(SKILL_DB_PATH)
+  ]);
+  return buildDataStore(heroes, skills);
+}
+
+function buildDataStore(heroes, skills) {
+  const heroMap = new Map();
+  const skillMap = new Map();
+  (heroes || []).forEach(hero => {
+    if (hero?.id) {
+      heroMap.set(hero.id, hero);
+    }
+  });
+  (skills || []).forEach(skill => {
+    if (skill?.id) {
+      skillMap.set(skill.id, skill);
+    }
+  });
+
+  const selectableSkills = (skills || []).filter(skill => skill?.category === 'user');
+
+  return { heroes: heroes || [], skills: skills || [], heroMap, skillMap, selectableSkills };
+}
+
 async function loadHeroSkillsetData() {
   if (!cachedDataPromise) {
-    cachedDataPromise = Promise.all([
-      fetchJson(HERO_DB_PATH),
-      fetchJson(SKILL_DB_PATH)
-    ]).then(([heroes, skills]) => {
-      const heroMap = new Map();
-      const skillMap = new Map();
-      heroes.forEach(hero => {
-        if (hero?.id) {
-          heroMap.set(hero.id, hero);
+    cachedDataPromise = (async () => {
+      try {
+        const databaseData = await loadFromDatabaseEndpoint();
+        if (databaseData) {
+          return databaseData;
         }
-      });
-      skills.forEach(skill => {
-        if (skill?.id) {
-          skillMap.set(skill.id, skill);
-        }
-      });
-      return {
-        heroes,
-        skills,
-        heroMap,
-        skillMap,
-        selectableSkills: skills.filter(skill => skill?.category === 'user')
-      };
-    }).catch(error => {
+      } catch (error) {
+        console.warn('[HeroSkillsetService] Failed to load data from Apps Script endpoint. Falling back to local data.', error);
+      }
+
+      return await loadFromLocalFiles();
+    })().catch(error => {
       cachedDataPromise = null;
       throw error;
     });
