@@ -124,6 +124,20 @@
       font-weight: 700;
     }
 
+    .page-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .data-type-switcher select {
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid #d7d6d2;
+      background: #fff;
+      font-size: 13px;
+    }
+
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -341,19 +355,21 @@
 
     .gallery-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
       gap: 10px;
+      justify-items: center;
     }
 
     .gallery-item {
       border: 1px solid #e9e9e7;
       border-radius: 10px;
       background: #faf9f7;
-      padding: 6px;
+      padding: 0;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
       cursor: pointer;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
@@ -364,15 +380,20 @@
     }
 
     .gallery-thumb {
-      width: 48px;
-      height: 48px;
+      width: 100%;
+      height: 100%;
       border-radius: 10px;
       object-fit: cover;
       background: #e3e2df;
     }
 
-    .gallery-label { font-size: 11px; color: #55534e; text-align: center; }
-    .upload-tile { align-items: center; justify-content: center; text-align: center; gap: 4px; }
+    .upload-tile {
+      text-align: center;
+      width: 72px;
+      height: 72px;
+      padding: 8px;
+      line-height: 1.2;
+    }
 
     .grade-selector {
       display: flex;
@@ -431,7 +452,15 @@
             <div class="page-title" id="pageTitle"></div>
             <div class="sidebar-subtitle" id="pageSubtitle"></div>
           </div>
-          <div class="status-badge" id="authorityBadge"></div>
+          <div class="page-actions">
+            <div class="data-type-switcher">
+              <select id="dataTypeSelect" aria-label="データタイプの切り替え">
+                <option value="hero">英雄DB</option>
+                <option value="skill">スキルDB</option>
+              </select>
+            </div>
+            <div class="status-badge" id="authorityBadge"></div>
+          </div>
         </div>
 
         <div class="card">
@@ -487,8 +516,8 @@
             </div>
             <div class="form-field">
               <label for="fixedSkills">固定スキルID</label>
-              <textarea id="fixedSkills" placeholder="heroA_skill1, heroA_skill2"></textarea>
-              <div class="helper-text">カンマ区切りで入力してください。</div>
+              <textarea id="fixedSkills" readonly></textarea>
+              <div class="helper-text">英雄IDを入力すると自動で3つの固定スキルIDが設定されます。</div>
             </div>
           </div>
         </div>
@@ -581,6 +610,13 @@
     const DRIVE_ENDPOINT = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
     const LOGIN_STORAGE_KEY = 'wikiLoginState';
     const TALENT_COUNT = 6;
+    const SKILL_TYPE_OPTIONS = [
+      { value: '', label: '選択してください' },
+      { value: 'パッシブ', label: 'パッシブ' },
+      { value: '連携', label: '連携' },
+      { value: '指揮', label: '指揮' },
+      { value: '反撃', label: '反撃' },
+    ];
 
     const elements = {
       blockedPanel: document.getElementById('blockedPanel'),
@@ -589,6 +625,7 @@
       pageTitle: document.getElementById('pageTitle'),
       pageSubtitle: document.getElementById('pageSubtitle'),
       authorityBadge: document.getElementById('authorityBadge'),
+      dataTypeSelect: document.getElementById('dataTypeSelect'),
       iconSlot: document.getElementById('iconSlot'),
       selectIconButton: document.getElementById('selectIconButton'),
       heroFields: document.getElementById('heroFields'),
@@ -692,7 +729,14 @@
       return await response.json();
     }
 
+    function buildSkillTypeOptions(defaultLabel = '選択してください') {
+      return SKILL_TYPE_OPTIONS.map(({ value, label }) => {
+        return `<option value="${value}">${label || defaultLabel}</option>`;
+      }).join('');
+    }
+
     function renderTalentFields() {
+      const typeOptions = buildSkillTypeOptions();
       const fragments = document.createDocumentFragment();
       for (let i = 1; i <= TALENT_COUNT; i++) {
         const wrapper = document.createElement('div');
@@ -705,7 +749,7 @@
           </div>
           <div class="form-field">
             <label>タイプ</label>
-            <input type="text" data-talent="type" data-index="${i}">
+            <select data-talent="type" data-index="${i}">${typeOptions}</select>
           </div>
           <div class="form-field">
             <label>説明</label>
@@ -716,6 +760,15 @@
       }
       elements.talentGrid.innerHTML = '';
       elements.talentGrid.appendChild(fragments);
+    }
+
+    function generateFixedSkillIds(heroId) {
+      if (!heroId) return [];
+      return [
+        `${heroId}_active_skill`,
+        `${heroId}_secondary_skill`,
+        `${heroId}_awaked_skill`,
+      ];
     }
 
     function createEmptyHeroRecord() {
@@ -771,9 +824,10 @@
         elements.heroUrl.value = record.url || '';
         elements.heroTroop.value = record.troopType || '';
         setSelectedGrade(elements.heroGradeRadios, record.grade || '');
-        elements.fixedSkills.value = Array.isArray(record.fixedSkillIds)
-          ? record.fixedSkillIds.join(', ')
-          : (record.fixedSkillIds || '');
+        const fixedIds = Array.isArray(record.fixedSkillIds) && record.fixedSkillIds.length
+          ? record.fixedSkillIds
+          : generateFixedSkillIds(record.id);
+        elements.fixedSkills.value = fixedIds.join(', ');
 
         document.querySelectorAll('[data-talent]').forEach((el) => {
           const index = el.getAttribute('data-index');
@@ -810,8 +864,8 @@
         record.grade = getSelectedGrade(elements.heroGradeRadios);
         record.image = state.selectedImage || '';
 
-        const fixed = elements.fixedSkills.value.split(',').map(v => v.trim()).filter(Boolean);
-        record.fixedSkillIds = fixed;
+        record.fixedSkillIds = generateFixedSkillIds(record.id);
+        elements.fixedSkills.value = record.fixedSkillIds.join(', ');
 
         document.querySelectorAll('[data-talent]').forEach((el) => {
           const index = el.getAttribute('data-index');
@@ -885,6 +939,18 @@
       elements.heroFields.hidden = dataType !== 'hero';
       elements.talentFields.hidden = dataType !== 'hero';
       elements.skillFields.hidden = dataType !== 'skill';
+      if (elements.dataTypeSelect) {
+        elements.dataTypeSelect.value = dataType === 'skill' ? 'skill' : 'hero';
+      }
+    }
+
+    function handleDataTypeChange(event) {
+      const nextType = event.target.value;
+      if (!nextType || nextType === dataType) return;
+      const url = new URL(window.location.href);
+      url.searchParams.set('data', nextType);
+      url.searchParams.delete('id');
+      window.location.href = url.toString();
     }
 
     async function verifyAuthority() {
@@ -1043,10 +1109,6 @@
           img.src = image.thumbnail || image.url;
           img.alt = image.name || '';
           item.appendChild(img);
-          const label = document.createElement('div');
-          label.className = 'gallery-label';
-          label.textContent = image.name || folder.displayName;
-          item.appendChild(label);
           item.addEventListener('click', () => {
             setIcon(image.thumbnail || image.url);
             elements.galleryModal.classList.remove('active');
@@ -1128,6 +1190,13 @@
     elements.reloadButton.addEventListener('click', () => loadRecords());
     elements.saveButton.addEventListener('click', saveRecord);
     elements.deleteButton.addEventListener('click', deleteRecord);
+    elements.dataTypeSelect.addEventListener('change', handleDataTypeChange);
+    elements.heroId.addEventListener('input', () => {
+      if (dataType === 'hero') {
+        const ids = generateFixedSkillIds(elements.heroId.value.trim());
+        elements.fixedSkills.value = ids.join(', ');
+      }
+    });
 
     initialize();
   </script>
