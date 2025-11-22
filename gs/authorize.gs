@@ -75,6 +75,7 @@ let cachedAdminTokenSecretFetchedAt = 0;
 const DRIVE_IMAGE_ADMIN_AUTHORITY = ADMIN_AUTHORITY_THRESHOLD;
 const DRIVE_IMAGE_ROLES = Array.from(new Set([
   DRIVE_IMAGE_ADMIN_ROLE,
+  'Developer',
   'Moderator',
   'Editor'
 ]));
@@ -801,6 +802,9 @@ function resolveDriveImageRole(value) {
     if (value >= DRIVE_IMAGE_ADMIN_AUTHORITY) {
       return DRIVE_IMAGE_ADMIN_ROLE;
     }
+    if (value >= 4) {
+      return 'Developer';
+    }
     if (value >= 3) {
       return 'Moderator';
     }
@@ -818,6 +822,9 @@ function resolveDriveImageRole(value) {
   const lower = stringValue.toLowerCase();
   if (lower === DRIVE_IMAGE_ADMIN_ROLE.toLowerCase() || lower === 'administrator' || lower === 'admin') {
     return DRIVE_IMAGE_ADMIN_ROLE;
+  }
+  if (lower === 'developer') {
+    return 'Developer';
   }
   if (lower === 'moderator') {
     return 'Moderator';
