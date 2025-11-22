@@ -440,6 +440,50 @@
             position: relative;
         }
 
+        .table-control {
+            position: absolute;
+            display: flex;
+            gap: 6px;
+            background: #fff;
+            border: 1px solid #d7d6d2;
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+            padding: 6px;
+            z-index: 30;
+            align-items: center;
+        }
+
+        .table-control[hidden] {
+            display: none;
+        }
+
+        .table-control button {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            border: 1px solid #d7d6d2;
+            background: #f7f6f3;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            color: #37352f;
+        }
+
+        .table-control button:hover {
+            background: #ecebe8;
+        }
+
+        .table-control-row {
+            transform: translate(-50%, 10px);
+        }
+
+        .table-control-col {
+            flex-direction: column;
+            transform: translate(10px, -50%);
+        }
+
         .youtube-paste-popup {
             position: absolute;
             top: 0;
@@ -1465,6 +1509,14 @@
                             <button id="link-remove" type="button" title="リンクを解除">解除</button>
                             <button id="link-cancel" type="button" title="リンク編集を閉じる">閉じる</button>
                         </div>
+                    </div>
+                    <div id="table-row-controls" class="table-control table-control-row" hidden>
+                        <button type="button" data-table-action="addRow" aria-label="行を追加">+</button>
+                        <button type="button" data-table-action="removeRow" aria-label="行を削除">-</button>
+                    </div>
+                    <div id="table-col-controls" class="table-control table-control-col" hidden>
+                        <button type="button" data-table-action="addColumn" aria-label="列を追加">+</button>
+                        <button type="button" data-table-action="removeColumn" aria-label="列を削除">-</button>
                     </div>
                     <div id="youtube-paste-popup" class="youtube-paste-popup" role="dialog" aria-hidden="true">
                         <div class="youtube-paste-popup-message">YouTubeのURLが検出されました。どのように貼り付けますか？</div>
@@ -2748,6 +2800,8 @@
             linkApply: document.getElementById('link-apply'),
             linkRemove: document.getElementById('link-remove'),
             linkCancel: document.getElementById('link-cancel'),
+            tableRowControls: document.getElementById('table-row-controls'),
+            tableColControls: document.getElementById('table-col-controls'),
             youtubePastePopup: document.getElementById('youtube-paste-popup'),
             youtubePasteAsUrl: document.getElementById('youtube-paste-as-url'),
             youtubeEmbedVideo: document.getElementById('youtube-embed-video'),
@@ -4708,6 +4762,8 @@
             });
             elements.youtubePasteAsUrl?.addEventListener('click', applyYouTubePasteAsUrl);
             elements.youtubeEmbedVideo?.addEventListener('click', applyYouTubeEmbed);
+            elements.tableRowControls?.addEventListener('click', handleTableControlClick);
+            elements.tableColControls?.addEventListener('click', handleTableControlClick);
             elements.linkInput.addEventListener('keydown', event => {
                 if (event.key === 'Enter') {
                     event.preventDefault();
@@ -4722,6 +4778,9 @@
                 updateToolbarShadow();
                 if (state.youtubePaste.visible) {
                     hideYouTubePastePopup();
+                }
+                if (!elements.tableRowControls?.hasAttribute('hidden')) {
+                    updateTableControls(state.editor);
                 }
             });
             elements.sidebarToggle?.addEventListener('click', () => {
@@ -4749,6 +4808,9 @@
                 requestAnimationFrame(updateToolbarMetrics);
                 if (state.youtubePaste.visible) {
                     hideYouTubePastePopup();
+                }
+                if (!elements.tableRowControls?.hasAttribute('hidden')) {
+                    updateTableControls(state.editor);
                 }
             });
             window.addEventListener('beforeunload', event => {
@@ -4786,6 +4848,71 @@
                     hidePageLinkPanel();
                 }
             });
+        }
+
+        function findActiveTableElement() {
+            const selection = window.getSelection();
+            const anchorNode = selection?.anchorNode;
+            if (!anchorNode) {
+                return null;
+            }
+            if (anchorNode instanceof Element) {
+                return anchorNode.closest('table');
+            }
+            if (anchorNode instanceof Text && anchorNode.parentElement) {
+                return anchorNode.parentElement.closest('table');
+            }
+            return null;
+        }
+
+        function hideTableControls() {
+            elements.tableRowControls?.setAttribute('hidden', 'true');
+            elements.tableColControls?.setAttribute('hidden', 'true');
+        }
+
+        function updateTableControls(editorInstance = state.editor) {
+            const rowControls = elements.tableRowControls;
+            const colControls = elements.tableColControls;
+            if (!rowControls || !colControls || !editorInstance) {
+                return;
+            }
+            const tableElement = findActiveTableElement();
+            const containerRect = elements.editorContainer?.getBoundingClientRect();
+            if (!tableElement || !containerRect || !editorInstance.isActive('table')) {
+                hideTableControls();
+                return;
+            }
+            const tableRect = tableElement.getBoundingClientRect();
+            rowControls.style.left = `${tableRect.left - containerRect.left + tableRect.width / 2}px`;
+            rowControls.style.top = `${tableRect.bottom - containerRect.top}px`;
+            colControls.style.left = `${tableRect.right - containerRect.left}px`;
+            colControls.style.top = `${tableRect.top - containerRect.top + tableRect.height / 2}px`;
+            rowControls.removeAttribute('hidden');
+            colControls.removeAttribute('hidden');
+        }
+
+        function handleTableControlClick(event) {
+            const target = event.target;
+            if (!(target instanceof Element)) {
+                return;
+            }
+            const button = target.closest('button[data-table-action]');
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+            event.preventDefault();
+            const action = button.getAttribute('data-table-action');
+            const commandMap = {
+                addRow: () => state.editor?.chain().focus().addRowAfter().run(),
+                removeRow: () => state.editor?.chain().focus().deleteRow().run(),
+                addColumn: () => state.editor?.chain().focus().addColumnAfter().run(),
+                removeColumn: () => state.editor?.chain().focus().deleteColumn().run()
+            };
+            const handler = commandMap[action];
+            if (typeof handler === 'function') {
+                handler();
+                updateTableControls(state.editor);
+            }
         }
 
         function initEditor() {
@@ -4846,10 +4973,20 @@
                     YouTubeEmbed
                 ],
                 content: '',
+                onSelectionUpdate({ editor }) {
+                    updateTableControls(editor);
+                },
+                onFocus({ editor }) {
+                    updateTableControls(editor);
+                },
+                onBlur() {
+                    hideTableControls();
+                },
                 onUpdate() {
                     if (!state.isApplyingContent) {
                         state.isDirty = true;
                     }
+                    updateTableControls(state.editor);
                 }
             });
             driveImageExtensionInstance = state.editor?.extensionManager?.extensions?.find((extension) => extension.name === 'driveImage') || null;

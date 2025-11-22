@@ -204,6 +204,11 @@
       gap: 12px 16px;
     }
 
+    .form-grid.inline-four {
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
     .form-field {
       display: flex;
       flex-direction: column;
@@ -233,6 +238,12 @@
     }
 
     .talent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .unique-skill-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 12px;
@@ -491,7 +502,7 @@
               <span class="grade-dot grade-legendary"></span>
             </label>
           </div>
-          <div class="form-grid">
+          <div class="form-grid inline-four">
             <div class="form-field">
               <label for="heroId">ID</label>
               <input type="text" id="heroId" placeholder="hero id">
@@ -514,12 +525,12 @@
                 <option value="運搬兵">運搬兵</option>
               </select>
             </div>
-            <div class="form-field">
-              <label for="fixedSkills">固定スキルID</label>
-              <textarea id="fixedSkills" readonly></textarea>
-              <div class="helper-text">英雄IDを入力すると自動で3つの固定スキルIDが設定されます。</div>
-            </div>
           </div>
+        </div>
+
+        <div class="card" id="uniqueSkillFields" hidden>
+          <h3>固有スキル</h3>
+          <div class="unique-skill-grid" id="uniqueSkillGrid"></div>
         </div>
 
         <div class="card" id="talentFields" hidden>
@@ -543,7 +554,7 @@
               <span class="grade-dot grade-legendary"></span>
             </label>
           </div>
-          <div class="form-grid">
+          <div class="form-grid inline-four">
             <div class="form-field">
               <label for="skillId">ID</label>
               <input type="text" id="skillId" placeholder="skill id">
@@ -555,10 +566,6 @@
             <div class="form-field">
               <label for="skillUrl">URL</label>
               <input type="text" id="skillUrl" placeholder="ページURL">
-            </div>
-            <div class="form-field">
-              <label for="skillCategory">カテゴリ</label>
-              <input type="text" id="skillCategory" placeholder="hero/user など">
             </div>
             <div class="form-field">
               <label for="skillType">スキル種別</label>
@@ -641,15 +648,15 @@
       galleryGrid: document.getElementById('galleryGrid'),
       closeModalButton: document.getElementById('closeModalButton'),
       uploadInput: document.getElementById('uploadInput'),
-      fixedSkills: document.getElementById('fixedSkills'),
       heroId: document.getElementById('heroId'),
       heroName: document.getElementById('heroName'),
       heroUrl: document.getElementById('heroUrl'),
       heroTroop: document.getElementById('heroTroop'),
+      uniqueSkillFields: document.getElementById('uniqueSkillFields'),
+      uniqueSkillGrid: document.getElementById('uniqueSkillGrid'),
       skillId: document.getElementById('skillId'),
       skillName: document.getElementById('skillName'),
       skillUrl: document.getElementById('skillUrl'),
-      skillCategory: document.getElementById('skillCategory'),
       skillType: document.getElementById('skillType'),
       skillDescription: document.getElementById('skillDescription'),
       talentGrid: document.getElementById('talentGrid'),
@@ -762,13 +769,31 @@
       elements.talentGrid.appendChild(fragments);
     }
 
-    function generateFixedSkillIds(heroId) {
-      if (!heroId) return [];
-      return [
-        `${heroId}_active_skill`,
-        `${heroId}_secondary_skill`,
-        `${heroId}_awaked_skill`,
-      ];
+    function renderUniqueSkillFields() {
+      const typeOptions = buildSkillTypeOptions();
+      const fragments = document.createDocumentFragment();
+      for (let i = 1; i <= 3; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'talent-card';
+        wrapper.innerHTML = `
+          <div class="talent-title">固有スキル${i}</div>
+          <div class="form-field">
+            <label>名前</label>
+            <input type="text" data-unique-skill="name" data-index="${i}">
+          </div>
+          <div class="form-field">
+            <label>タイプ</label>
+            <select data-unique-skill="type" data-index="${i}">${typeOptions}</select>
+          </div>
+          <div class="form-field">
+            <label>説明</label>
+            <textarea data-unique-skill="description" data-index="${i}" rows="3"></textarea>
+          </div>
+        `;
+        fragments.appendChild(wrapper);
+      }
+      elements.uniqueSkillGrid.innerHTML = '';
+      elements.uniqueSkillGrid.appendChild(fragments);
     }
 
     function createEmptyHeroRecord() {
@@ -778,6 +803,7 @@
         image: '',
         url: '',
         troopType: '',
+        fixedSkills: [],
         fixedSkillIds: [],
         grade: '',
       };
@@ -794,9 +820,9 @@
         image: '',
         description: '',
         url: '',
-        category: '',
         skillType: '',
         grade: '',
+        category: '',
       };
     }
 
@@ -824,10 +850,41 @@
         elements.heroUrl.value = record.url || '';
         elements.heroTroop.value = record.troopType || '';
         setSelectedGrade(elements.heroGradeRadios, record.grade || '');
-        const fixedIds = Array.isArray(record.fixedSkillIds) && record.fixedSkillIds.length
-          ? record.fixedSkillIds
-          : generateFixedSkillIds(record.id);
-        elements.fixedSkills.value = fixedIds.join(', ');
+
+        const uniqueSkillSources = Array.isArray(record.fixedSkills)
+          ? record.fixedSkills
+          : Array.isArray(record.fixedSkillIds)
+            ? record.fixedSkillIds
+            : [];
+        const uniqueSkillDefaults = Array.from({ length: 3 }, () => ({ name: '', type: '', description: '' }));
+        const uniqueSkills = uniqueSkillDefaults.map((fallback, index) => {
+          const source = uniqueSkillSources[index];
+          if (source && typeof source === 'object') {
+            return {
+              name: source.name || '',
+              type: source.type || '',
+              description: source.description || '',
+            };
+          }
+          return {
+            name: typeof source === 'string' ? source : '',
+            type: '',
+            description: '',
+          };
+        });
+
+        document.querySelectorAll('[data-unique-skill]').forEach((el) => {
+          const index = Number(el.getAttribute('data-index')) - 1;
+          const field = el.getAttribute('data-unique-skill');
+          const skill = uniqueSkills[index] || { name: '', type: '', description: '' };
+          if (field === 'description') {
+            el.value = skill.description || '';
+          } else if (field === 'type') {
+            el.value = skill.type || '';
+          } else {
+            el.value = skill.name || '';
+          }
+        });
 
         document.querySelectorAll('[data-talent]').forEach((el) => {
           const index = el.getAttribute('data-index');
@@ -846,7 +903,6 @@
         elements.skillId.value = record.id || '';
         elements.skillName.value = record.name || '';
         elements.skillUrl.value = record.url || '';
-        elements.skillCategory.value = record.category || '';
         elements.skillType.value = record.skillType || '';
         elements.skillDescription.value = record.description || '';
         setSelectedGrade(elements.skillGradeRadios, record.grade || '');
@@ -864,8 +920,22 @@
         record.grade = getSelectedGrade(elements.heroGradeRadios);
         record.image = state.selectedImage || '';
 
-        record.fixedSkillIds = generateFixedSkillIds(record.id);
-        elements.fixedSkills.value = record.fixedSkillIds.join(', ');
+        const uniqueSkills = Array.from({ length: 3 }, () => ({ name: '', type: '', description: '' }));
+        document.querySelectorAll('[data-unique-skill]').forEach((el) => {
+          const index = Number(el.getAttribute('data-index')) - 1;
+          const field = el.getAttribute('data-unique-skill');
+          const skill = uniqueSkills[index] || { name: '', type: '', description: '' };
+          if (field === 'description') {
+            skill.description = el.value.trim();
+          } else if (field === 'type') {
+            skill.type = el.value.trim();
+          } else {
+            skill.name = el.value.trim();
+          }
+          uniqueSkills[index] = skill;
+        });
+        record.fixedSkills = uniqueSkills;
+        record.fixedSkillIds = uniqueSkills;
 
         document.querySelectorAll('[data-talent]').forEach((el) => {
           const index = el.getAttribute('data-index');
@@ -888,9 +958,9 @@
       record.id = elements.skillId.value.trim();
       record.name = elements.skillName.value.trim();
       record.url = elements.skillUrl.value.trim();
-      record.category = elements.skillCategory.value.trim();
       record.skillType = elements.skillType.value.trim();
       record.description = elements.skillDescription.value.trim();
+      record.category = state.currentRecord?.category || '';
       record.grade = getSelectedGrade(elements.skillGradeRadios);
       record.image = state.selectedImage || '';
       return record;
@@ -938,6 +1008,7 @@
       elements.pageSubtitle.textContent = `クエリ: data=${dataType}`;
       elements.heroFields.hidden = dataType !== 'hero';
       elements.talentFields.hidden = dataType !== 'hero';
+      elements.uniqueSkillFields.hidden = dataType !== 'hero';
       elements.skillFields.hidden = dataType !== 'skill';
       if (elements.dataTypeSelect) {
         elements.dataTypeSelect.value = dataType === 'skill' ? 'skill' : 'hero';
@@ -1159,6 +1230,7 @@
 
     async function initialize() {
       renderTalentFields();
+      renderUniqueSkillFields();
       applyDataTypeLabels();
 
       if (dataType !== 'hero' && dataType !== 'skill') {
@@ -1191,13 +1263,6 @@
     elements.saveButton.addEventListener('click', saveRecord);
     elements.deleteButton.addEventListener('click', deleteRecord);
     elements.dataTypeSelect.addEventListener('change', handleDataTypeChange);
-    elements.heroId.addEventListener('input', () => {
-      if (dataType === 'hero') {
-        const ids = generateFixedSkillIds(elements.heroId.value.trim());
-        elements.fixedSkills.value = ids.join(', ');
-      }
-    });
-
     initialize();
   </script>
 </body>
