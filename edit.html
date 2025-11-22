@@ -4903,10 +4903,10 @@
             event.preventDefault();
             const action = button.getAttribute('data-table-action');
             const commandMap = {
-                addRow: () => state.editor?.commands.addRowAfter(),
-                removeRow: () => state.editor?.commands.deleteRow(),
-                addColumn: () => state.editor?.commands.addColumnAfter(),
-                removeColumn: () => state.editor?.commands.deleteColumn()
+                addRow: () => state.editor?.chain().focus().addRowAfter().run(),
+                removeRow: () => state.editor?.chain().focus().deleteRow().run(),
+                addColumn: () => state.editor?.chain().focus().addColumnAfter().run(),
+                removeColumn: () => state.editor?.chain().focus().deleteColumn().run()
             };
             const handler = commandMap[action];
             if (typeof handler === 'function') {
