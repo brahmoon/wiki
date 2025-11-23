@@ -205,6 +205,23 @@ function buildDataStore(heroes, skills) {
     }
   });
 
+  // Ensure fixed skill metadata is available even if the primary skill list omits it.
+  (heroes || []).forEach(hero => {
+    if (!Array.isArray(hero?.fixedSkills)) {
+      return;
+    }
+    hero.fixedSkills.forEach(skill => {
+      if (!skill?.id || skillMap.has(skill.id)) {
+        return;
+      }
+      skillMap.set(skill.id, {
+        ...skill,
+        id: skill.id,
+        category: skill.category || 'hero'
+      });
+    });
+  });
+
   const selectableSkills = (skills || []).filter(skill => skill?.category === 'user');
 
   return { heroes: heroes || [], skills: skills || [], heroMap, skillMap, selectableSkills };
