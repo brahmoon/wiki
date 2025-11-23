@@ -249,6 +249,12 @@
       gap: 12px;
     }
 
+    .unique-skill-icon-slot {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 8px;
+    }
+
     .talent-card {
       border: 1px solid #e9e9e7;
       border-radius: 12px;
@@ -671,6 +677,8 @@
       currentRecord: null,
       selectedImage: '',
       galleryFolders: [],
+      uniqueSkillImages: Array.from({ length: 3 }, () => ''),
+      galleryTarget: { type: 'record' },
     };
 
     function setStatus(message, type = '') {
@@ -697,6 +705,16 @@
         /\/folders\/([\w-]+)/.exec(value);
       const fileId = idMatch?.[1];
       return fileId ? `https://drive.google.com/thumbnail?sz=w100&id=${fileId}` : value;
+    }
+
+    function generateRandomFilename(length = 12, originalName = '') {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const randomPart = Array.from({ length })
+        .map(() => chars.charAt(Math.floor(Math.random() * chars.length)))
+        .join('');
+      const extensionMatch = (originalName || '').match(/\.[^.]+$/);
+      const extension = extensionMatch ? extensionMatch[0] : '';
+      return `${randomPart}${extension}`;
     }
 
     function getSelectedGrade(radios) {
@@ -777,6 +795,9 @@
         wrapper.className = 'talent-card';
         wrapper.innerHTML = `
           <div class="talent-title">固有スキル${i}</div>
+          <div class="icon-slot unique-skill-icon-slot" data-unique-skill-icon="${i}">
+            <div class="placeholder">アイコンを選択</div>
+          </div>
           <div class="form-field">
             <label>名前</label>
             <input type="text" data-unique-skill="name" data-index="${i}">
@@ -794,6 +815,13 @@
       }
       elements.uniqueSkillGrid.innerHTML = '';
       elements.uniqueSkillGrid.appendChild(fragments);
+
+      elements.uniqueSkillGrid.querySelectorAll('[data-unique-skill-icon]').forEach((slot) => {
+        const index = Number(slot.getAttribute('data-unique-skill-icon')) - 1;
+        slot.addEventListener('click', () => openGallery({ type: 'uniqueSkill', index }));
+      });
+
+      updateUniqueSkillIconSlots();
     }
 
     function createEmptyHeroRecord() {
@@ -803,7 +831,7 @@
         image: '',
         url: '',
         troopType: '',
-        fixedSkills: [],
+        fixedSkills: Array.from({ length: 3 }, () => ({ name: '', type: '', description: '', image: '' })),
         fixedSkillIds: [],
         grade: '',
       };
@@ -826,21 +854,48 @@
       };
     }
 
-    function setIcon(url) {
-      const thumbnailUrl = getDriveThumbnailUrl(url);
-      state.selectedImage = thumbnailUrl || '';
-      elements.iconSlot.innerHTML = '';
+    function renderIconSlot(slot, thumbnailUrl, placeholderText = 'アイコンを選択') {
+      if (!slot) return;
+      slot.innerHTML = '';
       if (thumbnailUrl) {
         const img = document.createElement('img');
         img.src = thumbnailUrl;
         img.alt = 'icon';
-        elements.iconSlot.appendChild(img);
+        slot.appendChild(img);
       } else {
         const placeholder = document.createElement('div');
         placeholder.className = 'placeholder';
-        placeholder.textContent = 'アイコンを選択';
-        elements.iconSlot.appendChild(placeholder);
+        placeholder.textContent = placeholderText;
+        slot.appendChild(placeholder);
       }
+    }
+
+    function setIconForTarget(target, url) {
+      const thumbnailUrl = getDriveThumbnailUrl(url);
+      if (target?.type === 'uniqueSkill') {
+        const index = Number(target.index);
+        if (Number.isFinite(index) && index >= 0 && index < state.uniqueSkillImages.length) {
+          state.uniqueSkillImages[index] = thumbnailUrl || '';
+          const slot = elements.uniqueSkillGrid.querySelector(`[data-unique-skill-icon="${index + 1}"]`);
+          renderIconSlot(slot, thumbnailUrl, 'アイコンを選択');
+        }
+        return;
+      }
+      state.selectedImage = thumbnailUrl || '';
+      renderIconSlot(elements.iconSlot, thumbnailUrl, 'アイコンを選択');
+    }
+
+    function setRecordIcon(url) {
+      setIconForTarget({ type: 'record' }, url);
+    }
+
+    function updateUniqueSkillIconSlots() {
+      const slots = elements.uniqueSkillGrid.querySelectorAll('[data-unique-skill-icon]');
+      slots.forEach((slot) => {
+        const index = Number(slot.getAttribute('data-unique-skill-icon')) - 1;
+        const image = state.uniqueSkillImages[index] || '';
+        renderIconSlot(slot, image, 'アイコンを選択');
+      });
     }
 
     function fillForm(record) {
@@ -856,7 +911,7 @@
           : Array.isArray(record.fixedSkillIds)
             ? record.fixedSkillIds
             : [];
-        const uniqueSkillDefaults = Array.from({ length: 3 }, () => ({ name: '', type: '', description: '' }));
+        const uniqueSkillDefaults = Array.from({ length: 3 }, () => ({ name: '', type: '', description: '', image: '' }));
         const uniqueSkills = uniqueSkillDefaults.map((fallback, index) => {
           const source = uniqueSkillSources[index];
           if (source && typeof source === 'object') {
@@ -864,19 +919,21 @@
               name: source.name || '',
               type: source.type || '',
               description: source.description || '',
+              image: source.image || '',
             };
           }
           return {
             name: typeof source === 'string' ? source : '',
             type: '',
             description: '',
+            image: '',
           };
         });
 
         document.querySelectorAll('[data-unique-skill]').forEach((el) => {
           const index = Number(el.getAttribute('data-index')) - 1;
           const field = el.getAttribute('data-unique-skill');
-          const skill = uniqueSkills[index] || { name: '', type: '', description: '' };
+          const skill = uniqueSkills[index] || { name: '', type: '', description: '', image: '' };
           if (field === 'description') {
             el.value = skill.description || '';
           } else if (field === 'type') {
@@ -885,6 +942,9 @@
             el.value = skill.name || '';
           }
         });
+
+        state.uniqueSkillImages = uniqueSkills.map((skill) => getDriveThumbnailUrl(skill.image || ''));
+        updateUniqueSkillIconSlots();
 
         document.querySelectorAll('[data-talent]').forEach((el) => {
           const index = el.getAttribute('data-index');
@@ -906,8 +966,10 @@
         elements.skillType.value = record.skillType || '';
         elements.skillDescription.value = record.description || '';
         setSelectedGrade(elements.skillGradeRadios, record.grade || '');
+        state.uniqueSkillImages = Array.from({ length: 3 }, () => '');
+        updateUniqueSkillIconSlots();
       }
-      setIcon(record.image || '');
+      setRecordIcon(record.image || '');
     }
 
     function collectFormData() {
@@ -920,7 +982,7 @@
         record.grade = getSelectedGrade(elements.heroGradeRadios);
         record.image = state.selectedImage || '';
 
-        const uniqueSkills = Array.from({ length: 3 }, () => ({ name: '', type: '', description: '' }));
+        const uniqueSkills = Array.from({ length: 3 }, () => ({ name: '', type: '', description: '', image: '' }));
         document.querySelectorAll('[data-unique-skill]').forEach((el) => {
           const index = Number(el.getAttribute('data-index')) - 1;
           const field = el.getAttribute('data-unique-skill');
@@ -932,6 +994,7 @@
           } else {
             skill.name = el.value.trim();
           }
+          skill.image = state.uniqueSkillImages[index] || '';
           uniqueSkills[index] = skill;
         });
         record.fixedSkills = uniqueSkills;
@@ -1134,7 +1197,8 @@
       }
     }
 
-    async function openGallery() {
+    async function openGallery(target = { type: 'record' }) {
+      state.galleryTarget = target || { type: 'record' };
       if (!DRIVE_ENDPOINT) {
         setStatus('DriveImageのWebApp URLが設定されていません。', 'error');
         return;
@@ -1181,7 +1245,7 @@
           img.alt = image.name || '';
           item.appendChild(img);
           item.addEventListener('click', () => {
-            setIcon(image.thumbnail || image.url);
+            setIconForTarget(state.galleryTarget, image.thumbnail || image.url);
             elements.galleryModal.classList.remove('active');
           });
           fragment.appendChild(item);
@@ -1205,19 +1269,22 @@
         setStatus('DriveImageのWebApp URLが設定されていません。', 'error');
         return;
       }
+      const target = state.galleryTarget || { type: 'record' };
       setStatus('アップロード中...');
       try {
         const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
         const preferredFolder = Array.isArray(state.galleryFolders) && state.galleryFolders.length
           ? state.galleryFolders[0]
           : null;
-        const result = await DriveImageHandler.uploadImage(file, null, {
+        const randomizedName = generateRandomFilename(12, file.name);
+        const renamedFile = new File([file], randomizedName, { type: file.type, lastModified: file.lastModified });
+        const result = await DriveImageHandler.uploadImage(renamedFile, null, {
           webAppUrl: DRIVE_ENDPOINT,
         }, preferredFolder?.name || (dataType === 'hero' ? 'Hero' : 'Skill'));
         if (result?.driveUrl) {
-          setIcon(result.driveUrl);
+          setIconForTarget(target, result.driveUrl);
           setStatus('アップロードしました。', 'success');
-          await openGallery();
+          await openGallery(target);
         }
       } catch (error) {
         console.error(error);
@@ -1227,6 +1294,7 @@
 
     function resetForm() {
       state.currentRecord = dataType === 'hero' ? createEmptyHeroRecord() : createEmptySkillRecord();
+      state.uniqueSkillImages = Array.from({ length: 3 }, () => '');
       fillForm(state.currentRecord);
       setStatus('新規データを作成中');
     }
@@ -1234,6 +1302,7 @@
     async function initialize() {
       renderTalentFields();
       renderUniqueSkillFields();
+      updateUniqueSkillIconSlots();
       applyDataTypeLabels();
 
       if (dataType !== 'hero' && dataType !== 'skill') {
@@ -1252,8 +1321,8 @@
       }
     }
 
-    elements.selectIconButton.addEventListener('click', openGallery);
-    elements.iconSlot.addEventListener('click', openGallery);
+    elements.selectIconButton.addEventListener('click', () => openGallery({ type: 'record' }));
+    elements.iconSlot.addEventListener('click', () => openGallery({ type: 'record' }));
     elements.closeModalButton.addEventListener('click', () => elements.galleryModal.classList.remove('active'));
     elements.galleryModal.addEventListener('click', (event) => {
       if (event.target === elements.galleryModal) {
