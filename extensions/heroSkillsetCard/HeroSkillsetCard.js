@@ -433,9 +433,23 @@ class HeroSkillsetCardNodeView {
       const heroId = this.config.rows[rowKey]?.heroId || null;
       const hero = heroId ? this.data.heroMap.get(heroId) : null;
       const fixedSkills = hero?.fixedSkillIds || [];
-      const fixed1 = fixedSkills[0] ? this.data.skillMap.get(fixedSkills[0]) : null;
-      const fixed2 = fixedSkills[1] ? this.data.skillMap.get(fixedSkills[1]) : null;
-      const fixed5 = fixedSkills[2] ? this.data.skillMap.get(fixedSkills[2]) : null;
+      const fixedSkillMeta = Array.isArray(hero?.fixedSkills) ? hero.fixedSkills : [];
+      const resolveFixedSkill = (index) => {
+        const skillId = fixedSkills[index] || null;
+        const fallback = fixedSkillMeta[index] || null;
+        const baseSkill = skillId ? this.data.skillMap.get(skillId) : null;
+        if (baseSkill) {
+          const mergedImage = baseSkill.image || fallback?.image || '';
+          return mergedImage ? { ...baseSkill, image: mergedImage } : baseSkill;
+        }
+        if (fallback && (fallback.name || fallback.image || fallback.id)) {
+          return { ...fallback };
+        }
+        return null;
+      };
+      const fixed1 = resolveFixedSkill(0);
+      const fixed2 = resolveFixedSkill(1);
+      const fixed5 = resolveFixedSkill(2);
       const userSkill3Id = this.config.rows[rowKey]?.userSkills?.skill3 || null;
       const userSkill4Id = this.config.rows[rowKey]?.userSkills?.skill4 || null;
       const userSkill3 = userSkill3Id ? this.data.skillMap.get(userSkill3Id) : null;
