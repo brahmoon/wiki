@@ -96,6 +96,28 @@ function normalizeFixedSkillIds(value) {
     .filter(Boolean);
 }
 
+function normalizeFixedSkills(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const name = normalizeString(entry.name);
+      const description = normalizeString(entry.description);
+      const type = normalizeString(entry.type);
+      const image = normalizeString(entry.image);
+      const id = normalizeString(entry.id || entry.name);
+      if (!name && !description && !image && !id) {
+        return null;
+      }
+      return { id, name, type, description, image };
+    })
+    .filter(Boolean);
+}
+
 function normalizeHeroRecord(record) {
   const normalized = {
     id: normalizeString(record?.id),
@@ -104,7 +126,8 @@ function normalizeHeroRecord(record) {
     url: normalizeString(record?.url),
     troopType: normalizeString(record?.troopType),
     grade: normalizeString(record?.grade),
-    fixedSkillIds: normalizeFixedSkillIds(record?.fixedSkillIds || record?.fixedSkills || [])
+    fixedSkillIds: normalizeFixedSkillIds(record?.fixedSkillIds || record?.fixedSkills || []),
+    fixedSkills: normalizeFixedSkills(record?.fixedSkills || [])
   };
 
   HERO_TALENT_KEYS.forEach(key => {
@@ -180,6 +203,23 @@ function buildDataStore(heroes, skills) {
     if (skill?.id) {
       skillMap.set(skill.id, skill);
     }
+  });
+
+  // Ensure fixed skill metadata is available even if the primary skill list omits it.
+  (heroes || []).forEach(hero => {
+    if (!Array.isArray(hero?.fixedSkills)) {
+      return;
+    }
+    hero.fixedSkills.forEach(skill => {
+      if (!skill?.id || skillMap.has(skill.id)) {
+        return;
+      }
+      skillMap.set(skill.id, {
+        ...skill,
+        id: skill.id,
+        category: skill.category || 'hero'
+      });
+    });
   });
 
   const selectableSkills = (skills || []).filter(skill => skill?.category === 'user');

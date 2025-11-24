@@ -432,10 +432,35 @@ class HeroSkillsetCardNodeView {
     ROW_KEYS.forEach(rowKey => {
       const heroId = this.config.rows[rowKey]?.heroId || null;
       const hero = heroId ? this.data.heroMap.get(heroId) : null;
-      const fixedSkills = hero?.fixedSkillIds || [];
-      const fixed1 = fixedSkills[0] ? this.data.skillMap.get(fixedSkills[0]) : null;
-      const fixed2 = fixedSkills[1] ? this.data.skillMap.get(fixedSkills[1]) : null;
-      const fixed5 = fixedSkills[2] ? this.data.skillMap.get(fixedSkills[2]) : null;
+      const fixedSkills = Array.isArray(hero?.fixedSkillIds) ? hero.fixedSkillIds : [];
+      const fixedSkillMeta = Array.isArray(hero?.fixedSkills) ? hero.fixedSkills : [];
+      const hasInlineFixedSkills = fixedSkillMeta.length > 0;
+      const resolveFixedSkill = (index) => {
+        if (hasInlineFixedSkills) {
+          const entry = fixedSkillMeta[index];
+          if (entry && typeof entry === 'object') {
+            const name = typeof entry.name === 'string' ? entry.name : '';
+            const type = typeof entry.type === 'string' ? entry.type : '';
+            const description = typeof entry.description === 'string' ? entry.description : '';
+            const image = typeof entry.image === 'string' ? entry.image : '';
+            const id = typeof entry.id === 'string' ? entry.id : name;
+            if (name || description || image || id || type) {
+              return { id, name, type, description, image };
+            }
+          }
+          return null;
+        }
+
+        const skillId = fixedSkills[index] || null;
+        const baseSkill = skillId ? this.data.skillMap.get(skillId) : null;
+        if (baseSkill) {
+          return baseSkill;
+        }
+        return null;
+      };
+      const fixed1 = resolveFixedSkill(0);
+      const fixed2 = resolveFixedSkill(1);
+      const fixed5 = resolveFixedSkill(2);
       const userSkill3Id = this.config.rows[rowKey]?.userSkills?.skill3 || null;
       const userSkill4Id = this.config.rows[rowKey]?.userSkills?.skill4 || null;
       const userSkill3 = userSkill3Id ? this.data.skillMap.get(userSkill3Id) : null;
