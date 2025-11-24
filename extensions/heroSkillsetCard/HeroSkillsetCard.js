@@ -432,18 +432,29 @@ class HeroSkillsetCardNodeView {
     ROW_KEYS.forEach(rowKey => {
       const heroId = this.config.rows[rowKey]?.heroId || null;
       const hero = heroId ? this.data.heroMap.get(heroId) : null;
-      const fixedSkills = hero?.fixedSkillIds || [];
+      const fixedSkills = Array.isArray(hero?.fixedSkillIds) ? hero.fixedSkillIds : [];
       const fixedSkillMeta = Array.isArray(hero?.fixedSkills) ? hero.fixedSkills : [];
+      const hasInlineFixedSkills = fixedSkillMeta.length > 0;
       const resolveFixedSkill = (index) => {
+        if (hasInlineFixedSkills) {
+          const entry = fixedSkillMeta[index];
+          if (entry && typeof entry === 'object') {
+            const name = typeof entry.name === 'string' ? entry.name : '';
+            const type = typeof entry.type === 'string' ? entry.type : '';
+            const description = typeof entry.description === 'string' ? entry.description : '';
+            const image = typeof entry.image === 'string' ? entry.image : '';
+            const id = typeof entry.id === 'string' ? entry.id : name;
+            if (name || description || image || id || type) {
+              return { id, name, type, description, image };
+            }
+          }
+          return null;
+        }
+
         const skillId = fixedSkills[index] || null;
-        const fallback = fixedSkillMeta[index] || null;
         const baseSkill = skillId ? this.data.skillMap.get(skillId) : null;
         if (baseSkill) {
-          const mergedImage = baseSkill.image || fallback?.image || '';
-          return mergedImage ? { ...baseSkill, image: mergedImage } : baseSkill;
-        }
-        if (fallback && (fallback.name || fallback.image || fallback.id)) {
-          return { ...fallback };
+          return baseSkill;
         }
         return null;
       };
