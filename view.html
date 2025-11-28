@@ -908,13 +908,34 @@
         const heroSlot = createViewHeroSlot(hero);
         const skills = document.createElement('div');
         skills.className = 'hero-skillset-card__skills';
-        const fixedSkillIds = Array.isArray(hero?.fixedSkillIds) ? hero.fixedSkillIds : [];
+
+        const fixedSkillEntries = Array.isArray(hero?.fixedSkills)
+          ? hero.fixedSkills
+          : Array.isArray(hero?.fixedSkillIds)
+            ? hero.fixedSkillIds
+                .map(entry =>
+                  typeof entry === 'string' ? data.skillMap.get(entry) : entry
+                )
+                .filter(Boolean)
+            : [];
+
+        const wrapFixedSkill = entry =>
+          entry
+            ? {
+                id: entry.id || entry.name || '',
+                name: entry.name || '',
+                type: entry.type || '',
+                description: entry.description || '',
+                image: entry.image || ''
+              }
+            : null;
+
         const slotMap = {
-          skill1: fixedSkillIds[0] ? data.skillMap.get(fixedSkillIds[0]) : null,
-          skill2: fixedSkillIds[1] ? data.skillMap.get(fixedSkillIds[1]) : null,
+          skill1: wrapFixedSkill(fixedSkillEntries[0]),
+          skill2: wrapFixedSkill(fixedSkillEntries[1]),
           skill3: rowData.userSkills?.skill3 ? data.skillMap.get(rowData.userSkills.skill3) : null,
           skill4: rowData.userSkills?.skill4 ? data.skillMap.get(rowData.userSkills.skill4) : null,
-          skill5: fixedSkillIds[2] ? data.skillMap.get(fixedSkillIds[2]) : null
+          skill5: wrapFixedSkill(fixedSkillEntries[2])
         };
         Object.entries(slotMap).forEach(([slotKey, skill]) => {
           const slot = createViewSkillSlot(slotKey, skill);

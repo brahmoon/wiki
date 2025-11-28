@@ -1,5 +1,3 @@
-const HERO_DB_PATH = './database/hero_db.json';
-const SKILL_DB_PATH = './database/skill_db.json';
 const DATABASE_ENDPOINT = typeof window !== 'undefined' ? window.APPS_SCRIPT_ENDPOINT_DATABASE : '';
 const LOGIN_STORAGE_KEY = 'wikiLoginState';
 
@@ -49,14 +47,6 @@ function getHeroTalents(hero) {
     return [];
   }
   return HERO_TALENT_KEYS.map(key => normalizeTalentEntry(hero[key])).filter(Boolean);
-}
-
-async function fetchJson(path) {
-  const response = await fetch(path, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Failed to load ${path}: ${response.status}`);
-  }
-  return await response.json();
 }
 
 function getLoginState() {
@@ -217,12 +207,53 @@ async function loadFromDatabaseEndpoint() {
   return buildDataStore(heroes, skills);
 }
 
-async function loadFromLocalFiles() {
-  const [heroes, skills] = await Promise.all([
-    fetchJson(HERO_DB_PATH),
-    fetchJson(SKILL_DB_PATH)
-  ]);
-  return buildDataStore(heroes, skills);
+function parseJsonField(value) {
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function loadFromSampleSpreadsheet() {
+  const response = await fetch('./database/sample_db.txt', { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`Failed to load sample database: ${response.status}`);
+  }
+
+  const text = (await response.text()).trim();
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) {
+    throw new Error('Sample database is empty.');
+  }
+
+  const headers = lines[0].split(/\t+/);
+  const heroes = lines.slice(1).map(line => {
+    const cells = line.split(/\t+/);
+    const record = headers.reduce((acc, header, index) => {
+      acc[header] = cells[index] || '';
+      return acc;
+    }, {});
+
+    const fixedSkillCandidates =
+      parseJsonField(record.fixedSkills) || parseJsonField(record.fixedSkillIds);
+
+    if (Array.isArray(fixedSkillCandidates)) {
+      record.fixedSkills = fixedSkillCandidates;
+    }
+
+    HERO_TALENT_KEYS.forEach(key => {
+      const parsed = parseJsonField(record[key]);
+      if (parsed) {
+        record[key] = parsed;
+      }
+    });
+
+    return normalizeHeroRecord(record);
+  });
+
+  return buildDataStore(heroes, []);
 }
 
 /**
@@ -277,7 +308,12 @@ async function loadHeroSkillsetData() {
         console.warn('[HeroSkillsetService] Failed to load data from Apps Script endpoint. Falling back to local data.', error);
       }
 
-      return await loadFromLocalFiles();
+      try {
+        return await loadFromSampleSpreadsheet();
+      } catch (error) {
+        console.warn('[HeroSkillsetService] Failed to load sample database.', error);
+        throw error;
+      }
     })().catch(error => {
       cachedDataPromise = null;
       throw error;
