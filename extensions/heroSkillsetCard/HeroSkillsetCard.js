@@ -512,33 +512,28 @@ class HeroSkillsetCardNodeView {
       const heroId = this.config.rows[rowKey]?.heroId || null;
       const hero = heroId ? this.data.heroMap.get(heroId) : null;
 
-      // ---------------------------------------------------------
-      // 🔥 fixedSkills ONLY — ID lookup removed completely
-      // ---------------------------------------------------------
-      let fixed1 = null;
-      let fixed2 = null;
-      let fixed5 = null;
+      const fixedSkillEntries = Array.isArray(hero?.fixedSkills)
+        ? hero.fixedSkills
+        : Array.isArray(hero?.fixedSkillIds)
+          ? hero.fixedSkillIds
+              .map(id => this.data.skillMap.get(id))
+              .filter(Boolean)
+          : [];
 
-      if (Array.isArray(hero?.fixedSkills)) {
-        const f0 = hero.fixedSkills[0];
-        const f1 = hero.fixedSkills[1];
-        const f2 = hero.fixedSkills[2];
+      const wrapFixedSkill = entry =>
+        entry
+          ? {
+              id: entry.id || entry.name || '',
+              name: entry.name || '',
+              type: entry.type || '',
+              description: entry.description || '',
+              image: entry.image || ''
+            }
+          : null;
 
-        const wrap = f =>
-          f
-            ? {
-                id: f.id || f.name || '',
-                name: f.name || '',
-                type: f.type || '',
-                description: f.description || '',
-                image: f.image || ''
-              }
-            : null;
-
-        fixed1 = wrap(f0);
-        fixed2 = wrap(f1);
-        fixed5 = wrap(f2);
-      }
+      const fixed1 = wrapFixedSkill(fixedSkillEntries[0]);
+      const fixed2 = wrapFixedSkill(fixedSkillEntries[1]);
+      const fixed5 = wrapFixedSkill(fixedSkillEntries[2]);
 
       const userSkill3Id = this.config.rows[rowKey]?.userSkills?.skill3 || null;
       const userSkill4Id = this.config.rows[rowKey]?.userSkills?.skill4 || null;
