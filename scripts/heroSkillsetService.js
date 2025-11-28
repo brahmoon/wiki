@@ -105,17 +105,49 @@ function normalizeFixedSkills(value) {
     .filter(Boolean);
 }
 
+function normalizeFixedSkillEntry(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const name = normalizeString(entry.name);
+  const description = normalizeString(entry.description);
+  const type = normalizeString(entry.type);
+  const image = normalizeString(entry.image);
+  const id = normalizeString(entry.id || name);
+
+  if (!id && !name && !description && !image) {
+    return null;
+  }
+
+  return { id, name, type, description, image };
+}
+
 function normalizeFixedSkillIds(value) {
   if (!Array.isArray(value)) {
     return [];
   }
+
   return value.map(normalizeString).filter(Boolean);
+}
+
+function normalizeEmbeddedFixedSkills(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(entry => (typeof entry === 'object' ? normalizeFixedSkillEntry(entry) : null))
+    .filter(Boolean);
 }
 
 /**
  * 英雄レコード正規化
  */
 function normalizeHeroRecord(record) {
+  const fixedSkills = normalizeFixedSkills(record?.fixedSkills || []);
+  const embeddedFixedSkills = normalizeEmbeddedFixedSkills(record?.fixedSkillIds || []);
+
   const normalized = {
     id: normalizeString(record?.id),
     name: normalizeString(record?.name),
@@ -126,8 +158,8 @@ function normalizeHeroRecord(record) {
 
     fixedSkillIds: normalizeFixedSkillIds(record?.fixedSkillIds || []),
 
-    // 🔥 fixedSkills（新仕様）だけを採用
-    fixedSkills: normalizeFixedSkills(record?.fixedSkills || [])
+    // 🔥 fixedSkills（新仕様）だけを採用。fixedSkillIds にオブジェクトが渡された場合もここで取り込む。
+    fixedSkills: fixedSkills.length ? fixedSkills : embeddedFixedSkills
   };
 
   HERO_TALENT_KEYS.forEach(key => {
@@ -222,16 +254,6 @@ function buildDataStore(heroes, skills) {
         });
       }
     });
-  });
-
-  // fixedSkillIds から fixedSkills を解決
-  (heroes || []).forEach(hero => {
-    const fixedSkills = Array.isArray(hero?.fixedSkills) ? hero.fixedSkills : [];
-    const fixedSkillIds = Array.isArray(hero?.fixedSkillIds) ? hero.fixedSkillIds : [];
-
-    if (!fixedSkills.length && fixedSkillIds.length) {
-      hero.fixedSkills = fixedSkillIds.map(id => skillMap.get(id)).filter(Boolean);
-    }
   });
 
   const selectableSkills = (skills || []).filter(skill => skill?.category === 'user');
