@@ -2,6 +2,7 @@ const HERO_DB_PATH = './database/hero_db.json';
 const SKILL_DB_PATH = './database/skill_db.json';
 const DATABASE_ENDPOINT = typeof window !== 'undefined' ? window.APPS_SCRIPT_ENDPOINT_DATABASE : '';
 const LOGIN_STORAGE_KEY = 'wikiLoginState';
+
 const ROW_KEYS = ['row1', 'row2'];
 const USER_SKILL_KEYS = ['skill3', 'skill4'];
 const HERO_TALENT_KEYS = ['talent1', 'talent2', 'talent3', 'talent4', 'talent5', 'talent6'];
@@ -74,34 +75,17 @@ function normalizeString(value) {
   return typeof value === 'string' ? value : '';
 }
 
-function normalizeFixedSkillIds(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map(entry => {
-      if (typeof entry === 'string') {
-        return entry;
-      }
-      if (entry && typeof entry === 'object') {
-        if (typeof entry.id === 'string') {
-          return entry.id;
-        }
-        if (typeof entry.name === 'string') {
-          return entry.name;
-        }
-      }
-      return null;
-    })
-    .filter(Boolean);
-}
-
+/**
+ * fixedSkills（新仕様）を正規化
+ * - ID 形式への変換はしない（HeroSkillsetCard が ID を使わないため）
+ * - name/type/description/image がそのまま UI に渡る
+ */
 function normalizeFixedSkills(value) {
   if (!Array.isArray(value)) {
     return [];
   }
   return value
-    .map((entry) => {
+    .map(entry => {
       if (!entry || typeof entry !== 'object') {
         return null;
       }
@@ -109,15 +93,21 @@ function normalizeFixedSkills(value) {
       const description = normalizeString(entry.description);
       const type = normalizeString(entry.type);
       const image = normalizeString(entry.image);
-      const id = normalizeString(entry.id || entry.name);
+      const id = normalizeString(entry.id || name);
+
+      // 最低限の情報がない場合は無視
       if (!name && !description && !image && !id) {
         return null;
       }
+
       return { id, name, type, description, image };
     })
     .filter(Boolean);
 }
 
+/**
+ * 英雄レコード正規化（fixedSkillIds を完全廃止）
+ */
 function normalizeHeroRecord(record) {
   const normalized = {
     id: normalizeString(record?.id),
@@ -126,7 +116,11 @@ function normalizeHeroRecord(record) {
     url: normalizeString(record?.url),
     troopType: normalizeString(record?.troopType),
     grade: normalizeString(record?.grade),
-    fixedSkillIds: normalizeFixedSkillIds(record?.fixedSkillIds || record?.fixedSkills || []),
+
+    // 🔥 fixedSkillIds は廃止
+    // fixedSkillIds: [],
+
+    // 🔥 fixedSkills（新仕様）だけを採用
     fixedSkills: normalizeFixedSkills(record?.fixedSkills || [])
   };
 
@@ -157,6 +151,7 @@ async function loadFromDatabaseEndpoint() {
 
   const loginState = getLoginState();
   const user = loginState?.user || {};
+
   const payload = {
     action: 'getHeroSkillsetData',
     playerId: user.playerId || '',
@@ -180,6 +175,7 @@ async function loadFromDatabaseEndpoint() {
 
   const heroes = result.heroes.map(normalizeHeroRecord);
   const skills = result.skills.map(normalizeSkillRecord);
+
   return buildDataStore(heroes, skills);
 }
 
@@ -191,40 +187,46 @@ async function loadFromLocalFiles() {
   return buildDataStore(heroes, skills);
 }
 
+/**
+ * fixedSkills を skillMap にも登録する（DB consistency 用）
+ * HeroSkillsetCard は ID を使わないので UI 表示には影響しない。
+ */
 function buildDataStore(heroes, skills) {
   const heroMap = new Map();
   const skillMap = new Map();
+
   (heroes || []).forEach(hero => {
-    if (hero?.id) {
-      heroMap.set(hero.id, hero);
-    }
-  });
-  (skills || []).forEach(skill => {
-    if (skill?.id) {
-      skillMap.set(skill.id, skill);
-    }
+    if (hero?.id) heroMap.set(hero.id, hero);
   });
 
-  // Ensure fixed skill metadata is available even if the primary skill list omits it.
+  (skills || []).forEach(skill => {
+    if (skill?.id) skillMap.set(skill.id, skill);
+  });
+
+  // fixedSkills も skillMap に登録する（重複は無視）
   (heroes || []).forEach(hero => {
-    if (!Array.isArray(hero?.fixedSkills)) {
-      return;
-    }
+    if (!Array.isArray(hero?.fixedSkills)) return;
+
     hero.fixedSkills.forEach(skill => {
-      if (!skill?.id || skillMap.has(skill.id)) {
-        return;
+      if (!skill?.id) return;
+      if (!skillMap.has(skill.id)) {
+        skillMap.set(skill.id, {
+          ...skill,
+          category: skill.category || 'hero'
+        });
       }
-      skillMap.set(skill.id, {
-        ...skill,
-        id: skill.id,
-        category: skill.category || 'hero'
-      });
     });
   });
 
   const selectableSkills = (skills || []).filter(skill => skill?.category === 'user');
 
-  return { heroes: heroes || [], skills: skills || [], heroMap, skillMap, selectableSkills };
+  return {
+    heroes: heroes || [],
+    skills: skills || [],
+    heroMap,
+    skillMap,
+    selectableSkills
+  };
 }
 
 async function loadHeroSkillsetData() {
@@ -232,9 +234,7 @@ async function loadHeroSkillsetData() {
     cachedDataPromise = (async () => {
       try {
         const databaseData = await loadFromDatabaseEndpoint();
-        if (databaseData) {
-          return databaseData;
-        }
+        if (databaseData) return databaseData;
       } catch (error) {
         console.warn('[HeroSkillsetService] Failed to load data from Apps Script endpoint. Falling back to local data.', error);
       }
@@ -261,22 +261,29 @@ function normalizeHeroSkillsetConfig(value) {
       parsed = null;
     }
   }
+
   if (!parsed || typeof parsed !== 'object') {
     return getDefaultHeroSkillsetConfig();
   }
+
   const normalized = getDefaultHeroSkillsetConfig();
   const sourceRows = parsed.rows && typeof parsed.rows === 'object' ? parsed.rows : parsed;
+
   ROW_KEYS.forEach(rowKey => {
     const sourceRow = sourceRows[rowKey];
     if (!sourceRow || typeof sourceRow !== 'object') {
       return;
     }
+
     if (typeof sourceRow.heroId === 'string') {
       normalized.rows[rowKey].heroId = sourceRow.heroId;
     }
-    const sourceSkills = sourceRow.userSkills && typeof sourceRow.userSkills === 'object'
-      ? sourceRow.userSkills
-      : sourceRow;
+
+    const sourceSkills =
+      sourceRow.userSkills && typeof sourceRow.userSkills === 'object'
+        ? sourceRow.userSkills
+        : sourceRow;
+
     USER_SKILL_KEYS.forEach(skillKey => {
       const candidate = sourceRow[skillKey] ?? sourceSkills[skillKey];
       if (typeof candidate === 'string') {
@@ -284,6 +291,7 @@ function normalizeHeroSkillsetConfig(value) {
       }
     });
   });
+
   return normalized;
 }
 
