@@ -70,14 +70,25 @@ function createHeroSlotButton(rowKey, hero) {
   button.className = 'hero-skillset-cell hero-skillset-cell--hero';
   button.dataset.heroSlot = 'true';
   button.dataset.row = rowKey;
-  button.setAttribute('aria-label', hero ? `${hero.name} を変更` : '英雄を選択');
-  const figure = createSlotFigure(hero ? { src: hero.image, alt: hero.name } : null, hero?.name || '', '+');
+  button.setAttribute(
+    'aria-label',
+    hero ? `${hero.name} を変更` : '英雄を選択'
+  );
+
+  const figure = createSlotFigure(
+    hero ? { src: hero.image, alt: hero.name } : null,
+    hero?.name || '',
+    '+'
+  );
+
   const label = document.createElement('span');
   label.className = 'hero-skillset-cell__label';
   label.textContent = hero?.name || '英雄を選択';
+
   if (!hero) {
     button.classList.add('is-empty');
   }
+
   button.append(figure, label);
   return button;
 }
@@ -88,12 +99,25 @@ function createSkillSlotElement({ rowKey, slotKey, skill, editable }) {
     element.type = 'button';
     element.dataset.skillSlot = slotKey;
     element.dataset.row = rowKey;
-    element.setAttribute('aria-label', skill ? `${skill.name} を変更` : 'スキルを選択');
+    element.setAttribute(
+      'aria-label',
+      skill ? `${skill.name} を変更` : 'スキルを選択'
+    );
   }
-  element.className = `hero-skillset-cell hero-skillset-cell--skill ${editable ? 'hero-skillset-cell--editable' : 'hero-skillset-cell--fixed'}`;
-  const figure = createSlotFigure(skill ? { src: skill.image, alt: skill.name } : null, skill?.name || '', editable ? '+' : '—');
+
+  element.className = `hero-skillset-cell hero-skillset-cell--skill ${
+    editable ? 'hero-skillset-cell--editable' : 'hero-skillset-cell--fixed'
+  }`;
+
+  const figure = createSlotFigure(
+    skill ? { src: skill.image, alt: skill.name } : null,
+    skill?.name || '',
+    editable ? '+' : '—'
+  );
+
   const label = document.createElement('span');
   label.className = 'hero-skillset-cell__label';
+
   if (skill) {
     label.textContent = skill.name;
   } else if (editable) {
@@ -103,6 +127,7 @@ function createSkillSlotElement({ rowKey, slotKey, skill, editable }) {
     label.textContent = '英雄未選択';
     element.classList.add('is-empty');
   }
+
   element.append(figure, label);
   return element;
 }
@@ -112,12 +137,15 @@ function getHeroTalentSummary(hero) {
   if (!talents.length) {
     return '才能情報が登録されていません。';
   }
-  return talents.slice(0, 2).map(talent => {
-    if (talent.type) {
-      return `${talent.name}（${talent.type}）`;
-    }
-    return talent.name;
-  }).join(' / ');
+  return talents
+    .slice(0, 2)
+    .map(talent => {
+      if (talent.type) {
+        return `${talent.name}（${talent.type}）`;
+      }
+      return talent.name;
+    })
+    .join(' / ');
 }
 
 function getSelectionOverlay() {
@@ -126,27 +154,37 @@ function getSelectionOverlay() {
   }
   const overlay = document.createElement('div');
   overlay.className = 'hero-skillset-overlay';
+
   const panel = document.createElement('div');
   panel.className = 'hero-skillset-overlay__panel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
+
   const title = document.createElement('h3');
   title.className = 'hero-skillset-overlay__title';
+
   const message = document.createElement('div');
   message.className = 'hero-skillset-overlay__message';
+
   const grid = document.createElement('div');
   grid.className = 'hero-skillset-overlay__grid';
+
   const footer = document.createElement('div');
   footer.className = 'hero-skillset-overlay__footer';
+
   const databaseButton = document.createElement('button');
   databaseButton.type = 'button';
-  databaseButton.className = 'hero-skillset-overlay__action hero-skillset-overlay__db';
+  databaseButton.className =
+    'hero-skillset-overlay__action hero-skillset-overlay__db';
   databaseButton.textContent = 'DB編集';
   databaseButton.hidden = true;
+
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.className = 'hero-skillset-overlay__close hero-skillset-overlay__action';
+  closeButton.className =
+    'hero-skillset-overlay__close hero-skillset-overlay__action';
   closeButton.textContent = '閉じる';
+
   footer.append(databaseButton, closeButton);
   panel.append(title, message, grid, footer);
   overlay.appendChild(panel);
@@ -173,7 +211,15 @@ function getSelectionOverlay() {
   });
 
   selectionOverlayInstance = {
-    open({ title: overlayTitle, items, allowClear, onSelect, onClear, emptyMessage, databaseType }) {
+    open({
+      title: overlayTitle,
+      items,
+      allowClear,
+      onSelect,
+      onClear,
+      emptyMessage,
+      databaseType
+    }) {
       title.textContent = overlayTitle || '';
       grid.innerHTML = '';
       message.textContent = '';
@@ -181,7 +227,11 @@ function getSelectionOverlay() {
       databaseButton.onclick = null;
 
       const authority = getUserAuthorityLevel();
-      const canEditDatabase = databaseType && authority !== null && authority >= DEVELOPER_AUTHORITY_VALUE;
+      const canEditDatabase =
+        databaseType &&
+        authority !== null &&
+        authority >= DEVELOPER_AUTHORITY_VALUE;
+
       if (canEditDatabase) {
         const type = databaseType === 'skill' ? 'skill' : 'hero';
         databaseButton.hidden = false;
@@ -189,17 +239,23 @@ function getSelectionOverlay() {
           window.open(`./database.html?data=${type}`, '_blank', 'noopener');
         };
       }
+
       if (allowClear) {
         const clearButton = document.createElement('button');
         clearButton.type = 'button';
         clearButton.className = 'hero-skillset-overlay__clear';
         clearButton.textContent = '選択を解除';
-        clearButton.addEventListener('click', () => {
-          onClear?.();
-          hide();
-        }, { once: true });
+        clearButton.addEventListener(
+          'click',
+          () => {
+            onClear?.();
+            hide();
+          },
+          { once: true }
+        );
         grid.appendChild(clearButton);
       }
+
       if (!items.length) {
         message.textContent = emptyMessage || '選択肢がありません。';
       } else {
@@ -207,34 +263,47 @@ function getSelectionOverlay() {
           const option = document.createElement('button');
           option.type = 'button';
           option.className = 'hero-skillset-overlay__option';
+
           const imgWrapper = document.createElement('div');
           imgWrapper.className = 'hero-skillset-overlay__option-figure';
+
           if (item.image) {
             const img = document.createElement('img');
             img.src = item.image;
             img.alt = item.name || '';
             imgWrapper.appendChild(img);
           }
+
           const label = document.createElement('div');
           label.className = 'hero-skillset-overlay__option-label';
           label.textContent = item.name || '';
+
           option.append(imgWrapper, label);
+
           if (item.description) {
             const desc = document.createElement('div');
             desc.className = 'hero-skillset-overlay__option-description';
             desc.textContent = item.description;
             option.appendChild(desc);
           }
-          option.addEventListener('click', () => {
-            onSelect?.(item.id);
-            hide();
-          }, { once: true });
+
+          option.addEventListener(
+            'click',
+            () => {
+              onSelect?.(item.id);
+              hide();
+            },
+            { once: true }
+          );
+
           grid.appendChild(option);
         });
       }
+
       overlay.classList.add('is-visible');
     }
   };
+
   return selectionOverlayInstance;
 }
 
@@ -243,18 +312,23 @@ class HeroSkillsetCardNodeView {
     this.node = node;
     this.editor = editor;
     this.getPos = getPos;
+
     this.config = cloneConfig(node.attrs.configuration);
     this.serializedConfig = encodeHeroSkillsetConfig(this.config);
+
     this.dom = document.createElement('div');
     this.dom.className = 'hero-skillset-card hero-skillset-card--editing';
     this.dom.setAttribute('data-hero-skillset-card', '');
     this.dom.setAttribute('data-config', this.serializedConfig);
     this.dom.contentEditable = 'false';
+
     this.body = document.createElement('div');
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.dom.appendChild(this.body);
+
     this.handleClick = this.handleClick.bind(this);
     this.dom.addEventListener('click', this.handleClick);
+
     this.render();
     void this.loadData();
   }
@@ -265,7 +339,8 @@ class HeroSkillsetCardNodeView {
       this.render();
     } catch (error) {
       console.error('英雄・スキルデータの読み込みに失敗しました。', error);
-      this.body.innerHTML = '<div class="hero-skillset-card__status hero-skillset-card__status--error">データを読み込めませんでした。</div>';
+      this.body.innerHTML =
+        '<div class="hero-skillset-card__status hero-skillset-card__status--error">データを読み込めませんでした。</div>';
     }
   }
 
@@ -279,6 +354,7 @@ class HeroSkillsetCardNodeView {
       }
       return;
     }
+
     const skillSlot = event.target.closest('[data-skill-slot]');
     if (skillSlot) {
       const rowKey = skillSlot.dataset.row;
@@ -291,28 +367,28 @@ class HeroSkillsetCardNodeView {
   }
 
   openHeroPicker(rowKey) {
-    if (!this.data) {
-      return;
-    }
+    if (!this.data) return;
+
     const overlay = getSelectionOverlay();
     const currentHeroId = this.config.rows[rowKey]?.heroId || null;
+
     const disallowed = ROW_KEYS.filter(key => key !== rowKey)
       .map(key => this.config.rows[key]?.heroId)
       .filter(Boolean);
-    const items = this.data.heroes.filter(hero => {
-      if (!hero?.id) {
-        return false;
-      }
-      if (hero.id === currentHeroId) {
-        return true;
-      }
-      return !disallowed.includes(hero.id);
-    }).map(hero => ({
-      id: hero.id,
-      name: hero.name,
-      image: hero.image,
-      description: getHeroTalentSummary(hero)
-    }));
+
+    const items = this.data.heroes
+      .filter(hero => {
+        if (!hero?.id) return false;
+        if (hero.id === currentHeroId) return true;
+        return !disallowed.includes(hero.id);
+      })
+      .map(hero => ({
+        id: hero.id,
+        name: hero.name,
+        image: hero.image,
+        description: getHeroTalentSummary(hero)
+      }));
+
     overlay.open({
       title: '英雄を選択',
       items,
@@ -325,11 +401,12 @@ class HeroSkillsetCardNodeView {
   }
 
   openSkillPicker(rowKey, slotKey) {
-    if (!this.data || !USER_SKILL_KEYS.includes(slotKey)) {
-      return;
-    }
+    if (!this.data || !USER_SKILL_KEYS.includes(slotKey)) return;
+
     const overlay = getSelectionOverlay();
-    const currentSkillId = this.config.rows[rowKey]?.userSkills?.[slotKey] || null;
+    const currentSkillId =
+      this.config.rows[rowKey]?.userSkills?.[slotKey] || null;
+
     const usedIds = [];
     ROW_KEYS.forEach(row => {
       USER_SKILL_KEYS.forEach(key => {
@@ -339,20 +416,20 @@ class HeroSkillsetCardNodeView {
         }
       });
     });
-    const items = this.data.selectableSkills.filter(skill => {
-      if (!skill?.id) {
-        return false;
-      }
-      if (skill.id === currentSkillId) {
-        return true;
-      }
-      return !usedIds.includes(skill.id);
-    }).map(skill => ({
-      id: skill.id,
-      name: skill.name,
-      image: skill.image,
-      description: skill.description
-    }));
+
+    const items = this.data.selectableSkills
+      .filter(skill => {
+        if (!skill?.id) return false;
+        if (skill.id === currentSkillId) return true;
+        return !usedIds.includes(skill.id);
+      })
+      .map(skill => ({
+        id: skill.id,
+        name: skill.name,
+        image: skill.image,
+        description: skill.description
+      }));
+
     overlay.open({
       title: 'スキルを選択',
       items,
@@ -375,9 +452,7 @@ class HeroSkillsetCardNodeView {
 
   clearHero(rowKey) {
     const next = cloneConfig(this.config);
-    if (!next.rows[rowKey]) {
-      return;
-    }
+    if (!next.rows[rowKey]) return;
     next.rows[rowKey].heroId = null;
     this.persistConfig(next);
   }
@@ -393,118 +468,156 @@ class HeroSkillsetCardNodeView {
 
   clearUserSkill(rowKey, slotKey) {
     const next = cloneConfig(this.config);
-    if (!next.rows[rowKey]) {
-      return;
-    }
+    if (!next.rows[rowKey]) return;
     next.rows[rowKey].userSkills[slotKey] = null;
     this.persistConfig(next);
   }
 
   persistConfig(nextConfig) {
     const serialized = encodeHeroSkillsetConfig(nextConfig);
-    if (serialized === this.serializedConfig) {
-      return;
-    }
+
+    if (serialized === this.serializedConfig) return;
+
     this.config = nextConfig;
     this.serializedConfig = serialized;
     this.render();
+
     const pos = typeof this.getPos === 'function' ? this.getPos() : null;
-    if (typeof pos !== 'number') {
-      return;
-    }
+    if (typeof pos !== 'number') return;
+
     const { state, dispatch } = this.editor.view;
     const transaction = state.tr.setNodeMarkup(pos, undefined, {
       ...this.node.attrs,
       configuration: serialized
     });
+
     dispatch(transaction);
   }
 
   render() {
     this.dom.setAttribute('data-config', this.serializedConfig);
+
     if (!this.data) {
-      this.body.innerHTML = '<div class="hero-skillset-card__status">英雄・スキルデータを読み込み中...</div>';
+      this.body.innerHTML =
+        '<div class="hero-skillset-card__status">英雄・スキルデータを読み込み中...</div>';
       return;
     }
+
     this.body.innerHTML = '';
+
     const grid = document.createElement('div');
     grid.className = 'hero-skillset-card__grid';
+
     ROW_KEYS.forEach(rowKey => {
       const heroId = this.config.rows[rowKey]?.heroId || null;
       const hero = heroId ? this.data.heroMap.get(heroId) : null;
-      const fixedSkills = Array.isArray(hero?.fixedSkillIds) ? hero.fixedSkillIds : [];
-      const fixedSkillMeta = Array.isArray(hero?.fixedSkills) ? hero.fixedSkills : [];
-      const hasInlineFixedSkills = fixedSkillMeta.length > 0;
-      const resolveFixedSkill = (index) => {
-        if (hasInlineFixedSkills) {
-          const entry = fixedSkillMeta[index];
-          if (entry && typeof entry === 'object') {
-            const name = typeof entry.name === 'string' ? entry.name : '';
-            const type = typeof entry.type === 'string' ? entry.type : '';
-            const description = typeof entry.description === 'string' ? entry.description : '';
-            const image = typeof entry.image === 'string' ? entry.image : '';
-            const id = typeof entry.id === 'string' ? entry.id : name;
-            if (name || description || image || id || type) {
-              return { id, name, type, description, image };
-            }
-          }
-          return null;
-        }
 
-        const skillId = fixedSkills[index] || null;
-        const baseSkill = skillId ? this.data.skillMap.get(skillId) : null;
-        if (baseSkill) {
-          return baseSkill;
-        }
-        return null;
-      };
-      const fixed1 = resolveFixedSkill(0);
-      const fixed2 = resolveFixedSkill(1);
-      const fixed5 = resolveFixedSkill(2);
+      // ---------------------------------------------------------
+      // 🔥 fixedSkills ONLY — ID lookup removed completely
+      // ---------------------------------------------------------
+      let fixed1 = null;
+      let fixed2 = null;
+      let fixed5 = null;
+
+      if (Array.isArray(hero?.fixedSkills)) {
+        const f0 = hero.fixedSkills[0];
+        const f1 = hero.fixedSkills[1];
+        const f2 = hero.fixedSkills[2];
+
+        const wrap = f =>
+          f
+            ? {
+                id: f.id || f.name || '',
+                name: f.name || '',
+                type: f.type || '',
+                description: f.description || '',
+                image: f.image || ''
+              }
+            : null;
+
+        fixed1 = wrap(f0);
+        fixed2 = wrap(f1);
+        fixed5 = wrap(f2);
+      }
+
       const userSkill3Id = this.config.rows[rowKey]?.userSkills?.skill3 || null;
       const userSkill4Id = this.config.rows[rowKey]?.userSkills?.skill4 || null;
-      const userSkill3 = userSkill3Id ? this.data.skillMap.get(userSkill3Id) : null;
-      const userSkill4 = userSkill4Id ? this.data.skillMap.get(userSkill4Id) : null;
+
+      const userSkill3 = userSkill3Id
+        ? this.data.skillMap.get(userSkill3Id)
+        : null;
+      const userSkill4 = userSkill4Id
+        ? this.data.skillMap.get(userSkill4Id)
+        : null;
+
       const row = document.createElement('div');
       row.className = 'hero-skillset-card__row';
       row.dataset.row = rowKey;
+
       const content = document.createElement('div');
       content.className = 'hero-skillset-card__row-content';
+
       const heroSlot = createHeroSlotButton(rowKey, hero);
       heroSlot.dataset.heroSlot = 'true';
+
       content.appendChild(heroSlot);
+
       const skills = document.createElement('div');
       skills.className = 'hero-skillset-card__skills';
-      const skill1 = createSkillSlotElement({ rowKey, slotKey: 'skill1', skill: fixed1, editable: false });
-      skill1.dataset.heroSlot = 'fixed';
-      const skill2 = createSkillSlotElement({ rowKey, slotKey: 'skill2', skill: fixed2, editable: false });
-      skill2.dataset.heroSlot = 'fixed';
-      const skill3 = createSkillSlotElement({ rowKey, slotKey: 'skill3', skill: userSkill3, editable: true });
-      skill3.dataset.skillSlot = 'skill3';
-      const skill4 = createSkillSlotElement({ rowKey, slotKey: 'skill4', skill: userSkill4, editable: true });
-      skill4.dataset.skillSlot = 'skill4';
-      const skill5 = createSkillSlotElement({ rowKey, slotKey: 'skill5', skill: fixed5, editable: false });
-      skill5.dataset.heroSlot = 'fixed';
+
+      const skill1 = createSkillSlotElement({
+        rowKey,
+        slotKey: 'skill1',
+        skill: fixed1,
+        editable: false
+      });
+      const skill2 = createSkillSlotElement({
+        rowKey,
+        slotKey: 'skill2',
+        skill: fixed2,
+        editable: false
+      });
+      const skill3 = createSkillSlotElement({
+        rowKey,
+        slotKey: 'skill3',
+        skill: userSkill3,
+        editable: true
+      });
+      const skill4 = createSkillSlotElement({
+        rowKey,
+        slotKey: 'skill4',
+        skill: userSkill4,
+        editable: true
+      });
+      const skill5 = createSkillSlotElement({
+        rowKey,
+        slotKey: 'skill5',
+        skill: fixed5,
+        editable: false
+      });
+
       skills.append(skill1, skill2, skill3, skill4, skill5);
       content.appendChild(skills);
       row.appendChild(content);
       grid.appendChild(row);
     });
+
     this.body.appendChild(grid);
   }
 
   update(node) {
-    if (node.type !== this.node.type) {
-      return false;
-    }
+    if (node.type !== this.node.type) return false;
+
     this.node = node;
     const nextConfig = cloneConfig(node.attrs.configuration);
     const serialized = encodeHeroSkillsetConfig(nextConfig);
+
     if (serialized !== this.serializedConfig) {
       this.config = nextConfig;
       this.serializedConfig = serialized;
       this.render();
     }
+
     return true;
   }
 
@@ -520,6 +633,7 @@ export const HeroSkillsetCard = Node.create({
   selectable: true,
   draggable: true,
   isolating: true,
+
   addAttributes() {
     return {
       configuration: {
@@ -527,21 +641,21 @@ export const HeroSkillsetCard = Node.create({
       }
     };
   },
+
   parseHTML() {
     return [
       {
         tag: 'div[data-hero-skillset-card]',
         priority: 1000,
         getAttrs: dom => {
-          if (!(dom instanceof HTMLElement)) {
-            return false;
-          }
+          if (!(dom instanceof HTMLElement)) return false;
           const config = dom.getAttribute('data-config') || null;
           return { configuration: config };
         }
       }
     ];
   },
+
   renderHTML({ HTMLAttributes }) {
     const attrs = {
       class: 'hero-skillset-card hero-skillset-card--view',
@@ -550,21 +664,31 @@ export const HeroSkillsetCard = Node.create({
         ? encodeHeroSkillsetConfig(HTMLAttributes.configuration)
         : encodeHeroSkillsetConfig(getDefaultHeroSkillsetConfig())
     };
-    return ['div', attrs, ['div', { class: 'hero-skillset-card__placeholder' }, '英雄スキル構成カード']];
+
+    return [
+      'div',
+      attrs,
+      ['div', { class: 'hero-skillset-card__placeholder' }, '英雄スキル構成カード']
+    ];
   },
+
   addCommands() {
     return {
       insertHeroSkillsetCard: () => ({ commands }) => {
         return commands.insertContent({
           type: this.name,
           attrs: {
-            configuration: encodeHeroSkillsetConfig(getDefaultHeroSkillsetConfig())
+            configuration: encodeHeroSkillsetConfig(
+              getDefaultHeroSkillsetConfig()
+            )
           }
         });
       }
     };
   },
+
   addNodeView() {
-    return ({ node, editor, getPos }) => new HeroSkillsetCardNodeView(node, editor, getPos);
+    return ({ node, editor, getPos }) =>
+      new HeroSkillsetCardNodeView(node, editor, getPos);
   }
 });
