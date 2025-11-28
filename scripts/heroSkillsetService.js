@@ -105,8 +105,15 @@ function normalizeFixedSkills(value) {
     .filter(Boolean);
 }
 
+function normalizeFixedSkillIds(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map(normalizeString).filter(Boolean);
+}
+
 /**
- * 英雄レコード正規化（fixedSkillIds を完全廃止）
+ * 英雄レコード正規化
  */
 function normalizeHeroRecord(record) {
   const normalized = {
@@ -117,8 +124,7 @@ function normalizeHeroRecord(record) {
     troopType: normalizeString(record?.troopType),
     grade: normalizeString(record?.grade),
 
-    // 🔥 fixedSkillIds は廃止
-    // fixedSkillIds: [],
+    fixedSkillIds: normalizeFixedSkillIds(record?.fixedSkillIds || []),
 
     // 🔥 fixedSkills（新仕様）だけを採用
     fixedSkills: normalizeFixedSkills(record?.fixedSkills || [])
@@ -216,6 +222,16 @@ function buildDataStore(heroes, skills) {
         });
       }
     });
+  });
+
+  // fixedSkillIds から fixedSkills を解決
+  (heroes || []).forEach(hero => {
+    const fixedSkills = Array.isArray(hero?.fixedSkills) ? hero.fixedSkills : [];
+    const fixedSkillIds = Array.isArray(hero?.fixedSkillIds) ? hero.fixedSkillIds : [];
+
+    if (!fixedSkills.length && fixedSkillIds.length) {
+      hero.fixedSkills = fixedSkillIds.map(id => skillMap.get(id)).filter(Boolean);
+    }
   });
 
   const selectableSkills = (skills || []).filter(skill => skill?.category === 'user');
