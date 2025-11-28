@@ -1,5 +1,3 @@
-const HERO_DB_PATH = './database/hero_db.json';
-const SKILL_DB_PATH = './database/skill_db.json';
 const DATABASE_ENDPOINT = typeof window !== 'undefined' ? window.APPS_SCRIPT_ENDPOINT_DATABASE : '';
 const LOGIN_STORAGE_KEY = 'wikiLoginState';
 
@@ -49,14 +47,6 @@ function getHeroTalents(hero) {
     return [];
   }
   return HERO_TALENT_KEYS.map(key => normalizeTalentEntry(hero[key])).filter(Boolean);
-}
-
-async function fetchJson(path) {
-  const response = await fetch(path, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Failed to load ${path}: ${response.status}`);
-  }
-  return await response.json();
 }
 
 function getLoginState() {
@@ -184,7 +174,7 @@ function normalizeSkillRecord(record) {
 
 async function loadFromDatabaseEndpoint() {
   if (!DATABASE_ENDPOINT || DATABASE_ENDPOINT.includes('YOUR_DATABASE_DEPLOYMENT_ID')) {
-    return null;
+    throw new Error('Apps Script endpoint is not configured.');
   }
 
   const loginState = getLoginState();
@@ -214,14 +204,6 @@ async function loadFromDatabaseEndpoint() {
   const heroes = result.heroes.map(normalizeHeroRecord);
   const skills = result.skills.map(normalizeSkillRecord);
 
-  return buildDataStore(heroes, skills);
-}
-
-async function loadFromLocalFiles() {
-  const [heroes, skills] = await Promise.all([
-    fetchJson(HERO_DB_PATH),
-    fetchJson(SKILL_DB_PATH)
-  ]);
   return buildDataStore(heroes, skills);
 }
 
@@ -272,12 +254,11 @@ async function loadHeroSkillsetData() {
     cachedDataPromise = (async () => {
       try {
         const databaseData = await loadFromDatabaseEndpoint();
-        if (databaseData) return databaseData;
+        return databaseData;
       } catch (error) {
-        console.warn('[HeroSkillsetService] Failed to load data from Apps Script endpoint. Falling back to local data.', error);
+        console.warn('[HeroSkillsetService] Failed to load data from Apps Script endpoint.', error);
+        throw error;
       }
-
-      return await loadFromLocalFiles();
     })().catch(error => {
       cachedDataPromise = null;
       throw error;
