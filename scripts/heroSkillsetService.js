@@ -174,7 +174,7 @@ function normalizeSkillRecord(record) {
 
 async function loadFromDatabaseEndpoint() {
   if (!DATABASE_ENDPOINT || DATABASE_ENDPOINT.includes('YOUR_DATABASE_DEPLOYMENT_ID')) {
-    return null;
+    throw new Error('Apps Script endpoint is not configured.');
   }
 
   const loginState = getLoginState();
@@ -205,55 +205,6 @@ async function loadFromDatabaseEndpoint() {
   const skills = result.skills.map(normalizeSkillRecord);
 
   return buildDataStore(heroes, skills);
-}
-
-function parseJsonField(value) {
-  if (typeof value !== 'string') return null;
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return null;
-  }
-}
-
-async function loadFromSampleSpreadsheet() {
-  const response = await fetch('./database/sample_db.txt', { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(`Failed to load sample database: ${response.status}`);
-  }
-
-  const text = (await response.text()).trim();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) {
-    throw new Error('Sample database is empty.');
-  }
-
-  const headers = lines[0].split(/\t+/);
-  const heroes = lines.slice(1).map(line => {
-    const cells = line.split(/\t+/);
-    const record = headers.reduce((acc, header, index) => {
-      acc[header] = cells[index] || '';
-      return acc;
-    }, {});
-
-    const fixedSkillCandidates =
-      parseJsonField(record.fixedSkills) || parseJsonField(record.fixedSkillIds);
-
-    if (Array.isArray(fixedSkillCandidates)) {
-      record.fixedSkills = fixedSkillCandidates;
-    }
-
-    HERO_TALENT_KEYS.forEach(key => {
-      const parsed = parseJsonField(record[key]);
-      if (parsed) {
-        record[key] = parsed;
-      }
-    });
-
-    return normalizeHeroRecord(record);
-  });
-
-  return buildDataStore(heroes, []);
 }
 
 /**
@@ -303,15 +254,9 @@ async function loadHeroSkillsetData() {
     cachedDataPromise = (async () => {
       try {
         const databaseData = await loadFromDatabaseEndpoint();
-        if (databaseData) return databaseData;
+        return databaseData;
       } catch (error) {
-        console.warn('[HeroSkillsetService] Failed to load data from Apps Script endpoint. Falling back to local data.', error);
-      }
-
-      try {
-        return await loadFromSampleSpreadsheet();
-      } catch (error) {
-        console.warn('[HeroSkillsetService] Failed to load sample database.', error);
+        console.warn('[HeroSkillsetService] Failed to load data from Apps Script endpoint.', error);
         throw error;
       }
     })().catch(error => {
