@@ -126,7 +126,7 @@ function routeAction(data) {
     case 'getPages':
       return getPages();
     case 'getPage':
-      return getPage(data.id);
+      return getPage(data.id, data.playerId);
     case 'renamePageTree':
       return renamePageTree({
         originalId: data.originalId,
@@ -268,7 +268,15 @@ function parseOrderValue(value) {
 }
 
 function ensureSheetStructure(sheet) {
-  const headers = ['ID', 'Title', 'Content', 'UpdatedAt', 'UpdatedBy', 'Order'];
+  const headers = ['ID', 'Title', 'Content', 'Content2', 'UpdatedAt', 'UpdatedBy', 'Order'];
+  const desiredWidth = headers.length;
+
+  if (sheet.getLastColumn() < desiredWidth) {
+    sheet.insertColumnAfter(3);
+    if (sheet.getLastColumn() < desiredWidth) {
+      sheet.insertColumnsAfter(sheet.getLastColumn(), desiredWidth - sheet.getLastColumn());
+    }
+  }
   const current = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
   let needsUpdate = false;
   for (let i = 0; i < headers.length; i++) {
@@ -294,16 +302,16 @@ function getPages() {
       return { success: true, pages: [] };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), 7);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const pages = data
       .filter(row => row[0])
       .map(row => ({
         id: row[0],
         title: row[1] || '無題',
-        updatedAt: row[3] || '',
-        updatedBy: row[4] || '',
-        order: parseOrderValue(row[5])
+        updatedAt: row[4] || '',
+        updatedBy: row[5] || '',
+        order: parseOrderValue(row[6])
       }));
 
     return { success: true, pages };
@@ -312,7 +320,29 @@ function getPages() {
   }
 }
 
-function getPage(id) {
+function resolveViewerAuthority(playerId) {
+  const normalizedPlayerId = normalizePlayerId(playerId);
+  if (!normalizedPlayerId) {
+    return { authority: null, playerId: '' };
+  }
+
+  const sheet = getAccountsSheet();
+  if (!sheet) {
+    return { authority: null, playerId: '' };
+  }
+
+  const record = findAccountAuthority(sheet, normalizedPlayerId);
+  if (!record) {
+    return { authority: null, playerId: '' };
+  }
+
+  return {
+    authority: parseAuthorityValue(record.authority),
+    playerId: record.playerId || '',
+  };
+}
+
+function getPage(id, playerId) {
   try {
     if (!id) {
       return { success: false, message: 'Page ID is required' };
@@ -325,22 +355,29 @@ function getPage(id) {
       return { success: false, message: 'No pages found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), 7);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const row = data.find(r => r[0] && r[0].toString() === id.toString());
     if (!row) {
       return { success: false, message: 'Page not found' };
     }
 
+    const viewer = resolveViewerAuthority(playerId);
+    const hasDeveloperAuthority = viewer.authority !== null && viewer.authority >= 4;
+    const baseContent = row[2] || '';
+    const contentWithMetadata = row[3] || '';
+    const selectedContent = hasDeveloperAuthority ? (contentWithMetadata || baseContent) : baseContent;
+
     return {
       success: true,
       page: {
         id: row[0],
         title: row[1] || '無題',
-        content: row[2] || '',
-        updatedAt: row[3] || '',
-        updatedBy: row[4] || '',
-        order: parseOrderValue(row[5])
+        content: selectedContent,
+        content2: contentWithMetadata,
+        updatedAt: row[4] || '',
+        updatedBy: row[5] || '',
+        order: parseOrderValue(row[6])
       }
     };
   } catch (error) {
@@ -359,7 +396,7 @@ function savePage(page) {
     const lastRow = sheet.getLastRow();
     const updatedAt = new Date().toISOString();
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), 7);
     const data = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, width).getValues() : [];
 
     let targetRow = -1;
@@ -387,7 +424,7 @@ function savePage(page) {
         }
         const rowParent = getParentIdFromPageId(rowId.toString());
         if (rowParent === parentId) {
-          const parsed = parseOrderValue(row[5]);
+          const parsed = parseOrderValue(row[6]);
           if (parsed !== null && parsed > maxOrder) {
             maxOrder = parsed;
           }
@@ -406,13 +443,14 @@ function savePage(page) {
       page.id,
       page.title || '無題',
       page.content || '',
+      page.content2 || '',
       updatedAt,
       page.updatedBy || '',
       orderValue
     ];
 
     if (targetRow > 0) {
-      sheet.getRange(targetRow, 1, 1, 6).setValues([rowData]);
+      sheet.getRange(targetRow, 1, 1, 7).setValues([rowData]);
       return { success: true, message: 'Page updated', updatedAt };
     }
 
@@ -443,7 +481,7 @@ function renamePageTree(params) {
       return { success: false, message: 'Page not found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), 7);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const updates = [];
     const prefix = originalId + '/';
@@ -521,7 +559,7 @@ function reorderPages(params) {
       return { success: false, message: 'No pages found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), 7);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
 
     const entries = data.map((row, index) => {
@@ -529,7 +567,7 @@ function reorderPages(params) {
       return {
         id,
         parent: getParentIdFromPageId(id),
-        order: parseOrderValue(row[5]),
+        order: parseOrderValue(row[6]),
         index,
       };
     });
@@ -604,7 +642,7 @@ function reorderPages(params) {
     }
 
     updates.forEach(update => {
-      sheet.getRange(update.rowIndex, 6).setValue(update.order);
+      sheet.getRange(update.rowIndex, 7).setValue(update.order);
     });
 
     return { success: true, message: 'Order updated' };
