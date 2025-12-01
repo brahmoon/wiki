@@ -160,17 +160,21 @@ function normalizeHeroRecord(record) {
 }
 
 function normalizeSkillRecord(record) {
+  const rawCategory = record?.category;
+  // category が空ならデフォルトで 'user' とみなす
+  const category = normalizeString(rawCategory) || 'user';
+
   return {
-    id: normalizeString(record?.id),
+    id: normalizeId(record?.id),              // ★ 数値IDにも対応
     name: normalizeString(record?.name),
     image: normalizeString(record?.image),
     description: normalizeString(record?.description),
     url: normalizeString(record?.url),
-    category: normalizeString(record?.category),
+    category,                                 // ★ デフォルト 'user'
     skillType: normalizeString(record?.skillType),
     grade: normalizeString(record?.grade)
   };
-}
++}
 
 async function loadFromDatabaseEndpoint() {
   if (!DATABASE_ENDPOINT || DATABASE_ENDPOINT.includes('YOUR_DATABASE_DEPLOYMENT_ID')) {
@@ -238,8 +242,11 @@ function buildDataStore(heroes, skills) {
     });
   });
 
-  const selectableSkills = (skills || []).filter(skill => skill?.category === 'user');
-
+  const selectableSkills = (skills || []).filter(skill => {
+    // category が 'user' または空/未定義ならユーザ選択スキルとして扱う
+    return !skill?.category || skill.category === 'user';
+  });
+  
   return {
     heroes: heroes || [],
     skills: skills || [],
@@ -269,6 +276,13 @@ async function loadHeroSkillsetData() {
 
 function getDefaultHeroSkillsetConfig() {
   return clone(DEFAULT_CONFIG);
+}
+
+function normalizeId(value) {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  // 数値やその他は文字列化
+  return String(value);
 }
 
 function normalizeHeroSkillsetConfig(value) {
