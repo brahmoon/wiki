@@ -174,7 +174,7 @@ function normalizeSkillRecord(record) {
     skillType: normalizeString(record?.skillType),
     grade: normalizeString(record?.grade)
   };
-+}
+}
 
 async function loadFromDatabaseEndpoint() {
   if (!DATABASE_ENDPOINT || DATABASE_ENDPOINT.includes('YOUR_DATABASE_DEPLOYMENT_ID')) {
