@@ -398,19 +398,74 @@ function normalizeTalentCell(value) {
   return { name, type, description };
 }
 
+function normalizeFixedSkillEntryForApi(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  var name = typeof entry.name === 'string' ? entry.name : '';
+  var type = typeof entry.type === 'string' ? entry.type : '';
+  var description = typeof entry.description === 'string' ? entry.description : '';
+  var image = typeof entry.image === 'string' ? entry.image : '';
+  // id が無い場合は name をそのまま id に利用
+  var id = typeof entry.id === 'string' ? entry.id : name;
+
+  if (!id && !name && !description && !image) {
+    return null;
+  }
+
+  return {
+    id: id,
+    name: name,
+    type: type,
+    description: description,
+    image: image
+  };
+}
+
+function normalizeFixedSkillsForApi(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map(function(entry) {
+      return normalizeFixedSkillEntryForApi(entry);
+    })
+    .filter(function(entry) {
+      return !!entry;
+    });
+}
+
 function normalizeHeroSkillsetRecord(record) {
   if (!record || typeof record !== 'object') {
     return null;
   }
 
-  const normalized = {
+  // シート上では fixedSkillIds カラムに JSON が入っている想定
+  // 例: [ { name, type, description, image }, ... ]
+  var rawFixed = record.fixedSkills || record.fixedSkillIds;
+
+  // 新仕様: UI でそのまま使える形に正規化
+  var fixedSkills = normalizeFixedSkillsForApi(
+    Array.isArray(rawFixed) ? rawFixed : []
+  );
+
+  // 旧仕様互換: ID配列も同時に用意する（id または name）
+  var fixedSkillIds = normalizeFixedSkillIds(rawFixed);
+
+  var normalized = {
     id: normalizeStringValue(record.id),
     name: normalizeStringValue(record.name),
     image: normalizeStringValue(record.image),
     url: normalizeStringValue(record.url),
     troopType: normalizeStringValue(record.troopType),
     grade: normalizeStringValue(record.grade),
-    fixedSkillIds: normalizeFixedSkillIds(record.fixedSkillIds || record.fixedSkills)
+
+    // 旧仕様との互換（HeroSkillsetService で still 使用）
+    fixedSkillIds: fixedSkillIds,
+
+    // ★ 新仕様: HeroSkillsetCard が直接参照するフィールド
+    fixedSkills: fixedSkills
   };
 
   HERO_TALENT_KEYS.forEach(function(key) {
@@ -419,6 +474,7 @@ function normalizeHeroSkillsetRecord(record) {
 
   return normalized;
 }
+
 
 function normalizeSkillRecordForHeroCard(record) {
   if (!record || typeof record !== 'object') {
