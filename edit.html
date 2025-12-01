@@ -1167,11 +1167,48 @@
 
         .editor-content {
             line-height: 1.7;
+            position: relative;
         }
 
         .ProseMirror {
             min-height: 400px;
             outline: none;
+        }
+
+        .editor-annotations {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: visible;
+            z-index: 12;
+        }
+
+        .editor-annotation {
+            position: absolute;
+            height: 22px;
+            min-width: 140px;
+        }
+
+        .editor-annotation__line {
+            position: absolute;
+            inset: 8px 0 0 0;
+            border-bottom: 2px solid var(--annotation-color, #2383e2);
+            opacity: 0.85;
+        }
+
+        .editor-annotation__label {
+            position: absolute;
+            right: -8px;
+            top: -2px;
+            transform: translateY(-50%);
+            background: #fff;
+            color: #24292f;
+            border: 1px solid var(--annotation-color, #2383e2);
+            border-radius: 14px;
+            padding: 2px 10px;
+            font-size: 12px;
+            white-space: nowrap;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
         }
 
         .ProseMirror p.is-editor-empty:first-child::before {
@@ -1794,6 +1831,7 @@
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
         const ADMIN_AUTHORITY_VALUE = 99;
         const EDITOR_AUTHORITY_VALUE = 2;
+        const DEVELOPER_AUTHORITY_VALUE = 4;
         const BLOCKED_AUTHORITY_VALUE = -1;
 
         const DRIVE_IMAGE_PERMISSION_DEBUG = true;
@@ -1921,6 +1959,7 @@
             currentParentId: null,
             isNewPage: false,
             isApplyingContent: false,
+            lastLoadedContentWithMetadata: '',
             currentPlayerId: '',
             linkEditor: {
                 visible: false,
@@ -1945,6 +1984,17 @@
                 loaded: false,
                 states: {}
             }
+        };
+
+        const ANNOTATION_COLORS = [
+            '#2383e2', '#d81b60', '#f39c12', '#16a085', '#9b59b6', '#e74c3c', '#2ecc71', '#8e44ad', '#f06292', '#2c3e50'
+        ];
+
+        const annotationState = {
+            overlay: null,
+            rafId: null,
+            colorIndex: 0,
+            colorMap: new Map()
         };
 
         function setEditorPlayerId(playerId) {
@@ -2144,6 +2194,26 @@
             }
             const number = Number(value);
             return Number.isFinite(number) ? number : null;
+        }
+
+        function getCurrentAuthorityValue() {
+            if (userSettingsState?.data && userSettingsState.data.authority !== undefined) {
+                const parsed = parseAuthority(userSettingsState.data.authority);
+                if (parsed !== null) {
+                    return parsed;
+                }
+            }
+            const loginState = getStoredLoginState();
+            return parseAuthority(loginState?.user?.authority);
+        }
+
+        function getCurrentUsername() {
+            const settingsName = (userSettingsState?.data?.username || '').trim();
+            if (settingsName) {
+                return settingsName;
+            }
+            const loginState = getStoredLoginState();
+            return getDisplayName(loginState?.user) || '';
         }
 
         function isPendingPlayerId(value) {
@@ -2492,6 +2562,8 @@
             } else if (!playerIdentifier && lastLoginIdentifier) {
                 lastLoginIdentifier = null;
             }
+
+            scheduleAnnotationRender();
         };
 
         const handleLoginNavigation = () => {
@@ -2789,6 +2861,7 @@
             pageHeader: document.querySelector('.page-header'),
             editorWrapper: document.querySelector('.editor-wrapper'),
             editorContainer: document.querySelector('.editor-container'),
+            editorContent: document.querySelector('.editor-content'),
             editor: document.getElementById('editor'),
             statusMessage: document.getElementById('status-message'),
             updatedAt: document.getElementById('updated-at'),
@@ -2818,6 +2891,111 @@
             console.warn(`Blocked user attempted to ${actionDescription}.`);
             setStatus('このアカウントには編集権限がありません', 'error');
             return false;
+        }
+
+        function getAnnotationOverlay() {
+            const editorContent = elements.editorContent;
+            if (!editorContent) {
+                return null;
+            }
+            if (annotationState.overlay && annotationState.overlay.isConnected) {
+                return annotationState.overlay;
+            }
+            const overlay = document.createElement('div');
+            overlay.className = 'editor-annotations';
+            editorContent.appendChild(overlay);
+            annotationState.overlay = overlay;
+            return overlay;
+        }
+
+        function clearEditorAnnotations(removeOverlay = false) {
+            if (annotationState.overlay) {
+                annotationState.overlay.innerHTML = '';
+                if (removeOverlay && annotationState.overlay.parentNode) {
+                    annotationState.overlay.parentNode.removeChild(annotationState.overlay);
+                    annotationState.overlay = null;
+                }
+            }
+        }
+
+        function getAnnotationColor(playerId) {
+            if (!playerId) {
+                return ANNOTATION_COLORS[0];
+            }
+            if (!annotationState.colorMap.has(playerId)) {
+                const paletteIndex = annotationState.colorIndex;
+                const color =
+                    paletteIndex < ANNOTATION_COLORS.length
+                        ? ANNOTATION_COLORS[paletteIndex]
+                        : `hsl(${(paletteIndex * 137.508) % 360}, 70%, 45%)`;
+                annotationState.colorIndex += 1;
+                annotationState.colorMap.set(playerId, color);
+            }
+            return annotationState.colorMap.get(playerId);
+        }
+
+        function renderEditorAnnotations() {
+            const authorityValue = getCurrentAuthorityValue();
+            if (authorityValue === null || authorityValue < DEVELOPER_AUTHORITY_VALUE) {
+                clearEditorAnnotations(true);
+                return;
+            }
+
+            const overlay = getAnnotationOverlay();
+            const editorContent = elements.editorContent;
+            const editorRoot = elements.editor?.querySelector('.ProseMirror');
+            if (!overlay || !editorContent || !editorRoot) {
+                return;
+            }
+
+            overlay.innerHTML = '';
+            const containerRect = editorContent.getBoundingClientRect();
+            const blocks = Array.from(editorRoot.children || []).filter(node => node instanceof HTMLElement);
+
+            blocks.forEach((node, index) => {
+                const playerId = node.getAttribute('data-editor-player-id') || getEditorPlayerId();
+                const nextNode = blocks[index + 1] || null;
+                const nextPlayerId = nextNode ? (nextNode.getAttribute('data-editor-player-id') || getEditorPlayerId()) : null;
+
+                if (!playerId) {
+                    return;
+                }
+                if (nextPlayerId === playerId) {
+                    return;
+                }
+
+                const editorName = node.getAttribute('data-editor-name') || getCurrentUsername() || '不明なユーザー';
+                const rect = node.getBoundingClientRect();
+                const offsetLeft = rect.left - containerRect.left;
+                const top = rect.bottom - containerRect.top;
+                const annotationWidth = Math.max(0, containerRect.width - offsetLeft + 140);
+
+                const annotation = document.createElement('div');
+                annotation.className = 'editor-annotation';
+                annotation.style.left = `${offsetLeft}px`;
+                annotation.style.top = `${top}px`;
+                annotation.style.width = `${annotationWidth}px`;
+                annotation.style.setProperty('--annotation-color', getAnnotationColor(playerId));
+
+                const line = document.createElement('div');
+                line.className = 'editor-annotation__line';
+                const label = document.createElement('div');
+                label.className = 'editor-annotation__label';
+                label.textContent = `${editorName}（${playerId}）`;
+
+                annotation.append(line, label);
+                overlay.appendChild(annotation);
+            });
+        }
+
+        function scheduleAnnotationRender() {
+            if (annotationState.rafId) {
+                return;
+            }
+            annotationState.rafId = requestAnimationFrame(() => {
+                annotationState.rafId = null;
+                renderEditorAnnotations();
+            });
         }
 
         function applyToolbarConfigStates(states) {
@@ -4521,14 +4699,20 @@
                 elements.pageName.value = slug;
                 elements.pageName.disabled = false;
                 elements.pageTitle.value = page.title || '無題';
+                const authorityValue = getCurrentAuthorityValue();
+                const useContentWithMetadata = authorityValue !== null && authorityValue >= DEVELOPER_AUTHORITY_VALUE;
+                const contentSource = useContentWithMetadata ? (page.content2 || page.content || '') : (page.content || '');
+                const normalizedContent = normalizePageLinkCards(contentSource);
+                state.lastLoadedContentWithMetadata = useContentWithMetadata ? normalizePageLinkCards(page.content2 || '') : '';
+
                 state.isApplyingContent = true;
-                const normalizedContent = normalizePageLinkCards(page.content || '');
                 state.editor.commands.setContent(normalizedContent, false);
                 state.isApplyingContent = false;
                 await waitForNextFrame();
                 hideLinkEditor();
                 hidePageLinkPanel();
                 renderToolbar();
+                scheduleAnnotationRender();
                 setUpdatedAt(page.updatedAt ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}` : '');
                 setStatus('ページを読み込みました', 'success');
                 updateBreadcrumb(page.id);
@@ -4552,11 +4736,50 @@
                 }
                 renderToolbar();
                 syncLinkEditorFromSelection();
+                scheduleAnnotationRender();
             });
             state.editor.on('selectionUpdate', () => {
                 renderToolbar();
                 syncLinkEditorFromSelection();
+                scheduleAnnotationRender();
             });
+        }
+
+        function buildContentWithEditorMetadata(content) {
+            const safeContent = content || '';
+            if (!safeContent) {
+                return '';
+            }
+
+            const playerId = getEditorPlayerId();
+            const editorName = getCurrentUsername();
+            if (!playerId || !editorName) {
+                return safeContent;
+            }
+
+            const parser = new DOMParser();
+            const nextDoc = parser.parseFromString(`<div>${safeContent}</div>`, 'text/html');
+            const body = nextDoc.body;
+            const previousContent = state.lastLoadedContentWithMetadata || '';
+            const previousDoc = previousContent ? parser.parseFromString(`<div>${previousContent}</div>`, 'text/html') : null;
+            const previousChildren = previousDoc ? Array.from(previousDoc.body.children || []) : [];
+
+            Array.from(body.children || []).forEach((element, index) => {
+                const previousElement = previousChildren[index];
+                const previousPlayerId = previousElement?.getAttribute('data-editor-player-id');
+                const previousName = previousElement?.getAttribute('data-editor-name');
+                const previousHtml = previousElement ? previousElement.innerHTML : null;
+
+                if (previousElement && previousHtml === element.innerHTML && previousPlayerId && previousName) {
+                    element.setAttribute('data-editor-player-id', previousPlayerId);
+                    element.setAttribute('data-editor-name', previousName);
+                } else {
+                    element.setAttribute('data-editor-player-id', playerId);
+                    element.setAttribute('data-editor-name', editorName);
+                }
+            });
+
+            return body.innerHTML;
         }
 
         async function saveCurrentPage() {
@@ -4589,6 +4812,7 @@
 
             const rawContent = state.editor.getHTML();
             const normalizedContent = normalizePageLinkCards(rawContent);
+            const contentWithMetadata = buildContentWithEditorMetadata(normalizedContent);
 
             const updatedBy = getEditorPlayerId();
 
@@ -4596,6 +4820,7 @@
                 id,
                 title: titleInput,
                 content: normalizedContent,
+                content2: contentWithMetadata,
                 updatedBy
             };
 
@@ -4628,6 +4853,7 @@
                 state.isNewPage = false;
                 state.currentPageId = id;
                 state.currentParentId = parentId || null;
+                state.lastLoadedContentWithMetadata = contentWithMetadata;
                 slugInput = normalizeSlug(slugInput);
                 elements.pageName.value = slugInput;
                 elements.pageName.disabled = false;
@@ -4658,6 +4884,7 @@
             state.currentPageId = tempId;
             state.isNewPage = true;
             state.isDirty = true;
+            state.lastLoadedContentWithMetadata = '';
 
             elements.pageName.disabled = false;
             elements.pageName.value = '';
@@ -4670,6 +4897,7 @@
             hideLinkEditor();
             hidePageLinkPanel();
             renderToolbar();
+            clearEditorAnnotations(true);
 
             const node = {
                 id: tempId,
@@ -4812,7 +5040,9 @@
                 if (!elements.tableRowControls?.hasAttribute('hidden')) {
                     updateTableControls(state.editor);
                 }
+                scheduleAnnotationRender();
             });
+            document.addEventListener('scroll', scheduleAnnotationRender, true);
             window.addEventListener('beforeunload', event => {
                 if (state.isDirty) {
                     event.preventDefault();
