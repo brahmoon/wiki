@@ -161,16 +161,15 @@ function normalizeHeroRecord(record) {
 
 function normalizeSkillRecord(record) {
   const rawCategory = record?.category;
-  // category が空ならデフォルトで 'user' とみなす
   const category = normalizeString(rawCategory) || 'user';
 
   return {
-    id: normalizeId(record?.id),              // ★ 数値IDにも対応
+    id: normalizeId(record?.id),
     name: normalizeString(record?.name),
     image: normalizeString(record?.image),
     description: normalizeString(record?.description),
     url: normalizeString(record?.url),
-    category,                                 // ★ デフォルト 'user'
+    category,
     skillType: normalizeString(record?.skillType),
     grade: normalizeString(record?.grade)
   };
