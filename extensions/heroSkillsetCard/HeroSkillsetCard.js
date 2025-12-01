@@ -333,6 +333,15 @@ class HeroSkillsetCardNodeView {
     void this.loadData();
   }
 
+  stopEvent(event) {
+    // スロットをタップしたときは IME を開かせない
+    if (event.target.closest('[data-hero-slot], [data-skill-slot]')) {
+      event.preventDefault();
+      return true;
+    }
+    return false;
+  }
+  
   async loadData() {
     try {
       this.data = await loadHeroSkillsetData();
