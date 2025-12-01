@@ -326,12 +326,7 @@ class HeroSkillsetCardNodeView {
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.dom.appendChild(this.body);
 
-    this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handleClick = this.handleClick.bind(this);
-    this.dom.addEventListener('mousedown', this.handlePointerDown);
-    this.dom.addEventListener('touchstart', this.handlePointerDown, {
-      passive: false
-    });
     this.dom.addEventListener('click', this.handleClick);
 
     this.render();
@@ -368,14 +363,6 @@ class HeroSkillsetCardNodeView {
         event.preventDefault();
         this.openSkillPicker(rowKey, slotKey);
       }
-    }
-  }
-
-  handlePointerDown(event) {
-    const slot = event.target.closest('[data-hero-slot], [data-skill-slot]');
-    if (slot) {
-      event.preventDefault();
-      event.stopPropagation();
     }
   }
 
@@ -630,8 +617,6 @@ class HeroSkillsetCardNodeView {
   }
 
   destroy() {
-    this.dom.removeEventListener('mousedown', this.handlePointerDown);
-    this.dom.removeEventListener('touchstart', this.handlePointerDown);
     this.dom.removeEventListener('click', this.handleClick);
   }
 }
