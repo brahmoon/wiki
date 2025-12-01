@@ -2224,18 +2224,31 @@
             if (!user) {
                 return false;
             }
-            if (isPendingPlayerId(user.playerId)) {
-                return true;
-            }
+
             const authorityValue = parseAuthority(user.authority);
             if (authorityValue === BLOCKED_AUTHORITY_VALUE) {
+                // ブロックユーザーは authorize に飛ばさない（そもそも編集不可）
                 return false;
             }
+
+            const rawPlayerId = (user.playerId || '').toString().trim();
+
+            // 1. プレイヤーIDが未設定 or 仮ID → 編集権限があるなら必ず authorize へ
+            if (!rawPlayerId || isPendingPlayerId(rawPlayerId)) {
+                if (authorityValue !== null && authorityValue >= EDITOR_AUTHORITY_VALUE) {
+                    return true;  // 権限2以上で playerId 無しはNG
+                }
+            }
+
+            // 2. 権限値が不明なら一旦 authorize へ
             if (authorityValue === null) {
                 return true;
             }
+
+            // 3. 権限が EDITOR_AUTHORITY_VALUE 未満なら authorize へ
             return authorityValue < EDITOR_AUTHORITY_VALUE;
         }
+
 
         function redirectToAuthorizePage() {
             const targetPage = state.currentPageId || initialPageIdFromQuery || '';
