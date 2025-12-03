@@ -332,12 +332,13 @@ class HeroSkillsetCardNodeView {
     this.nameInput.type = 'text';
     this.nameInput.placeholder = '構成名（任意）';
     this.nameInput.value = this.config.name || '';
+    this.nameInput.contentEditable = 'false';
     this.nameInput.addEventListener('input', () => {
       const next = cloneConfig(this.config);
       next.name = this.nameInput.value.trim();
       this.persistConfig(next);
     });
-    this.dom.prepend(this.nameInput);
+    this.body.prepend(this.nameInput);
 
     this.handleClick = this.handleClick.bind(this);
     this.dom.addEventListener('click', this.handleClick);
@@ -347,6 +348,10 @@ class HeroSkillsetCardNodeView {
   }
 
   stopEvent(event) {
+    if (event.target === this.nameInput) {
+      return true;
+    }  
+  
     // スロットをタップしたときは IME を開かせない
     if (event.target.closest('[data-hero-slot], [data-skill-slot]')) {
       event.preventDefault();
