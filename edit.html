@@ -484,6 +484,16 @@
             transform: translate(calc(-100% - 8px), -50%);
         }
 
+        .table-header-control .active {
+            background: #2383e2;
+            border-color: #1f6bb5;
+            color: #fff;
+        }
+
+        .table-merge-control {
+            transform: translate(-50%, calc(-100% - 8px));
+        }
+
         .youtube-paste-popup {
             position: absolute;
             top: 0;
@@ -1535,6 +1545,15 @@
                     <div id="table-col-controls" class="table-control table-control-col" hidden>
                         <button type="button" data-table-action="addColumn" aria-label="列を追加">+</button>
                         <button type="button" data-table-action="removeColumn" aria-label="列を削除">-</button>
+                    </div>
+                    <div id="table-header-row-toggle" class="table-control table-control-col table-header-control" hidden>
+                        <button type="button" data-table-header-action="row" aria-label="ヘッダー行を切り替え">H</button>
+                    </div>
+                    <div id="table-header-col-toggle" class="table-control table-control-row table-header-control" hidden>
+                        <button type="button" data-table-header-action="column" aria-label="ヘッダー列を切り替え">H</button>
+                    </div>
+                    <div id="table-merge-controls" class="table-control table-merge-control" hidden>
+                        <button type="button" data-table-merge-action="mergeOrSplit" aria-label="セルを結合">結合</button>
                     </div>
                     <div id="youtube-paste-popup" class="youtube-paste-popup" role="dialog" aria-hidden="true">
                         <div class="youtube-paste-popup-message">YouTubeのURLが検出されました。どのように貼り付けますか？</div>
@@ -2821,6 +2840,10 @@
             linkCancel: document.getElementById('link-cancel'),
             tableRowControls: document.getElementById('table-row-controls'),
             tableColControls: document.getElementById('table-col-controls'),
+            tableHeaderRowToggle: document.getElementById('table-header-row-toggle'),
+            tableHeaderColToggle: document.getElementById('table-header-col-toggle'),
+            tableMergeControls: document.getElementById('table-merge-controls'),
+            tableMergeButton: document.querySelector('#table-merge-controls button'),
             youtubePastePopup: document.getElementById('youtube-paste-popup'),
             youtubePasteAsUrl: document.getElementById('youtube-paste-as-url'),
             youtubeEmbedVideo: document.getElementById('youtube-embed-video'),
@@ -4783,8 +4806,14 @@
             elements.youtubeEmbedVideo?.addEventListener('click', applyYouTubeEmbed);
             elements.tableRowControls?.addEventListener('click', handleTableControlClick);
             elements.tableColControls?.addEventListener('click', handleTableControlClick);
+            elements.tableHeaderRowToggle?.addEventListener('click', handleTableHeaderToggleClick);
+            elements.tableHeaderColToggle?.addEventListener('click', handleTableHeaderToggleClick);
+            elements.tableMergeControls?.addEventListener('click', handleTableMergeClick);
             elements.tableRowControls?.addEventListener('mousedown', handleTableControlMouseDown);
             elements.tableColControls?.addEventListener('mousedown', handleTableControlMouseDown);
+            elements.tableHeaderRowToggle?.addEventListener('mousedown', handleTableControlMouseDown);
+            elements.tableHeaderColToggle?.addEventListener('mousedown', handleTableControlMouseDown);
+            elements.tableMergeControls?.addEventListener('mousedown', handleTableControlMouseDown);
             elements.linkInput.addEventListener('keydown', event => {
                 if (event.key === 'Enter') {
                     event.preventDefault();
@@ -4886,15 +4915,88 @@
             return null;
         }
 
+        function findActiveTableCell(tableElement = findActiveTableElement()) {
+            if (!tableElement) {
+                return null;
+            }
+            const selectedCell = tableElement.querySelector('td.selectedCell, th.selectedCell');
+            if (selectedCell instanceof HTMLElement) {
+                return selectedCell;
+            }
+            const selection = window.getSelection();
+            const anchorNode = selection?.anchorNode;
+            if (!anchorNode) {
+                return null;
+            }
+            const baseNode = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
+            return baseNode?.closest('td, th') ?? null;
+        }
+
+        function getCellPositionInfo(cell) {
+            if (!cell) {
+                return null;
+            }
+            const row = cell.parentElement;
+            const table = cell.closest('table');
+            if (!row || !table) {
+                return null;
+            }
+            const rows = Array.from(table.rows);
+            const rowIndex = rows.indexOf(row);
+            let colIndex = 0;
+            const cells = Array.from(row.cells);
+            for (const current of cells) {
+                if (current === cell) {
+                    break;
+                }
+                colIndex += current.colSpan || 1;
+            }
+            return { rowIndex, colIndex };
+        }
+
+        function isMergedCell(cell) {
+            if (!cell) {
+                return false;
+            }
+            return (cell.colSpan || 1) > 1 || (cell.rowSpan || 1) > 1;
+        }
+
+        function getCellsBoundingBox(cells) {
+            if (!cells.length) {
+                return null;
+            }
+            const firstRect = cells[0].getBoundingClientRect();
+            const bounds = {
+                left: firstRect.left,
+                right: firstRect.right,
+                top: firstRect.top,
+                bottom: firstRect.bottom
+            };
+            for (let index = 1; index < cells.length; index += 1) {
+                const rect = cells[index].getBoundingClientRect();
+                bounds.left = Math.min(bounds.left, rect.left);
+                bounds.right = Math.max(bounds.right, rect.right);
+                bounds.top = Math.min(bounds.top, rect.top);
+                bounds.bottom = Math.max(bounds.bottom, rect.bottom);
+            }
+            return { ...bounds, width: bounds.right - bounds.left, height: bounds.bottom - bounds.top };
+        }
+
         function hideTableControls() {
             elements.tableRowControls?.setAttribute('hidden', 'true');
             elements.tableColControls?.setAttribute('hidden', 'true');
+            elements.tableHeaderRowToggle?.setAttribute('hidden', 'true');
+            elements.tableHeaderColToggle?.setAttribute('hidden', 'true');
+            elements.tableMergeControls?.setAttribute('hidden', 'true');
         }
 
         function updateTableControls(editorInstance = state.editor) {
             const rowControls = elements.tableRowControls;
             const colControls = elements.tableColControls;
-            if (!rowControls || !colControls || !editorInstance) {
+            const headerRowToggle = elements.tableHeaderRowToggle;
+            const headerColToggle = elements.tableHeaderColToggle;
+            const mergeControls = elements.tableMergeControls;
+            if (!rowControls || !colControls || !editorInstance || !elements.editorContainer) {
                 return;
             }
             const tableElement = findActiveTableElement();
@@ -4914,6 +5016,66 @@
             colControls.style.top = `${tableRect.top - containerRect.top + tableRect.height / 2}px`;
             rowControls.removeAttribute('hidden');
             colControls.removeAttribute('hidden');
+
+            const activeCell = findActiveTableCell(tableElement);
+            const positionInfo = getCellPositionInfo(activeCell);
+            const selectedCells = Array.from(tableElement.querySelectorAll('td.selectedCell, th.selectedCell'));
+            const isHeaderActive = activeCell?.tagName === 'TH';
+
+            if (headerColToggle) {
+                if (positionInfo && positionInfo.colIndex === 0 && activeCell) {
+                    const cellRect = activeCell.getBoundingClientRect();
+                    headerColToggle.style.left = `${cellRect.left - containerRect.left + cellRect.width / 2}px`;
+                    headerColToggle.style.top = `${cellRect.bottom - containerRect.top}px`;
+                    const button = headerColToggle.querySelector('button[data-table-header-action="column"]');
+                    if (button instanceof HTMLButtonElement) {
+                        button.classList.toggle('active', isHeaderActive);
+                        button.setAttribute('aria-pressed', isHeaderActive ? 'true' : 'false');
+                    }
+                    headerColToggle.removeAttribute('hidden');
+                } else {
+                    headerColToggle.setAttribute('hidden', 'true');
+                }
+            }
+
+            if (headerRowToggle) {
+                if (positionInfo && positionInfo.rowIndex === 0 && activeCell) {
+                    const cellRect = activeCell.getBoundingClientRect();
+                    headerRowToggle.style.left = `${cellRect.right - containerRect.left}px`;
+                    headerRowToggle.style.top = `${cellRect.top - containerRect.top + cellRect.height / 2}px`;
+                    const button = headerRowToggle.querySelector('button[data-table-header-action="row"]');
+                    if (button instanceof HTMLButtonElement) {
+                        button.classList.toggle('active', isHeaderActive);
+                        button.setAttribute('aria-pressed', isHeaderActive ? 'true' : 'false');
+                    }
+                    headerRowToggle.removeAttribute('hidden');
+                } else {
+                    headerRowToggle.setAttribute('hidden', 'true');
+                }
+            }
+
+            const hasMultiCellSelection = selectedCells.length > 1;
+            const hasMergedCellSelection = !hasMultiCellSelection && isMergedCell(activeCell);
+
+            if (mergeControls && (hasMultiCellSelection || hasMergedCellSelection) && activeCell) {
+                const targetCells = hasMultiCellSelection ? selectedCells : [activeCell];
+                const bounds = getCellsBoundingBox(targetCells);
+                if (bounds) {
+                    mergeControls.style.left = `${bounds.left - containerRect.left + bounds.width / 2}px`;
+                    mergeControls.style.top = `${bounds.top - containerRect.top}px`;
+                    const label = hasMergedCellSelection ? '分割' : '結合';
+                    const mergeButton = elements.tableMergeButton;
+                    if (mergeButton) {
+                        mergeButton.textContent = label;
+                        mergeButton.setAttribute('aria-label', `${label}する`);
+                    }
+                    mergeControls.removeAttribute('hidden');
+                } else {
+                    mergeControls.setAttribute('hidden', 'true');
+                }
+            } else {
+                mergeControls?.setAttribute('hidden', 'true');
+            }
         }
 
         function handleTableControlClick(event) {
@@ -4947,6 +5109,48 @@
             if (event.target instanceof Element && event.target.closest('.table-control')) {
                 event.preventDefault();
             }
+        }
+
+        function handleTableHeaderToggleClick(event) {
+            const target = event.target;
+            if (!(target instanceof Element)) {
+                return;
+            }
+            const button = target.closest('button[data-table-header-action]');
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+            event.preventDefault();
+            const action = button.getAttribute('data-table-header-action');
+            const commandMap = {
+                row: () => state.editor?.chain().focus().toggleHeaderRow().run(),
+                column: () => state.editor?.chain().focus().toggleHeaderColumn().run()
+            };
+            const handler = commandMap[action];
+            if (typeof handler === 'function') {
+                if (state.lastTableSelection && !state.editor?.isActive('table')) {
+                    state.editor?.commands.setTextSelection(state.lastTableSelection);
+                }
+                handler();
+                updateTableControls(state.editor);
+            }
+        }
+
+        function handleTableMergeClick(event) {
+            const target = event.target;
+            if (!(target instanceof Element)) {
+                return;
+            }
+            const button = target.closest('button[data-table-merge-action]');
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+            event.preventDefault();
+            if (state.lastTableSelection && !state.editor?.isActive('table')) {
+                state.editor?.commands.setTextSelection(state.lastTableSelection);
+            }
+            state.editor?.chain().focus().mergeOrSplit().run();
+            updateTableControls(state.editor);
         }
 
         function initEditor() {
