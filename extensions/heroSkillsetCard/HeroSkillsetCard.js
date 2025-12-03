@@ -321,17 +321,15 @@ class HeroSkillsetCardNodeView {
     this.dom.setAttribute('data-hero-skillset-card', '');
     this.dom.setAttribute('data-config', this.serializedConfig);
     this.dom.contentEditable = 'false';
+    
+    this.contentDOM = document.createElement("div");
+    this.contentDOM.className = "hero-skillset-card__config-name";
+    this.dom.appendChild(this.contentDOM);
 
     this.body = document.createElement('div');
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.dom.appendChild(this.body);
     
-    this.contentDOM = document.createElement('div');
-    this.contentDOM.className = 'hero-skillset-card__config-name';
-    this.dom.appendChild(this.contentDOM);
-    
-    this.dom.prepend(this.nameInput);
-
     this.handleClick = this.handleClick.bind(this);
     this.dom.addEventListener('click', this.handleClick);
 
@@ -626,13 +624,6 @@ class HeroSkillsetCardNodeView {
       this.config = nextConfig;
       this.serializedConfig = serialized;
       this.render();
-      
-      // nameInput の内容と表示状態を更新
-      this.nameInput.value = this.config.name || "";
-      this.nameInput.style.display =
-        (!this.config.name || this.config.name.trim() === "")
-          ? "none"
-          : "block";
     }
 
     return true;
@@ -647,7 +638,7 @@ export const HeroSkillsetCard = Node.create({
   name: 'heroSkillsetCard',
   group: 'block',
   atom: false,
-  content: 'inline',
+  content: 'inline*',
   selectable: true,
   draggable: true,
   isolating: true,
