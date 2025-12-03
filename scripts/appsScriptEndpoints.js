@@ -4,7 +4,7 @@
   }
 
   const endpoints = Object.freeze({
-    WIKI: 'https://script.google.com/macros/s/AKfycbxB7AqZnmtGW0aa-KQEHMTJEkA8cIvgpk7C1o0d2cnSL8SNDWx0Sqok_622t2tBttRltQ/exec', // gs/wiki-backend.gs
+    WIKI: 'https://script.google.com/macros/s/AKfycbx5gBtCxkNZUnubXhd9Pu_TtWhGGYkNzLLx5d_Pl1eUgS-KItfPd2kIEgBo6cteOTjDZQ/exec', // gs/wiki-backend.gs
     DRIVE_IMAGE: 'https://script.google.com/macros/s/AKfycbyiAxaPIz2_E0fAwXFTINUW1SMwQH19Yh3k_3gFEMOiFuCWxOoHaquj1qxLJC3xd1Ow/exec', // extensions/driveImage/DriveImageAppsScript.gs
     LOGIN: 'https://script.google.com/macros/s/AKfycbwHhnYgB02en5yytMZEp37uj6R6sG9avJaI-NiBPtlNOm1hf5KkICOeMqPMrIIIne8k/exec', // gs/login.gs
     ADMIN_AUTH: 'https://script.google.com/macros/s/AKfycbxEKtDO85fhESn4fyk9aQqCqPC2rBvFqvSG0Kdz8nLUfq_b68WyLmpenuv2R_kG6BL5SA/exec', // gs/authorize.gs
