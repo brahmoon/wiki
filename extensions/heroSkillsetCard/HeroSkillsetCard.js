@@ -688,7 +688,6 @@ export const HeroSkillsetCard = Node.create({
 
     return [
       'div',
-      attrs,
       { ...HTMLAttributes, 'data-hero-skillset-card': '' },
       ['div', { class: 'hero-skillset-card__config-name' }, 0],
       ['div', { class: 'hero-skillset-card__placeholder' }, '英雄スキル構成カード']
