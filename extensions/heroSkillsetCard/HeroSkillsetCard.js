@@ -326,19 +326,10 @@ class HeroSkillsetCardNodeView {
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.dom.appendChild(this.body);
     
-    // 構成名入力 UI
-    this.nameInput = document.createElement('input');
-    this.nameInput.className = 'hero-skillset-card__name';
-    this.nameInput.type = 'text';
-    this.nameInput.placeholder = '構成名（任意）';
-    this.nameInput.value = this.config.name || '';
-    this.nameInput.contentEditable = 'false';
-    this.nameInput.addEventListener('input', () => {
-      const next = cloneConfig(this.config);
-      next.name = this.nameInput.value.trim();
-      this.persistConfig(next);
-    });
-    //this.body.prepend(this.nameInput);
+    this.contentDOM = document.createElement("div");
+    this.contentDOM.className = "hero-skillset-card__config-name";
+    this.dom.appendChild(this.contentDOM);
+    
     this.dom.prepend(this.nameInput);
 
     this.handleClick = this.handleClick.bind(this);
@@ -349,10 +340,6 @@ class HeroSkillsetCardNodeView {
   }
 
   stopEvent(event) {
-    if (event.target === this.nameInput) {
-      return true;
-    }  
-  
     // スロットをタップしたときは IME を開かせない
     if (event.target.closest('[data-hero-slot], [data-skill-slot]')) {
       event.preventDefault();
@@ -524,13 +511,6 @@ class HeroSkillsetCardNodeView {
 
   render() {
     this.dom.setAttribute('data-config', this.serializedConfig);
-    
-    // 入力が空なら高さゼロにして隠す
-//    if (!this.config.name || this.config.name.trim() === "") {
-//      this.nameInput.style.display = "none";
-//    } else {
-      this.nameInput.style.display = "block";
-//    }
 
     if (!this.data) {
       this.body.innerHTML =
@@ -666,7 +646,8 @@ class HeroSkillsetCardNodeView {
 export const HeroSkillsetCard = Node.create({
   name: 'heroSkillsetCard',
   group: 'block',
-  atom: true,
+  atom: false,
+  content: 'inline',
   selectable: true,
   draggable: true,
   isolating: true,
@@ -708,6 +689,8 @@ export const HeroSkillsetCard = Node.create({
     return [
       'div',
       attrs,
+      { ...HTMLAttributes, 'data-hero-skillset-card': '' },
+      ['div', { class: 'hero-skillset-card__config-name' }, 0],
       ['div', { class: 'hero-skillset-card__placeholder' }, '英雄スキル構成カード']
     ];
   },
