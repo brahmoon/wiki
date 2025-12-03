@@ -338,7 +338,8 @@ class HeroSkillsetCardNodeView {
       next.name = this.nameInput.value.trim();
       this.persistConfig(next);
     });
-    this.body.prepend(this.nameInput);
+    //this.body.prepend(this.nameInput);
+    this.dom.prepend(this.nameInput);
 
     this.handleClick = this.handleClick.bind(this);
     this.dom.addEventListener('click', this.handleClick);
