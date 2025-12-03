@@ -324,6 +324,21 @@ class HeroSkillsetCardNodeView {
 
     this.body = document.createElement('div');
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
+    this.nameField = document.createElement('div');
+    this.nameField.className = 'hero-skillset-card__name ProseMirror';
+    this.nameField.contentEditable = 'true';
+    this.nameField.setAttribute('role', 'textbox');
+    this.nameField.setAttribute('aria-label', '構成名');
+    this.nameField.spellcheck = false;
+
+    this.handleNameInput = this.handleNameInput.bind(this);
+    this.handleNameKeyDown = this.handleNameKeyDown.bind(this);
+    this.handleNamePaste = this.handleNamePaste.bind(this);
+
+    this.nameField.addEventListener('input', this.handleNameInput);
+    this.nameField.addEventListener('keydown', this.handleNameKeyDown);
+    this.nameField.addEventListener('paste', this.handleNamePaste);
+
     this.dom.appendChild(this.body);
 
     this.handleClick = this.handleClick.bind(this);
@@ -339,7 +354,54 @@ class HeroSkillsetCardNodeView {
       event.preventDefault();
       return true;
     }
+    if (this.nameField.contains(event.target)) {
+      return true;
+    }
     return false;
+  }
+
+  sanitizeNameText(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  handleNameInput() {
+    const value = this.sanitizeNameText(this.nameField.textContent || '');
+    if (this.nameField.textContent !== value) {
+      this.nameField.textContent = value;
+      const range = document.createRange();
+      range.selectNodeContents(this.nameField);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+
+    if (value !== this.config.name) {
+      const next = cloneConfig(this.config);
+      next.name = value;
+      this.persistConfig(next);
+    }
+  }
+
+  handleNameKeyDown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.nameField.blur();
+    }
+  }
+
+  handleNamePaste(event) {
+    if (!event.clipboardData) return;
+    event.preventDefault();
+    const text = event.clipboardData.getData('text/plain');
+    const sanitized = this.sanitizeNameText(text);
+    document.execCommand('insertText', false, sanitized);
   }
   
   async loadData() {
@@ -514,6 +576,12 @@ class HeroSkillsetCardNodeView {
 
     this.body.innerHTML = '';
 
+    const nameText = this.sanitizeNameText(this.config.name || '');
+    if (this.nameField.textContent !== nameText) {
+      this.nameField.textContent = nameText;
+    }
+    this.body.appendChild(this.nameField);
+
     const grid = document.createElement('div');
     grid.className = 'hero-skillset-card__grid';
 
@@ -627,6 +695,9 @@ class HeroSkillsetCardNodeView {
 
   destroy() {
     this.dom.removeEventListener('click', this.handleClick);
+    this.nameField.removeEventListener('input', this.handleNameInput);
+    this.nameField.removeEventListener('keydown', this.handleNameKeyDown);
+    this.nameField.removeEventListener('paste', this.handleNamePaste);
   }
 }
 
@@ -641,10 +712,7 @@ export const HeroSkillsetCard = Node.create({
   addAttributes() {
     return {
       configuration: {
-        default: encodeHeroSkillsetConfig({
-          name: "",
-          ...getDefaultHeroSkillsetConfig()
-        })
+        default: encodeHeroSkillsetConfig(getDefaultHeroSkillsetConfig())
       }
     };
   },
