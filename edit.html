@@ -1962,7 +1962,8 @@
             toolbarConfig: {
                 loaded: false,
                 states: {}
-            }
+            },
+            lastTableSelection: null
         };
 
         function setEditorPlayerId(playerId) {
@@ -4782,6 +4783,8 @@
             elements.youtubeEmbedVideo?.addEventListener('click', applyYouTubeEmbed);
             elements.tableRowControls?.addEventListener('click', handleTableControlClick);
             elements.tableColControls?.addEventListener('click', handleTableControlClick);
+            elements.tableRowControls?.addEventListener('mousedown', handleTableControlMouseDown);
+            elements.tableColControls?.addEventListener('mousedown', handleTableControlMouseDown);
             elements.linkInput.addEventListener('keydown', event => {
                 if (event.key === 'Enter') {
                     event.preventDefault();
@@ -4900,6 +4903,10 @@
                 hideTableControls();
                 return;
             }
+            const selection = editorInstance.state?.selection;
+            if (selection) {
+                state.lastTableSelection = { from: selection.from, to: selection.to };
+            }
             const tableRect = tableElement.getBoundingClientRect();
             rowControls.style.left = `${tableRect.left - containerRect.left + tableRect.width / 2}px`;
             rowControls.style.top = `${tableRect.bottom - containerRect.top}px`;
@@ -4928,8 +4935,17 @@
             };
             const handler = commandMap[action];
             if (typeof handler === 'function') {
+                if (state.lastTableSelection && !state.editor?.isActive('table')) {
+                    state.editor?.commands.setTextSelection(state.lastTableSelection);
+                }
                 handler();
                 updateTableControls(state.editor);
+            }
+        }
+
+        function handleTableControlMouseDown(event) {
+            if (event.target instanceof Element && event.target.closest('.table-control')) {
+                event.preventDefault();
             }
         }
 
