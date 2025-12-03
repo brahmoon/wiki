@@ -1588,7 +1588,6 @@
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { HeroSkillsetCard } from './extensions/heroSkillsetCard/HeroSkillsetCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
-        import { EditorInfo } from './extensions/editorInfo/EditorInfo.js';
 
         const TableDeletionShortcuts = Extension.create({
             name: 'tableDeletionShortcuts',
@@ -1961,11 +1960,6 @@
             }
             const loginState = getStoredLoginState();
             return (loginState?.user?.playerId || '').trim();
-        }
-
-        function getEditorUserName() {
-          const login = getStoredLoginState();
-          return login?.user?.username || login?.user?.name || login?.user?.email || "unknown";
         }
 
         function resolveAdminToken(loginState) {
@@ -4930,7 +4924,6 @@
                             levels: [1, 2, 3]
                         }
                     }),
-                    EditorInfo,
                     Placeholder.configure({
                         placeholder: 'ここにコンテンツを入力してください...'
                     }),
@@ -4995,60 +4988,6 @@
                     }
                     updateTableControls(state.editor);
                 }
-            });
-            
-            // =============================================
-            // Editor: ノード追加 & テキスト編集の監視
-            // =============================================
-            editor.on('update', ({ editor, transaction }) => {
-              const username = getEditorUserName();     
-              const playerId = getEditorPlayerId();
-              const now = new Date().toISOString();
-
-              transaction.steps.forEach(step => {
-                if (step.slice?.content?.content) {
-                  step.slice.content.content.forEach(() => {
-                    const pos = step.from;
-                    editor.commands.command(({ tr }) => {
-                      const node = tr.doc.nodeAt(pos);
-                      if (!node) return false;
-                      tr.setNodeMarkup(pos, undefined, {
-                        ...node.attrs,
-                        editorUsername: username,
-                        editorPlayerId: playerId,
-                        editorUpdatedAt: now,
-                      });
-                      return true;
-                    });
-                  });
-                }
-              });
-            });
-
-            // =============================================
-            // テキスト編集時 → 対象要素の editorInfo を更新
-            // =============================================
-            editor.on('transaction', ({ editor, transaction }) => {
-              if (!transaction.docChanged) return;
-
-              const username = getEditorUserName();
-              const playerId = getEditorPlayerId();
-              const now = new Date().toISOString();
-
-              const { $from } = editor.state.selection;
-              const pos = $from.before($from.depth);
-
-              editor.commands.command(({ tr }) => {
-                const node = tr.doc.nodeAt(pos);
-                if (!node) return false;
-                tr.setNodeMarkup(pos, undefined, {
-                  ...node.attrs,
-                  editorUsername: username,
-                  editorPlayerId: playerId,
-                  editorUpdatedAt: now,
-                });
-                return true;
-              });
             });
             driveImageExtensionInstance = state.editor?.extensionManager?.extensions?.find((extension) => extension.name === 'driveImage') || null;
             refreshDriveImageUserPermissions();
