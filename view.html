@@ -1144,10 +1144,25 @@
         }
       };
 
+      let scrollSyncRafId = null;
+
+      const requestScrollSync = () => {
+        if (!popup.classList.contains('is-visible')) {
+          return;
+        }
+        if (scrollSyncRafId !== null) {
+          return;
+        }
+        scrollSyncRafId = window.requestAnimationFrame(() => {
+          scrollSyncRafId = null;
+          syncPosition();
+        });
+      };
+
       window.addEventListener('pointerup', resumeScrollSync);
       window.addEventListener('pointercancel', resumeScrollSync);
-      window.addEventListener('scroll', syncPosition, true);
-      window.addEventListener('resize', syncPosition);
+      window.addEventListener('scroll', requestScrollSync, { capture: true, passive: true });
+      window.addEventListener('resize', requestScrollSync);
 
       function positionRelativeToAnchor(anchor) {
         if (!anchor) {
