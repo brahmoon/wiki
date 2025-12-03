@@ -326,8 +326,8 @@ class HeroSkillsetCardNodeView {
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.dom.appendChild(this.body);
     
-    this.contentDOM = document.createElement('div');
-    this.contentDOM.className = 'hero-skillset-card__config-name';
+    this.contentDOM = document.createElement("div");
+    this.contentDOM.className = "hero-skillset-card__config-name";
     this.dom.appendChild(this.contentDOM);
     
     this.dom.prepend(this.nameInput);
@@ -688,7 +688,7 @@ export const HeroSkillsetCard = Node.create({
 
     return [
       'div',
-      { ...HTMLAttributes, 'data-hero-skillset-card': '' },
+      attrs,
       ['div', { class: 'hero-skillset-card__config-name' }, 0],
       ['div', { class: 'hero-skillset-card__placeholder' }, '英雄スキル構成カード']
     ];
