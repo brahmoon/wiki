@@ -5243,7 +5243,7 @@
             // =============================================
             // Editor: ノード追加 & テキスト編集の監視
             // =============================================
-            state.editor.on('update', ({ editor, transaction }) => {
+            editor.on('update', ({ editor, transaction }) => {
               const username = getEditorUserName();     
               const playerId = getEditorPlayerId();
               const now = new Date().toISOString();
@@ -5271,7 +5271,7 @@
             // =============================================
             // テキスト編集時 → 対象要素の editorInfo を更新
             // =============================================
-            state.editor.on('transaction', ({ editor, transaction }) => {
+            editor.on('transaction', ({ editor, transaction }) => {
               if (!transaction.docChanged) return;
 
               const username = getEditorUserName();
