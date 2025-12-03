@@ -520,11 +520,11 @@ class HeroSkillsetCardNodeView {
     this.dom.setAttribute('data-config', this.serializedConfig);
     
     // 入力が空なら高さゼロにして隠す
-    if (!this.config.name || this.config.name.trim() === "") {
-      this.nameInput.style.display = "none";
-    } else {
-      this.nameInput.style.display = "block";
-    }
+//    if (!this.config.name || this.config.name.trim() === "") {
+//      this.nameInput.style.display = "none";
+//    } else {
+//      this.nameInput.style.display = "block";
+//    }
 
     if (!this.data) {
       this.body.innerHTML =
