@@ -325,6 +325,19 @@ class HeroSkillsetCardNodeView {
     this.body = document.createElement('div');
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.dom.appendChild(this.body);
+    
+    // 構成名入力 UI
+    this.nameInput = document.createElement('input');
+    this.nameInput.className = 'hero-skillset-card__name';
+    this.nameInput.type = 'text';
+    this.nameInput.placeholder = '構成名（任意）';
+    this.nameInput.value = this.config.name || '';
+    this.nameInput.addEventListener('input', () => {
+      const next = cloneConfig(this.config);
+      next.name = this.nameInput.value.trim();
+      this.persistConfig(next);
+    });
+    this.dom.prepend(this.nameInput);
 
     this.handleClick = this.handleClick.bind(this);
     this.dom.addEventListener('click', this.handleClick);
@@ -505,6 +518,13 @@ class HeroSkillsetCardNodeView {
 
   render() {
     this.dom.setAttribute('data-config', this.serializedConfig);
+    
+    // 入力が空なら高さゼロにして隠す
+    if (!this.config.name || this.config.name.trim() === "") {
+      this.nameInput.style.display = "none";
+    } else {
+      this.nameInput.style.display = "block";
+    }
 
     if (!this.data) {
       this.body.innerHTML =
@@ -620,6 +640,13 @@ class HeroSkillsetCardNodeView {
       this.config = nextConfig;
       this.serializedConfig = serialized;
       this.render();
+      
+      // nameInput の内容と表示状態を更新
+      this.nameInput.value = this.config.name || "";
+      this.nameInput.style.display =
+        (!this.config.name || this.config.name.trim() === "")
+          ? "none"
+          : "block";
     }
 
     return true;
@@ -641,7 +668,10 @@ export const HeroSkillsetCard = Node.create({
   addAttributes() {
     return {
       configuration: {
-        default: encodeHeroSkillsetConfig(getDefaultHeroSkillsetConfig())
+        default: encodeHeroSkillsetConfig({
+          name: "",
+          ...getDefaultHeroSkillsetConfig()
+        })
       }
     };
   },
