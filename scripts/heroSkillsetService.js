@@ -20,7 +20,6 @@ function createDefaultRowsConfig() {
 }
 
 const DEFAULT_CONFIG = {
-  name: '',
   rows: createDefaultRowsConfig()
 };
 
@@ -300,9 +299,6 @@ function normalizeHeroSkillsetConfig(value) {
   }
 
   const normalized = getDefaultHeroSkillsetConfig();
-  if (typeof parsed.name === 'string') {
-    normalized.name = parsed.name.trim();
-  }
   const sourceRows = parsed.rows && typeof parsed.rows === 'object' ? parsed.rows : parsed;
 
   ROW_KEYS.forEach(rowKey => {

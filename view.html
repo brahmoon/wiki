@@ -432,15 +432,6 @@
       gap: 12px;
     }
 
-    .hero-skillset-card__name {
-      font-weight: bold;
-      font-size: 1.2em;
-      line-height: 1.4;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     .hero-skillset-slot {
       border: 1px solid #dfddd6;
       border-radius: 14px;
@@ -684,10 +675,6 @@
         gap: 10px;
       }
 
-      .hero-skillset-card__name {
-        font-size: 1.05em;
-      }
-
       .hero-skillset-card__grid {
         gap: 10px;
       }
@@ -908,9 +895,6 @@
       card.classList.add('hero-skillset-card', 'hero-skillset-card--view');
       const body = document.createElement('div');
       body.className = 'hero-skillset-card__body hero-skillset-slot';
-      const name = document.createElement('div');
-      name.className = 'hero-skillset-card__name';
-      name.textContent = config.name || '';
       const grid = document.createElement('div');
       grid.className = 'hero-skillset-card__grid';
       HERO_SKILLSET_ROWS.forEach(rowKey => {
@@ -961,7 +945,7 @@
         rowWrapper.append(content);
         grid.appendChild(rowWrapper);
       });
-      body.append(name, grid);
+      body.appendChild(grid);
       card.innerHTML = '';
       card.appendChild(body);
       if (card.__heroSkillsetInfoHandler) {
