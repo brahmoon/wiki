@@ -523,7 +523,7 @@ class HeroSkillsetCardNodeView {
 //    if (!this.config.name || this.config.name.trim() === "") {
 //      this.nameInput.style.display = "none";
 //    } else {
-//      this.nameInput.style.display = "block";
+      this.nameInput.style.display = "block";
 //    }
 
     if (!this.data) {
