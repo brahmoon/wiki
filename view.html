@@ -1118,36 +1118,6 @@
           hide();
         }
       });
-      let suspendScrollSync = false;
-
-      function syncPosition() {
-        if (!popup.classList.contains('is-visible') || !currentAnchor || suspendScrollSync) {
-          return;
-        }
-        if (!document.body.contains(currentAnchor)) {
-          hide();
-          return;
-        }
-        positionRelativeToAnchor(currentAnchor);
-      }
-
-      window.addEventListener('pointerdown', () => {
-        if (popup.classList.contains('is-visible')) {
-          suspendScrollSync = true;
-        }
-      });
-
-      const resumeScrollSync = () => {
-        if (suspendScrollSync && popup.classList.contains('is-visible')) {
-          suspendScrollSync = false;
-          syncPosition();
-        }
-      };
-
-      window.addEventListener('pointerup', resumeScrollSync);
-      window.addEventListener('pointercancel', resumeScrollSync);
-      window.addEventListener('scroll', syncPosition, true);
-      window.addEventListener('resize', syncPosition);
 
       function positionRelativeToAnchor(anchor) {
         if (!anchor) {
