@@ -801,6 +801,20 @@
             gap: 12px;
         }
 
+        .hero-skillset-card__name {
+            font-weight: bold;
+            font-size: 1.2em;
+            line-height: 1.4;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .hero-skillset-card__name.ProseMirror {
+            min-height: auto;
+            padding: 0;
+        }
+
         .hero-skillset-slot {
             border: 1px solid #dfddd6;
             border-radius: 14px;
@@ -1056,6 +1070,10 @@
         @media (max-width: 720px) {
           .hero-skillset-card__body {
             gap: 10px;
+          }
+
+          .hero-skillset-card__name {
+            font-size: 1.05em;
           }
 
           .hero-skillset-card__grid {
