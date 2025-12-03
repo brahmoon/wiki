@@ -324,6 +324,7 @@ class HeroSkillsetCardNodeView {
     
     this.contentDOM = document.createElement("div");
     this.contentDOM.className = "hero-skillset-card__config-name";
+    this.contentDOM.className = "hero-skillset-card__config-name";
     this.dom.appendChild(this.contentDOM);
 
     this.body = document.createElement('div');
@@ -662,7 +663,7 @@ export const HeroSkillsetCard = Node.create({
         getAttrs: dom => {
           if (!(dom instanceof HTMLElement)) return false;
           const config = dom.getAttribute('data-config') || null;
-          return { configuration: config };
+          return { configuration: config ?? "" };
         }
       }
     ];
@@ -673,18 +674,17 @@ export const HeroSkillsetCard = Node.create({
       class: 'hero-skillset-card hero-skillset-card--view',
       'data-hero-skillset-card': '',
       'data-config': HTMLAttributes.configuration
-        ? encodeHeroSkillsetConfig(HTMLAttributes.configuration)
-        : encodeHeroSkillsetConfig(getDefaultHeroSkillsetConfig())
-    };
+        ? HTMLAttributes.configuration
+        : encodeHeroSkillsetConfig(getDefaultHeroSkillsetConfig())    };
 
     return [
       'div',
-      { ...HTMLAttributes, 'data-hero-skillset-card': '' },
+      { 'data-hero-skillset-card': '', class: 'hero-skillset-card hero-skillset-card--view', 'data-config': HTMLAttributes.configuration },
       ['div', { class: 'hero-skillset-card__config-name' }, 0],
-      ['div', { class: 'hero-skillset-card__placeholder' }, '英雄スキル構成カード']
+      ['div', { class: 'hero-skillset-card__body hero-skillset-slot' }],
     ];
   },
-
+  
   addCommands() {
     return {
       insertHeroSkillsetCard: () => ({ commands }) => {
