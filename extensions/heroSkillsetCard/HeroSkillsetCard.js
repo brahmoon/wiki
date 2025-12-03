@@ -325,12 +325,6 @@ class HeroSkillsetCardNodeView {
     this.body = document.createElement('div');
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.dom.appendChild(this.body);
-    
-    this.contentDOM = document.createElement("div");
-    this.contentDOM.className = "hero-skillset-card__config-name";
-    this.dom.appendChild(this.contentDOM);
-    
-    this.dom.prepend(this.nameInput);
 
     this.handleClick = this.handleClick.bind(this);
     this.dom.addEventListener('click', this.handleClick);
@@ -626,13 +620,6 @@ class HeroSkillsetCardNodeView {
       this.config = nextConfig;
       this.serializedConfig = serialized;
       this.render();
-      
-      // nameInput の内容と表示状態を更新
-      this.nameInput.value = this.config.name || "";
-      this.nameInput.style.display =
-        (!this.config.name || this.config.name.trim() === "")
-          ? "none"
-          : "block";
     }
 
     return true;
@@ -646,8 +633,7 @@ class HeroSkillsetCardNodeView {
 export const HeroSkillsetCard = Node.create({
   name: 'heroSkillsetCard',
   group: 'block',
-  atom: false,
-  content: 'inline',
+  atom: true,
   selectable: true,
   draggable: true,
   isolating: true,
@@ -688,8 +674,7 @@ export const HeroSkillsetCard = Node.create({
 
     return [
       'div',
-      { ...HTMLAttributes, 'data-hero-skillset-card': '' },
-      ['div', { class: 'hero-skillset-card__config-name' }, 0],
+      attrs,
       ['div', { class: 'hero-skillset-card__placeholder' }, '英雄スキル構成カード']
     ];
   },
