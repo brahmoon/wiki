@@ -1756,6 +1756,7 @@
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
         import { NodeSelection, TextSelection } from 'https://esm.sh/@tiptap/pm/state';
+        import { SnapshotCompare } from 'https://esm.sh/@tiptap-pro/extension-snapshot-compare?dev';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
@@ -1815,7 +1816,6 @@
         };
 
         const SNAPSHOT_COMPARE_MODULE_URL = 'https://esm.sh/@tiptap-pro/extension-snapshot-compare@2?bundle';
-        let SnapshotCompare = null;
         let snapshotCompareLoadPromise = null;
 
         async function loadSnapshotCompareModule() {
