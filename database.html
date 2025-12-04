@@ -1223,6 +1223,7 @@
 
     async function openGallery(target = { type: 'record' }) {
       state.galleryTarget = target || { type: 'record' };
+      const galleryType = state.galleryTarget?.type === 'uniqueSkill' ? 'skill' : dataType;
       if (!DRIVE_ENDPOINT) {
         setStatus('DriveImageのWebApp URLが設定されていません。', 'error');
         return;
@@ -1238,7 +1239,7 @@
         });
         const folders = (result?.folders || []).filter((folder) => {
           const label = (folder.displayName || folder.name || '').toLowerCase();
-          return dataType === 'hero' ? label.includes('hero') : label.includes('skill');
+          return galleryType === 'hero' ? label.includes('hero') : label.includes('skill');
         });
         state.galleryFolders = folders;
         renderGallery();
@@ -1294,6 +1295,7 @@
         return;
       }
       const target = state.galleryTarget || { type: 'record' };
+      const uploadFolderType = target?.type === 'uniqueSkill' ? 'Skill' : dataType === 'hero' ? 'Hero' : 'Skill';
       setStatus('アップロード中...');
       try {
         const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
@@ -1304,7 +1306,7 @@
         const renamedFile = new File([file], randomizedName, { type: file.type, lastModified: file.lastModified });
         const result = await DriveImageHandler.uploadImage(renamedFile, null, {
           webAppUrl: DRIVE_ENDPOINT,
-        }, preferredFolder?.name || (dataType === 'hero' ? 'Hero' : 'Skill'));
+        }, preferredFolder?.name || uploadFolderType);
         if (result?.driveUrl) {
           setIconForTarget(target, result.driveUrl);
           setStatus('アップロードしました。', 'success');
