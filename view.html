@@ -668,6 +668,17 @@
       color: #5a5752;
     }
 
+    .hero-skillset-info-popup__link {
+      display: inline-flex;
+      margin-top: 10px;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #2383e2;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
     @media (max-width: 720px) {
       .hero-skillset-card__body {
         gap: 10px;
@@ -1086,7 +1097,12 @@
       titleRow.append(title, badge);
       const body = document.createElement('div');
       body.className = 'hero-skillset-info-popup__body';
-      popup.append(close, titleRow, body);
+      const link = document.createElement('a');
+      link.className = 'hero-skillset-info-popup__link';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = '説明ページを開く';
+      popup.append(close, titleRow, body, link);
       document.body.appendChild(popup);
 
       let currentAnchor = null;
