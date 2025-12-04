@@ -1005,7 +1005,7 @@
         heroSkillsetInfoPopup.show({
           anchor: trigger,
           titleText: info.name || '',
-          badgeText: info.skillType || '',
+          badgeText: info.skillType || info.type || '',
           badgeVariant: 'type',
           lines: info.description
             ? [{ description: info.description }]
@@ -1189,6 +1189,8 @@
             badge.hidden = false;
             badge.className = `hero-skillset-info-popup__badge hero-skillset-info-popup__badge--${badgeVariant}`;
           } else {
+            badge.textContent = '';
+            badge.className = 'hero-skillset-info-popup__badge';
             badge.hidden = true;
           }
           body.innerHTML = '';
