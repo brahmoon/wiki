@@ -1313,6 +1313,24 @@
             overflow: auto;
         }
 
+        .diff-added {
+            background: #ecfdf3;
+            text-decoration: underline;
+            text-decoration-color: #22c55e;
+            text-decoration-thickness: 2px;
+            color: inherit;
+        }
+
+        .diff-removed {
+            background: #fff1f2;
+            color: #e11d48;
+            text-decoration: line-through;
+            border-radius: 4px;
+            padding: 1px 2px;
+            margin-right: 2px;
+            white-space: pre-wrap;
+        }
+
         .ProseMirror {
             min-height: 400px;
             outline: none;
@@ -1755,87 +1773,15 @@
         import { TableRow } from 'https://esm.sh/@tiptap/extension-table-row';
         import { TableCell } from 'https://esm.sh/@tiptap/extension-table-cell';
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
-        import { NodeSelection, TextSelection } from 'https://esm.sh/@tiptap/pm/state';
-        import { SnapshotCompare } from 'https://esm.sh/@tiptap-pro/extension-snapshot-compare?dev';
+        import { NodeSelection, Plugin, PluginKey, TextSelection } from 'https://esm.sh/@tiptap/pm/state';
+        import { Decoration, DecorationSet } from 'https://esm.sh/@tiptap/pm/view';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
         import { PageLinkCard } from './extensions/pageLinkCard/PageLinkCard.js';
         import { HeroSkillsetCard } from './extensions/heroSkillsetCard/HeroSkillsetCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
-        
-        const elements = {
-            appContainer: document.getElementById('appContainer'),
-            sidebar: document.getElementById('pageSidebar'),
-            sidebarToggle: document.getElementById('sidebarToggle'),
-            sidebarOverlay: document.getElementById('sidebarOverlay'),
-            pageTree: document.getElementById('page-tree'),
-            breadcrumb: document.getElementById('breadcrumb'),
-            pageName: document.getElementById('page-name'),
-            pageTitle: document.getElementById('page-title'),
-            savePage: document.getElementById('save-page'),
-            viewPage: document.getElementById('view-page'),
-            createRootPage: document.getElementById('create-root-page'),
-            reloadPages: document.getElementById('reload-pages'),
-            toolbar: document.getElementById('toolbar'),
-            pageHeader: document.querySelector('.page-header'),
-            editorWrapper: document.querySelector('.editor-wrapper'),
-            editorContainer: document.querySelector('.editor-container'),
-            editor: document.getElementById('editor'),
-            versionHistoryToggle: document.getElementById('version-history-toggle'),
-            versionHistoryPanel: document.getElementById('version-history-panel'),
-            versionHistoryList: document.getElementById('version-history-list'),
-            versionHistoryClose: document.getElementById('version-history-close'),
-            versionHistorySummary: document.getElementById('version-history-summary'),
-            snapshotCompareViewer: document.getElementById('snapshot-compare-viewer'),
-            snapshotCompareMessage: document.getElementById('snapshot-compare-message'),
-            snapshotCompareClose: document.getElementById('snapshot-compare-close'),
-            statusMessage: document.getElementById('status-message'),
-            updatedAt: document.getElementById('updated-at'),
-            loadingOverlay: document.getElementById('loading-overlay'),
-            loadingMessage: document.getElementById('loading-message'),
-            linkEditorBar: document.getElementById('link-editor-bar'),
-            linkInput: document.getElementById('link-editor-input'),
-            linkTargetToggle: document.getElementById('link-target-toggle'),
-            linkApply: document.getElementById('link-apply'),
-            linkRemove: document.getElementById('link-remove'),
-            linkCancel: document.getElementById('link-cancel'),
-            tableRowControls: document.getElementById('table-row-controls'),
-            tableColControls: document.getElementById('table-col-controls'),
-            tableHeaderRowButton: document.querySelector('#table-row-controls button[data-table-header-action="row"]'),
-            tableHeaderColButton: document.querySelector('#table-col-controls button[data-table-header-action="column"]'),
-            tableMergeControls: document.getElementById('table-merge-controls'),
-            tableMergeButton: document.querySelector('#table-merge-controls button'),
-            youtubePastePopup: document.getElementById('youtube-paste-popup'),
-            youtubePasteAsUrl: document.getElementById('youtube-paste-as-url'),
-            youtubeEmbedVideo: document.getElementById('youtube-embed-video'),
-            pageLinkPanel: document.getElementById('page-link-panel'),
-            pageLinkInput: document.getElementById('page-link-input'),
-            pageLinkSuggestions: document.getElementById('page-link-suggestions'),
-            pageLinkCancel: document.getElementById('page-link-cancel')
-        };
-
-        const SNAPSHOT_COMPARE_MODULE_URL = 'https://esm.sh/@tiptap-pro/extension-snapshot-compare@2?bundle';
-        let snapshotCompareLoadPromise = null;
-
-        async function loadSnapshotCompareModule() {
-            if (SnapshotCompare) {
-                return SnapshotCompare;
-            }
-            if (!snapshotCompareLoadPromise) {
-                snapshotCompareLoadPromise = import(SNAPSHOT_COMPARE_MODULE_URL)
-                    .then((module) => {
-                        SnapshotCompare = module?.SnapshotCompare || null;
-                        return SnapshotCompare;
-                    })
-                    .catch((error) => {
-                        console.error('Failed to load Snapshot Compare extension', error);
-                        SnapshotCompare = null;
-                        return null;
-                    });
-            }
-            return snapshotCompareLoadPromise;
-        }
+        import { diffWordsWithSpace } from 'https://esm.sh/diff@5';
 
         const TableDeletionShortcuts = Extension.create({
             name: 'tableDeletionShortcuts',
@@ -2286,7 +2232,6 @@
                 elements.versionHistoryToggle.hidden = false;
                 elements.versionHistoryToggle.setAttribute('aria-hidden', 'false');
             }
-            loadSnapshotCompareModule();
             if (state.currentPageId) {
                 loadVersionHistory(state.currentPageId);
             }
@@ -2393,6 +2338,132 @@
             return json;
         }
 
+        function extractTextFromNode(node) {
+            if (!node) {
+                return '';
+            }
+            let text = '';
+            node.descendants((child) => {
+                if (child.isText) {
+                    text += child.text || '';
+                } else if (child.type?.name === 'hardBreak') {
+                    text += '\n';
+                }
+            });
+            return text;
+        }
+
+        function extractTextWithPositions(node) {
+            const positionMap = [];
+            if (!node) {
+                return { text: '', positionMap };
+            }
+            let text = '';
+            node.descendants((child, pos) => {
+                if (child.isText) {
+                    const value = child.text || '';
+                    for (let i = 0; i < value.length; i++) {
+                        positionMap[text.length + i] = pos + i + 1;
+                    }
+                    text += value;
+                } else if (child.type?.name === 'hardBreak') {
+                    positionMap[text.length] = pos + 1;
+                    text += '\n';
+                }
+            });
+            return { text, positionMap };
+        }
+
+        function buildDiffDecorationSet(doc, options) {
+            const diffParts = options?.diffParts || [];
+            const positionMap = options?.positionMap || [];
+            if (!doc || !diffParts.length) {
+                return DecorationSet.empty;
+            }
+
+            const decorations = [];
+            let newOffset = 0;
+            const docSize = doc.content.size;
+
+            const mapOffsetToPos = (offset, isEnd = false) => {
+                if (!Array.isArray(positionMap) || positionMap.length === 0) {
+                    return isEnd ? docSize : 0;
+                }
+                if (offset < 0) {
+                    return 0;
+                }
+                if (offset >= positionMap.length) {
+                    return docSize;
+                }
+                const mapped = positionMap[offset];
+                if (typeof mapped !== 'number') {
+                    return isEnd ? docSize : 0;
+                }
+                return isEnd ? Math.min(docSize, mapped + 1) : mapped;
+            };
+
+            for (const part of diffParts) {
+                const value = part?.value || '';
+                if (part?.removed) {
+                    const anchorPos = mapOffsetToPos(newOffset);
+                    if (value) {
+                        decorations.push(
+                            Decoration.widget(anchorPos, () => {
+                                const span = document.createElement('span');
+                                span.className = 'diff-removed';
+                                span.textContent = value;
+                                return span;
+                            })
+                        );
+                    }
+                    continue;
+                }
+
+                if (value) {
+                    const startPos = mapOffsetToPos(newOffset);
+                    newOffset += value.length;
+                    const endPos = mapOffsetToPos(newOffset - 1, true);
+                    if (part?.added && endPos > startPos) {
+                        decorations.push(Decoration.inline(startPos, endPos, { class: 'diff-added' }));
+                    }
+                }
+            }
+
+            return DecorationSet.create(doc, decorations);
+        }
+
+        function createDiffHighlighterExtension(options) {
+            const diffPluginKey = new PluginKey('diff-highlighter');
+            const safeOptions = options || { diffParts: [], positionMap: [] };
+
+            return Extension.create({
+                name: 'diffHighlighter',
+                addOptions() {
+                    return safeOptions;
+                },
+                addProseMirrorPlugins() {
+                    const opts = this.options || {};
+                    return [
+                        new Plugin({
+                            key: diffPluginKey,
+                            state: {
+                                init: (_, state) => buildDiffDecorationSet(state.doc, opts),
+                                apply(tr, oldState) {
+                                    if (tr.docChanged) {
+                                        return buildDiffDecorationSet(tr.doc, opts);
+                                    }
+                                    return oldState.map(tr.mapping, tr.doc);
+                                }
+                            },
+                            props: {
+                                decorations: (state) => diffPluginKey.getState(state)
+                            }
+                        })
+                    ];
+                }
+            });
+        }
+
         async function renderSnapshotComparison(currentVersion, previousVersion) {
             if (!state.snapshotCompare.enabled) {
                 return;
@@ -2405,29 +2476,46 @@
             }
 
             destroySnapshotCompareViewer();
-
-            await loadSnapshotCompareModule();
-            if (!SnapshotCompare) {
-                showSnapshotCompareMessage('Snapshot Compare拡張の読み込みに失敗しました。');
+            const schema = state.editor?.schema;
+            if (!schema) {
+                showSnapshotCompareMessage('比較用のスキーマを取得できませんでした。');
                 return;
             }
 
-            const baseExtensions = (state.editor?.extensionManager?.extensions || []).filter(ext => ext?.name !== 'snapshotCompare');
-            const viewerExtensions = [...baseExtensions, SnapshotCompare.configure({
-                oldDocument,
-                newDocument
-            })];
+            let newDocNode = null;
+            let oldDocNode = null;
+
+            try {
+                newDocNode = schema.nodeFromJSON(newDocument);
+                oldDocNode = schema.nodeFromJSON(oldDocument);
+            } catch (error) {
+                console.error('Failed to parse documents for diff view', error);
+                showSnapshotCompareMessage('比較用のデータを解析できませんでした。');
+                return;
+            }
+
+            const { text: newText, positionMap } = extractTextWithPositions(newDocNode);
+            const oldText = extractTextFromNode(oldDocNode);
+            const diffParts = diffWordsWithSpace(oldText, newText);
+            const hasDiff = diffParts.some((part) => part?.added || part?.removed);
+            const diffExtension = createDiffHighlighterExtension({ diffParts, positionMap });
+
+            const viewerExtensions = (state.editor?.extensionManager?.extensions || []).concat(diffExtension);
 
             state.snapshotCompare.viewer = new Editor({
                 element: elements.snapshotCompareViewer,
                 extensions: viewerExtensions,
                 editable: false,
-                content: ''
+                content: newDocument
             });
 
             const currentLabel = currentVersion?.versionIndex ?? (state.snapshotCompare.versions.indexOf(currentVersion) + 1);
             const previousLabel = previousVersion?.versionIndex ?? (currentLabel + 1);
-            showSnapshotCompareMessage(`バージョン${currentLabel} と バージョン${previousLabel} を比較中です。`);
+            showSnapshotCompareMessage(
+                hasDiff
+                    ? `バージョン${currentLabel} と バージョン${previousLabel} を比較中です。`
+                    : '差分はありません。'
+            );
         }
 
         async function compareVersionAtIndex(index) {
@@ -3296,6 +3384,57 @@
             }
         });
         const PAGE_LINK_CACHE_KEY = 'wiki.pageLinkCache';
+
+        const elements = {
+            appContainer: document.getElementById('appContainer'),
+            sidebar: document.getElementById('pageSidebar'),
+            sidebarToggle: document.getElementById('sidebarToggle'),
+            sidebarOverlay: document.getElementById('sidebarOverlay'),
+            pageTree: document.getElementById('page-tree'),
+            breadcrumb: document.getElementById('breadcrumb'),
+            pageName: document.getElementById('page-name'),
+            pageTitle: document.getElementById('page-title'),
+            savePage: document.getElementById('save-page'),
+            viewPage: document.getElementById('view-page'),
+            createRootPage: document.getElementById('create-root-page'),
+            reloadPages: document.getElementById('reload-pages'),
+            toolbar: document.getElementById('toolbar'),
+            pageHeader: document.querySelector('.page-header'),
+            editorWrapper: document.querySelector('.editor-wrapper'),
+            editorContainer: document.querySelector('.editor-container'),
+            editor: document.getElementById('editor'),
+            versionHistoryToggle: document.getElementById('version-history-toggle'),
+            versionHistoryPanel: document.getElementById('version-history-panel'),
+            versionHistoryList: document.getElementById('version-history-list'),
+            versionHistoryClose: document.getElementById('version-history-close'),
+            versionHistorySummary: document.getElementById('version-history-summary'),
+            snapshotCompareViewer: document.getElementById('snapshot-compare-viewer'),
+            snapshotCompareMessage: document.getElementById('snapshot-compare-message'),
+            snapshotCompareClose: document.getElementById('snapshot-compare-close'),
+            statusMessage: document.getElementById('status-message'),
+            updatedAt: document.getElementById('updated-at'),
+            loadingOverlay: document.getElementById('loading-overlay'),
+            loadingMessage: document.getElementById('loading-message'),
+            linkEditorBar: document.getElementById('link-editor-bar'),
+            linkInput: document.getElementById('link-editor-input'),
+            linkTargetToggle: document.getElementById('link-target-toggle'),
+            linkApply: document.getElementById('link-apply'),
+            linkRemove: document.getElementById('link-remove'),
+            linkCancel: document.getElementById('link-cancel'),
+            tableRowControls: document.getElementById('table-row-controls'),
+            tableColControls: document.getElementById('table-col-controls'),
+            tableHeaderRowButton: document.querySelector('#table-row-controls button[data-table-header-action="row"]'),
+            tableHeaderColButton: document.querySelector('#table-col-controls button[data-table-header-action="column"]'),
+            tableMergeControls: document.getElementById('table-merge-controls'),
+            tableMergeButton: document.querySelector('#table-merge-controls button'),
+            youtubePastePopup: document.getElementById('youtube-paste-popup'),
+            youtubePasteAsUrl: document.getElementById('youtube-paste-as-url'),
+            youtubeEmbedVideo: document.getElementById('youtube-embed-video'),
+            pageLinkPanel: document.getElementById('page-link-panel'),
+            pageLinkInput: document.getElementById('page-link-input'),
+            pageLinkSuggestions: document.getElementById('page-link-suggestions'),
+            pageLinkCancel: document.getElementById('page-link-cancel')
+        };
 
         function ensureEditorAccess(actionDescription = '操作') {
             if (!isBlockedEditorUser) {
