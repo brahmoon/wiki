@@ -629,7 +629,14 @@
       { value: '連携', label: '連携' },
       { value: '指揮', label: '指揮' },
       { value: '反撃', label: '反撃' },
+      { value: 'アクティブ', label: 'アクティブ' },
+      { value: '覚醒', label: '覚醒' },
     ];
+
+    const UNIQUE_SKILL_TYPE_LOCKS = {
+      1: 'アクティブ',
+      3: '覚醒',
+    };
 
     const elements = {
       blockedPanel: document.getElementById('blockedPanel'),
@@ -760,6 +767,21 @@
       }).join('');
     }
 
+    function applyUniqueSkillTypeLocks() {
+      if (dataType !== 'hero') return;
+
+      document.querySelectorAll('[data-unique-skill="type"]').forEach((select) => {
+        const index = Number(select.getAttribute('data-index'));
+        const lockedValue = UNIQUE_SKILL_TYPE_LOCKS[index];
+        if (lockedValue) {
+          select.value = lockedValue;
+          select.disabled = true;
+        } else {
+          select.disabled = false;
+        }
+      });
+    }
+
     function renderTalentFields() {
       const typeOptions = buildSkillTypeOptions();
       const fragments = document.createDocumentFragment();
@@ -821,6 +843,7 @@
         slot.addEventListener('click', () => openGallery({ type: 'uniqueSkill', index }));
       });
 
+      applyUniqueSkillTypeLocks();
       updateUniqueSkillIconSlots();
     }
 
@@ -944,6 +967,7 @@
         });
 
         state.uniqueSkillImages = uniqueSkills.map((skill) => getDriveThumbnailUrl(skill.image || ''));
+        applyUniqueSkillTypeLocks();
         updateUniqueSkillIconSlots();
 
         document.querySelectorAll('[data-talent]').forEach((el) => {
