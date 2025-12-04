@@ -61,6 +61,14 @@ export class WikiDataService {
     return response.page;
   }
 
+  async getPageHistory(id) {
+    if (!id) {
+      throw new Error('Page ID is required');
+    }
+    const response = await this.#apiCall('getPageHistory', { id });
+    return response.versions || [];
+  }
+
   async savePage(page) {
     if (!page || !page.id) {
       throw new Error('Page payload must include an id');

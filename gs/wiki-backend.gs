@@ -129,6 +129,8 @@ function routeAction(data) {
       return getPages();
     case 'getPage':
       return getPage(data.id);
+    case 'getPageHistory':
+      return getPageHistory(data.id);
     case 'renamePageTree':
       return renamePageTree({
         originalId: data.originalId,
@@ -565,6 +567,45 @@ function savePage(page) {
     return { success: true, message: 'Page saved', updatedAt };
   } catch (error) {
     return { success: false, message: 'Failed to save page: ' + error };
+  }
+}
+
+function getPageHistory(id) {
+  try {
+    if (!id) {
+      return { success: false, message: 'Page ID is required' };
+    }
+
+    const sheet = getLatestDataSheet();
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: true, versions: [] };
+    }
+
+    const width = Math.max(sheet.getLastColumn(), 6);
+    const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
+    const matches = data.filter(row => row[0] && row[0].toString() === id.toString());
+
+    if (!matches.length) {
+      return { success: true, versions: [] };
+    }
+
+    matches.sort((a, b) => {
+      const aDate = a[3] || '';
+      const bDate = b[3] || '';
+      return bDate > aDate ? 1 : bDate < aDate ? -1 : 0;
+    });
+
+    const versions = matches.map((row, index) => ({
+      versionIndex: index + 1,
+      updatedAt: row[3] || '',
+      htmlContent: row[2] || '',
+      rowData: row.slice(0, width),
+    }));
+
+    return { success: true, versions };
+  } catch (error) {
+    return { success: false, message: 'Failed to get page history: ' + error };
   }
 }
 
