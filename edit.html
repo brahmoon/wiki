@@ -1764,6 +1764,29 @@
         import { HeroSkillsetCard } from './extensions/heroSkillsetCard/HeroSkillsetCard.js';
         import { WikiDataService } from './scripts/wikiDataService.js';
 
+        const SNAPSHOT_COMPARE_MODULE_URL = 'https://esm.sh/@tiptap-pro/extension-snapshot-compare@2?bundle';
+        let SnapshotCompare = null;
+        let snapshotCompareLoadPromise = null;
+
+        async function loadSnapshotCompareModule() {
+            if (SnapshotCompare) {
+                return SnapshotCompare;
+            }
+            if (!snapshotCompareLoadPromise) {
+                snapshotCompareLoadPromise = import(SNAPSHOT_COMPARE_MODULE_URL)
+                    .then((module) => {
+                        SnapshotCompare = module?.SnapshotCompare || null;
+                        return SnapshotCompare;
+                    })
+                    .catch((error) => {
+                        console.error('Failed to load Snapshot Compare extension', error);
+                        SnapshotCompare = null;
+                        return null;
+                    });
+            }
+            return snapshotCompareLoadPromise;
+        }
+
         const TableDeletionShortcuts = Extension.create({
             name: 'tableDeletionShortcuts',
             addKeyboardShortcuts() {
@@ -2213,6 +2236,7 @@
                 elements.versionHistoryToggle.hidden = false;
                 elements.versionHistoryToggle.setAttribute('aria-hidden', 'false');
             }
+            loadSnapshotCompareModule();
             if (state.currentPageId) {
                 loadVersionHistory(state.currentPageId);
             }
@@ -2293,7 +2317,7 @@
             showSnapshotCompareMessage('');
         }
 
-        function handleVersionHistoryClick(event) {
+        async function handleVersionHistoryClick(event) {
             const target = event.target instanceof Element ? event.target.closest('.version-history-item') : null;
             if (!target) {
                 return;
@@ -2302,7 +2326,7 @@
             if (!Number.isFinite(index)) {
                 return;
             }
-            compareVersionAtIndex(index);
+            await compareVersionAtIndex(index);
         }
 
         function convertHtmlToProseMirrorJSON(htmlContent) {
@@ -2319,7 +2343,7 @@
             return json;
         }
 
-        function renderSnapshotComparison(currentVersion, previousVersion) {
+        async function renderSnapshotComparison(currentVersion, previousVersion) {
             if (!state.snapshotCompare.enabled) {
                 return;
             }
@@ -2332,6 +2356,7 @@
 
             destroySnapshotCompareViewer();
 
+            await loadSnapshotCompareModule();
             if (!SnapshotCompare) {
                 showSnapshotCompareMessage('Snapshot Compare拡張の読み込みに失敗しました。');
                 return;
@@ -2355,7 +2380,7 @@
             showSnapshotCompareMessage(`バージョン${currentLabel} と バージョン${previousLabel} を比較中です。`);
         }
 
-        function compareVersionAtIndex(index) {
+        async function compareVersionAtIndex(index) {
             if (!state.snapshotCompare.enabled) {
                 return;
             }
@@ -2370,7 +2395,7 @@
                 destroySnapshotCompareViewer();
                 return;
             }
-            renderSnapshotComparison(currentVersion, previousVersion);
+            await renderSnapshotComparison(currentVersion, previousVersion);
         }
 
         async function loadVersionHistory(pageId) {
@@ -5618,11 +5643,13 @@
                         userGoogleEmail: getCurrentUserGoogleEmail()
                     }),
                     YouTubeEmbed,
-                    SnapshotCompare.configure({
-                        onOpen: () => showSnapshotCompareMessage('比較モードを開きました。'),
-                        onClose: () => showSnapshotCompareMessage(''),
-                        enabled: true
-                    })
+                    ...(SnapshotCompare
+                        ? [SnapshotCompare.configure({
+                              onOpen: () => showSnapshotCompareMessage('比較モードを開きました。'),
+                              onClose: () => showSnapshotCompareMessage(''),
+                              enabled: true
+                          })]
+                        : [])
                 ],
                 content: '',
                 onSelectionUpdate({ editor }) {
