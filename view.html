@@ -1290,6 +1290,22 @@
 
     const pageCache = { value: null };
 
+    function selectLatestPages(pages = []) {
+      const latest = new Map();
+      pages.forEach(page => {
+        if (!page || !page.id) {
+          return;
+        }
+        const key = page.id.toString();
+        const existing = latest.get(key);
+        const updatedAt = page.updatedAt || '';
+        if (!existing || updatedAt > (existing.updatedAt || '')) {
+          latest.set(key, page);
+        }
+      });
+      return Array.from(latest.values());
+    }
+
     const dataService = {
       async getPages() {
         if (Array.isArray(pageCache.value)) {
@@ -1297,7 +1313,7 @@
         }
 
         const response = await apiCall('getPages');
-        const pages = response.pages || [];
+        const pages = selectLatestPages(response.pages || []);
         pageCache.value = pages;
         return pages;
       },
@@ -1306,10 +1322,12 @@
           throw new Error('Page ID is required');
         }
         const response = await apiCall('getPage', { id });
-        if (!response.page) {
+        const pages = selectLatestPages([response.page].filter(Boolean));
+        const page = pages[0];
+        if (!page) {
           throw new Error('Page not found');
         }
-        return response.page;
+        return page;
       },
       getCachedPages() {
         return pageCache.value;
