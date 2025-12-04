@@ -1166,8 +1166,7 @@
           if (line.description) {
             const desc = document.createElement('div');
             desc.className = 'hero-skillset-info-popup__line-description';
-            const prefix = line.title ? '：' : '';
-            desc.textContent = `${prefix}${line.description}`;
+            desc.textContent = `${line.description}`;
             lineEl.appendChild(desc);
           }
           if (!line.title && !line.description && line.badgeText) {
