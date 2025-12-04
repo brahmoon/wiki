@@ -2565,7 +2565,12 @@
             const hasDiff = diffParts.some((part) => part?.added || part?.removed);
             const diffExtension = createDiffHighlighterExtension({ diffParts, positionMap });
 
-            const viewerExtensions = (state.editor?.extensionManager?.extensions || []).concat(diffExtension);
+            // ▼▼▼ 修正箇所: history プラグインを除外するフィルタを追加 ▼▼▼
+            const baseExtensions = state.editor?.extensionManager?.extensions || [];
+            const viewerExtensions = baseExtensions
+                .filter(ext => ext.name !== 'history') // エラー回避のため履歴プラグインを除外
+                .concat(diffExtension);
+            // ▲▲▲ 修正ここまで ▲▲▲
 
             state.snapshotCompare.viewer = new Editor({
                 element: elements.snapshotCompareViewer,
