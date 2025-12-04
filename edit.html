@@ -5786,7 +5786,14 @@
                         userRole: '',
                         userGoogleEmail: getCurrentUserGoogleEmail()
                     }),
-                    YouTubeEmbed
+                    YouTubeEmbed,
+                    ...(SnapshotCompare
+                        ? [SnapshotCompare.configure({
+                              onOpen: () => showSnapshotCompareMessage('比較モードを開きました。'),
+                              onClose: () => showSnapshotCompareMessage(''),
+                              enabled: true
+                          })]
+                        : [])
                 ],
                 content: '',
                 onSelectionUpdate({ editor }) {
