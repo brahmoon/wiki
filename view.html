@@ -1186,13 +1186,6 @@
             fallback.textContent = fallbackText;
             body.appendChild(fallback);
           }
-          if (url) {
-            link.href = url;
-            link.hidden = false;
-          } else {
-            link.hidden = true;
-            link.removeAttribute('href');
-          }
           currentAnchor = anchor || null;
           popup.classList.add('is-visible');
           positionRelativeToAnchor(currentAnchor);
