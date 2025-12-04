@@ -1775,6 +1775,7 @@
         import { TableHeader } from 'https://esm.sh/@tiptap/extension-table-header';
         import { NodeSelection, Plugin, PluginKey, TextSelection } from 'https://esm.sh/@tiptap/pm/state';
         import { Decoration, DecorationSet } from 'https://esm.sh/@tiptap/pm/view';
+        import { DOMParser as ProseMirrorDOMParser } from 'https://esm.sh/@tiptap/pm/model';
         import { ResizableImage } from 'https://brahmoon.github.io/wiki/extensions/resizableImage/ResizableImage.js';
         import { DriveImageExtension } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageExtension.js';
         import { DriveImageHandler } from 'https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js';
@@ -2385,14 +2386,21 @@
             if (!state.editor || typeof htmlContent !== 'string') {
                 return null;
             }
-            const tempEditor = new Editor({
-                extensions: state.editor.extensionManager.extensions,
-                content: htmlContent || '',
-                editable: false
-            });
-            const json = tempEditor.getJSON();
-            tempEditor.destroy();
-            return json;
+
+            try {
+                // HTML → DOM
+                const element = document.createElement('div');
+                element.innerHTML = htmlContent;
+
+                // 既存エディタの schema で parse
+                const parser = ProseMirrorDOMParser.fromSchema(state.editor.schema);
+                const doc = parser.parse(element);
+
+                return doc.toJSON();
+            } catch (error) {
+                console.error('HTML conversion failed', error);
+                return null;
+            }
         }
 
         function extractTextFromNode(node) {
