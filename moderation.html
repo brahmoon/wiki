@@ -335,9 +335,11 @@
     let moderatorContext = null;
     let blockTarget = null;
 
+    const LOGIN_STORAGE_KEY = 'wikiLoginState';
+
     const getStoredLoginState = () => {
       try {
-        const raw = localStorage.getItem('loginState');
+        const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
         return raw ? JSON.parse(raw) : null;
       } catch (error) {
         console.error('loginStateの読み込みに失敗しました', error);
