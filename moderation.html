@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モデレーター管理</title>
+  <link rel="stylesheet" href="./styles/editor.css">
+  <script src="./scripts/appsScriptEndpoints.js"></script>
+  <style>
+    :root {
+      --muted-text: #55534e;
+      --primary: #2383e2;
+      --danger: #d32f2f;
+      --border: #e0dfdc;
+      --bg: #f7f6f3;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #37352f;
+      min-height: 100vh;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .page-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .status-text {
+      color: var(--muted-text);
+      margin: 0;
+      line-height: 1.6;
+    }
+
+    .card,
+    .member-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 18px 48px rgba(15, 15, 15, 0.05);
+      padding: 20px;
+      border: 1px solid #efefed;
+    }
+
+    .member-status {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      color: #6b6a67;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    .member-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn {
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid #d0cfcc;
+      background: #f7f6f3;
+      color: #37352f;
+      font-weight: 600;
+      font-size: 14px;
+      padding: 0 16px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .btn:hover {
+      background: #ebe9e4;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #1f74cb;
+      border-color: #1f74cb;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      background: #b71c1c;
+      border-color: #b71c1c;
+    }
+
+    .member-table-wrapper {
+      overflow: auto;
+      border: 1px solid #efefed;
+      border-radius: 14px;
+    }
+
+    .member-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 960px;
+    }
+
+    .member-table thead th {
+      background: #f7f6f3;
+      font-weight: 700;
+    }
+
+    .member-table th,
+    .member-table td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid #efefed;
+      font-size: 14px;
+      color: #37352f;
+    }
+
+    .member-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .member-table tbody tr:hover {
+      background: #f9fbff;
+    }
+
+    .member-language {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #1f5fad;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .member-actions-cell {
+      width: 1%;
+      white-space: nowrap;
+    }
+
+    .member-row-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      position: relative;
+    }
+
+    .member-actions-trigger {
+      border: 1px solid #d0cfcc;
+      background: #f7f6f3;
+      color: #37352f;
+      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .member-actions-trigger:hover,
+    .member-actions-trigger:focus-visible {
+      background: #ebe9e4;
+      border-color: #c8c6c1;
+      outline: none;
+    }
+
+    .member-actions-trigger-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .member-actions-menu {
+      position: absolute;
+      top: 46px;
+      right: 0;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #efefed;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+      padding: 6px;
+      min-width: 180px;
+      display: none;
+      z-index: 10;
+    }
+
+    .member-actions-menu.is-open {
+      display: block;
+    }
+
+    .member-actions-menu-item {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #37352f;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .member-actions-menu-item:hover:not([disabled]) {
+      background: #f7f6f3;
+      color: #1f5fad;
+    }
+
+    .member-actions-menu-item[disabled] {
+      color: #9a9894;
+      cursor: not-allowed;
+    }
+
+    .member-authority-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 12px;
+      background: #eef4ff;
+      color: #1f5fad;
+      font-weight: 700;
+      font-size: 12px;
+      border: 1px solid #dce8ff;
+    }
+
+    .member-authority-badge--admin {
+      background: #fef3e6;
+      color: #bf6d00;
+      border-color: #f8ddad;
+    }
+
+    .member-approval-cell {
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .member-approval-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: #fff5e6;
+      color: #bf6d00;
+      font-weight: 700;
+      font-size: 12px;
+      border: 1px solid #ffe0b2;
+    }
+
+    .member-loading,
+    .member-empty,
+    .member-error {
+      padding: 24px;
+      text-align: center;
+      color: #6b6a67;
+      font-size: 14px;
+    }
+
+    .member-error {
+      color: #d32f2f;
+      margin: 12px 0;
+    }
+
+    .member-empty {
+      background: #f7f6f3;
+      border-radius: 12px;
+      border: 1px dashed #d0cfcc;
+      padding: 28px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 12px;
+      max-width: 520px;
+      width: 100%;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .modal-close {
+      border: none;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--muted-text);
+    }
+
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      resize: vertical;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .status-success {
+      color: #1f5fad;
+      font-weight: 700;
+    }
+
+    .member-link-dialog {
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 17, 17, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 3000;
+    }
+
+    .member-link-dialog[hidden] {
+      display: none;
+    }
+
+    .member-link-dialog__card {
+      width: min(520px, 100%);
+      background: #fff;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 30px 80px rgba(15, 15, 15, 0.35);
+    }
+
+    .member-link-dialog__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .member-link-dialog__header h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .member-link-dialog__close {
+      border: none;
+      background: transparent;
+      font-size: 20px;
+      cursor: pointer;
+      color: #6b6a67;
+    }
+
+    .member-link-dialog__player {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: #6b6a67;
+    }
+
+    .member-link-dialog__input-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .member-link-dialog__input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid #d0d0cc;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #f7f6f3;
+    }
+
+    .member-link-dialog__status {
+      margin: 12px 0 0;
+      font-size: 13px;
+      color: #6b6a67;
+    }
+
+    .member-link-dialog__status.is-error {
+      color: #b91c1c;
+    }
+
+    .member-link-dialog__status.is-success {
+      color: #15803d;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <header>
+      <h1>ユーザー管理（モデレーター）</h1>
+      <p id="page-status" class="status-text">権限を確認しています…</p>
+    </header>
+
+    <div id="authorization-error" class="member-error hidden" role="alert" aria-live="polite"></div>
+
+    <section id="moderation-card" class="member-card hidden" aria-hidden="true">
+      <div class="member-status">
+        <span id="user-count"></span>
+        <span id="moderator-info"></span>
+      </div>
+      <div class="member-actions">
+        <button id="reload-button" class="btn" type="button">再読み込み</button>
+      </div>
+
+      <div id="loading-state" class="member-loading">ユーザー情報を取得しています…</div>
+      <div id="empty-state" class="member-empty hidden">ユーザーが見つかりませんでした。</div>
+      <div id="error-state" class="member-error hidden"></div>
+
+      <div id="table-wrapper" class="member-table-wrapper hidden" aria-hidden="true">
+        <table class="member-table">
+          <thead>
+            <tr>
+              <th>Login ID</th>
+              <th>ユーザー名</th>
+              <th>Kingdom</th>
+              <th>言語</th>
+              <th>Authority</th>
+              <th>承認状態</th>
+              <th>更新日時</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="block-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="block-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="block-modal-title" class="modal-title">ユーザーをブロック</h2>
+        <button id="block-modal-close" class="modal-close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <div class="muted" id="block-target"></div>
+        </div>
+        <label for="block-reason">ブロック理由：</label>
+        <textarea id="block-reason" aria-describedby="block-error"></textarea>
+        <div id="block-error" class="error" role="alert"></div>
+        <div id="block-status" class="muted" aria-live="polite"></div>
+        <div class="modal-actions">
+          <button id="block-cancel" type="button">キャンセル</button>
+          <button id="block-submit" class="btn-danger" type="button">ブロック</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="member-link-dialog" class="member-link-dialog" hidden aria-hidden="true">
+    <div class="member-link-dialog__card" role="dialog" aria-modal="true" aria-labelledby="member-link-dialog-title">
+      <div class="member-link-dialog__header">
+        <h2 id="member-link-dialog-title">申請URLを発行</h2>
+        <button id="member-link-dialog-close" class="member-link-dialog__close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <p id="member-link-dialog-player" class="member-link-dialog__player"></p>
+      <p id="member-link-dialog-description">以下のURLをコピーして対象のプレイヤーに送信してください。</p>
+      <div class="member-link-dialog__input-group">
+        <input
+          id="member-link-dialog-input"
+          class="member-link-dialog__input"
+          type="text"
+          readonly
+          aria-describedby="member-link-dialog-description"
+        />
+        <button id="member-link-dialog-copy" class="btn btn-primary" type="button">コピー</button>
+      </div>
+      <p id="member-link-dialog-status" class="member-link-dialog__status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
+    const MODERATOR_AUTHORITY_VALUE = 3;
+    const ADMIN_AUTHORITY_VALUE = 99;
+    const BLOCKED_AUTHORITY_VALUE = -1;
+    const AUTHORITY_LABELS = {
+      99: 'Administrator',
+      4: 'Developer',
+      3: 'Moderator',
+      2: 'Editor',
+      1: 'Viewer',
+      [-1]: 'Blocked',
+    };
+
+    const elements = {
+      status: document.getElementById('page-status'),
+      error: document.getElementById('authorization-error'),
+      card: document.getElementById('moderation-card'),
+      count: document.getElementById('user-count'),
+      moderatorInfo: document.getElementById('moderator-info'),
+      loading: document.getElementById('loading-state'),
+      empty: document.getElementById('empty-state'),
+      errorState: document.getElementById('error-state'),
+      tableWrapper: document.getElementById('table-wrapper'),
+      tableBody: document.getElementById('user-table-body'),
+      reload: document.getElementById('reload-button'),
+      blockModal: document.getElementById('block-modal'),
+      blockClose: document.getElementById('block-modal-close'),
+      blockCancel: document.getElementById('block-cancel'),
+      blockSubmit: document.getElementById('block-submit'),
+      blockReason: document.getElementById('block-reason'),
+      blockError: document.getElementById('block-error'),
+      blockStatus: document.getElementById('block-status'),
+      blockTarget: document.getElementById('block-target'),
+      linkDialog: document.getElementById('member-link-dialog'),
+      linkInput: document.getElementById('member-link-dialog-input'),
+      linkCopy: document.getElementById('member-link-dialog-copy'),
+      linkStatus: document.getElementById('member-link-dialog-status'),
+      linkPlayer: document.getElementById('member-link-dialog-player'),
+      linkClose: document.getElementById('member-link-dialog-close'),
+    };
+
+    let moderatorContext = null;
+    let blockTarget = null;
+
+    const LOGIN_STORAGE_KEY = 'wikiLoginState';
+
+    const getStoredLoginState = () => {
+      try {
+        const raw = localStorage.getItem(LOGIN_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (error) {
+        console.error('loginStateの読み込みに失敗しました', error);
+        return null;
+      }
+    };
+
+    const parseAuthority = (value) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : null;
+    };
+
+    const formatAuthorityLabel = (value) => {
+      const authorityValue = parseAuthority(value);
+      if (authorityValue === null) return '-';
+      return AUTHORITY_LABELS[authorityValue] || authorityValue.toString();
+    };
+
+    const shouldShowUserManagement = (authority) => {
+      if (authority === null) return false;
+      if (authority >= ADMIN_AUTHORITY_VALUE) return false;
+      return authority >= MODERATOR_AUTHORITY_VALUE;
+    };
+
+    const formatDateTime = (value) => {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '-';
+      return date.toLocaleString('ja-JP', { hour12: false });
+    };
+
+    const formatLanguage = (value) => {
+      if (!value) return '-';
+      const normalized = String(value).toLowerCase();
+      if (normalized === 'en') return 'English';
+      if (normalized === 'ja') return '日本語';
+      return value;
+    };
+
+    const isPending = (playerId) => {
+      if (typeof playerId !== 'string') return false;
+      const normalized = playerId.trim();
+      return normalized.startsWith('!') || normalized.toUpperCase().startsWith('PENDING');
+    };
+
+    const stripPendingPlayerId = (value) => {
+      if (!value) return '';
+      return value.toString().replace(/^!+/, '');
+    };
+
+    const safeBase64Encode = (value) => {
+      if (value === undefined || value === null) {
+        return '';
+      }
+      const stringValue = value.toString();
+      try {
+        return window.btoa(unescape(encodeURIComponent(stringValue)));
+      } catch (error) {
+        try {
+          return window.btoa(stringValue);
+        } catch (encodeError) {
+          console.error('Failed to encode base64 value', encodeError);
+          return '';
+        }
+      }
+    };
+
+    const buildAuthorizationLink = (playerId) => {
+      const strippedPlayerId = stripPendingPlayerId(playerId || '');
+      if (!strippedPlayerId) {
+        return '';
+      }
+      const encodedPlayerId = safeBase64Encode(strippedPlayerId);
+      if (!encodedPlayerId) {
+        return '';
+      }
+      const encodedCode = encodeURIComponent(encodedPlayerId);
+      return `https://brahmoon.github.io/wiki/authorize.html?code=${encodedCode}`;
+    };
+
+    const showBlockModal = (user) => {
+      blockTarget = user;
+      elements.blockReason.value = '';
+      elements.blockError.textContent = '';
+      elements.blockStatus.textContent = '';
+      elements.blockStatus.classList.remove('status-success');
+      elements.blockSubmit.disabled = false;
+      elements.blockCancel.textContent = 'キャンセル';
+      elements.blockTarget.textContent = `${user.playerId || '-'} / ${user.username || '名無し'}`;
+      elements.blockModal.classList.remove('hidden');
+    };
+
+    const closeBlockModal = () => {
+      blockTarget = null;
+      elements.blockModal.classList.add('hidden');
+      elements.blockReason.value = '';
+      elements.blockError.textContent = '';
+      elements.blockStatus.textContent = '';
+      elements.blockStatus.classList.remove('status-success');
+      elements.blockSubmit.disabled = false;
+      elements.blockCancel.textContent = 'キャンセル';
+    };
+
+    const setLinkDialogStatus = (message, state = '') => {
+      if (!elements.linkStatus) return;
+      elements.linkStatus.textContent = message || '';
+      elements.linkStatus.classList.remove('is-error', 'is-success');
+      if (state === 'error') {
+        elements.linkStatus.classList.add('is-error');
+      } else if (state === 'success') {
+        elements.linkStatus.classList.add('is-success');
+      }
+    };
+
+    const closeLinkDialog = () => {
+      if (elements.linkDialog) {
+        elements.linkDialog.hidden = true;
+        elements.linkDialog.setAttribute('aria-hidden', 'true');
+      }
+      if (elements.linkInput) {
+        elements.linkInput.value = '';
+      }
+      if (elements.linkPlayer) {
+        elements.linkPlayer.textContent = '';
+      }
+      setLinkDialogStatus('');
+    };
+
+    const openLinkDialog = (user) => {
+      const linkValue = buildAuthorizationLink(user?.playerId);
+      if (!linkValue) {
+        elements.errorState.textContent = '申請URLを生成できませんでした。対象ユーザーの情報を確認してください。';
+        elements.errorState.classList.remove('hidden');
+        return;
+      }
+
+      if (elements.linkInput) {
+        elements.linkInput.value = linkValue;
+        elements.linkInput.focus();
+        elements.linkInput.select();
+      }
+
+      if (elements.linkPlayer) {
+        const stripped = stripPendingPlayerId(user?.playerId || '');
+        const kingdom = user?.kingdom || '-';
+        elements.linkPlayer.textContent = `Player ID: ${stripped || '-'} / Kingdom: ${kingdom || '-'}`;
+      }
+
+      setLinkDialogStatus('コピーしてゲーム内で送信してください。');
+      if (elements.linkDialog) {
+        elements.linkDialog.hidden = false;
+        elements.linkDialog.setAttribute('aria-hidden', 'false');
+      }
+    };
+
+    const copyLinkValue = async () => {
+      const linkValue = elements.linkInput?.value || '';
+      if (!linkValue) {
+        setLinkDialogStatus('コピーするURLがありません。', 'error');
+        return;
+      }
+
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(linkValue);
+        } else if (document.queryCommandSupported && document.queryCommandSupported('copy')) {
+          elements.linkInput?.focus();
+          elements.linkInput?.select();
+          const succeeded = document.execCommand('copy');
+          if (!succeeded) {
+            throw new Error('コピーに失敗しました。');
+          }
+        } else {
+          throw new Error('コピー機能が利用できません。');
+        }
+        setLinkDialogStatus('コピーしました。', 'success');
+      } catch (error) {
+        console.error('Failed to copy authorization link', error);
+        setLinkDialogStatus('コピーに失敗しました。手動でコピーしてください。', 'error');
+      }
+    };
+
+    const setLoadingState = (isLoading) => {
+      elements.loading.classList.toggle('hidden', !isLoading);
+    };
+
+    const showTable = () => {
+      elements.tableWrapper.classList.remove('hidden');
+      elements.tableWrapper.setAttribute('aria-hidden', 'false');
+    };
+
+    const hideTable = () => {
+      elements.tableWrapper.classList.add('hidden');
+      elements.tableWrapper.setAttribute('aria-hidden', 'true');
+    };
+
+    function closeAllActionMenus(except = null) {
+      document.querySelectorAll('.member-actions-menu').forEach((menu) => {
+        if (except && menu === except) return;
+        menu.classList.remove('is-open');
+      });
+    }
+
+    const renderUsers = (users = []) => {
+      elements.tableBody.textContent = '';
+
+      if (!Array.isArray(users) || users.length === 0) {
+        hideTable();
+        elements.empty.classList.remove('hidden');
+        elements.count.textContent = '';
+        return;
+      }
+
+      elements.empty.classList.add('hidden');
+      const fragment = document.createDocumentFragment();
+
+      users.forEach((user) => {
+        const row = document.createElement('tr');
+
+        const loginCell = document.createElement('td');
+        loginCell.textContent = user.playerId || '-';
+        row.appendChild(loginCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = user.username || '-';
+        row.appendChild(nameCell);
+
+        const kingdomCell = document.createElement('td');
+        kingdomCell.textContent = user.kingdom || '-';
+        row.appendChild(kingdomCell);
+
+        const languageCell = document.createElement('td');
+        const languageChip = document.createElement('span');
+        languageChip.className = 'member-language';
+        languageChip.textContent = formatLanguage(user.language);
+        languageCell.appendChild(languageChip);
+        row.appendChild(languageCell);
+
+        const authorityCell = document.createElement('td');
+        const authorityBadge = document.createElement('span');
+        authorityBadge.className = 'member-authority-badge';
+        const authorityValue = parseAuthority(user.authority);
+        if (authorityValue === ADMIN_AUTHORITY_VALUE) {
+          authorityBadge.classList.add('member-authority-badge--admin');
+        }
+        authorityBadge.textContent = formatAuthorityLabel(authorityValue);
+        authorityCell.appendChild(authorityBadge);
+        row.appendChild(authorityCell);
+
+        const approvalCell = document.createElement('td');
+        approvalCell.className = 'member-approval-cell';
+        if (isPending(user.playerId)) {
+          const badge = document.createElement('span');
+          badge.className = 'member-approval-badge';
+          badge.textContent = '承認待ち';
+          approvalCell.appendChild(badge);
+        } else {
+          approvalCell.textContent = '-';
+        }
+        row.appendChild(approvalCell);
+
+        const updatedCell = document.createElement('td');
+        updatedCell.textContent = formatDateTime(user.updatedAt);
+        row.appendChild(updatedCell);
+
+        const actionsCell = document.createElement('td');
+        actionsCell.className = 'member-actions-cell';
+        const actionsWrapper = document.createElement('div');
+        actionsWrapper.className = 'member-row-actions';
+
+        const trigger = document.createElement('button');
+        trigger.className = 'member-actions-trigger';
+        trigger.type = 'button';
+        trigger.innerHTML = '<span class="sr-only">ユーザー操作</span><span class="member-actions-trigger-icon" aria-hidden="true">⋮</span>';
+
+        const menu = document.createElement('div');
+        menu.className = 'member-actions-menu';
+
+        if (isPending(user.playerId)) {
+          const issueButton = document.createElement('button');
+          issueButton.className = 'member-actions-menu-item';
+          issueButton.type = 'button';
+          issueButton.textContent = '申請URLを発行';
+          issueButton.addEventListener('click', () => {
+            openLinkDialog(user);
+            closeAllActionMenus();
+          });
+          menu.appendChild(issueButton);
+        }
+
+        if (authorityValue !== null && authorityValue <= 2 && authorityValue !== BLOCKED_AUTHORITY_VALUE) {
+          const blockButton = document.createElement('button');
+          blockButton.className = 'member-actions-menu-item';
+          blockButton.type = 'button';
+          blockButton.textContent = 'ユーザーをブロック';
+          blockButton.addEventListener('click', () => {
+            closeAllActionMenus();
+            showBlockModal(user);
+          });
+          menu.appendChild(blockButton);
+        }
+
+        if (menu.children.length === 0) {
+          const disabled = document.createElement('button');
+          disabled.className = 'member-actions-menu-item';
+          disabled.type = 'button';
+          disabled.textContent = '操作なし';
+          disabled.disabled = true;
+          menu.appendChild(disabled);
+        }
+
+        trigger.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (menu.classList.contains('is-open')) {
+            closeAllActionMenus();
+          } else {
+            closeAllActionMenus(menu);
+            menu.classList.add('is-open');
+          }
+        });
+
+        actionsWrapper.appendChild(trigger);
+        actionsWrapper.appendChild(menu);
+        actionsCell.appendChild(actionsWrapper);
+        row.appendChild(actionsCell);
+
+        fragment.appendChild(row);
+      });
+
+      elements.tableBody.appendChild(fragment);
+      elements.count.textContent = `${users.length}件のユーザー`;
+      showTable();
+    };
+
+
+    const showAuthorizationError = (message) => {
+      elements.error.textContent = message;
+      elements.error.classList.remove('hidden');
+      elements.card.classList.add('hidden');
+      elements.card.setAttribute('aria-hidden', 'true');
+      elements.status.textContent = '権限がありません。';
+    };
+
+    const showCard = () => {
+      elements.card.classList.remove('hidden');
+      elements.card.setAttribute('aria-hidden', 'false');
+    };
+
+    const fetchModerationAccess = async (loginState) => {
+      if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS) {
+        throw new Error('Apps Script エンドポイントが設定されていません。');
+      }
+
+      const payload = {
+        action: 'verifyModeratorAccess',
+        email: loginState?.user?.email || '',
+        googleEmail: loginState?.user?.email || '',
+        playerId: loginState?.user?.playerId || '',
+        origin: window.location.origin,
+      };
+
+      const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || `権限確認に失敗しました (HTTP ${response.status})`);
+      }
+
+      const result = await response.json().catch(() => null);
+      if (!result || !result.success) {
+        throw new Error((result && result.message) || '権限を確認できませんでした。');
+      }
+
+      return result;
+    };
+
+    const fetchUsers = async () => {
+      setLoadingState(true);
+      hideTable();
+      elements.empty.classList.add('hidden');
+      elements.errorState.classList.add('hidden');
+
+      try {
+        const payload = {
+          action: 'listModerationAccounts',
+          adminToken: moderatorContext?.adminToken || '',
+          email: moderatorContext?.email || '',
+          googleEmail: moderatorContext?.email || '',
+          playerId: moderatorContext?.playerId || '',
+          origin: window.location.origin,
+        };
+
+        const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(text || `ユーザー一覧の取得に失敗しました (HTTP ${response.status})`);
+        }
+
+        const result = await response.json().catch(() => null);
+        if (!result || !result.success) {
+          throw new Error((result && result.message) || 'ユーザー情報を取得できませんでした。');
+        }
+
+        renderUsers(Array.isArray(result.members) ? result.members : []);
+      } catch (error) {
+        elements.errorState.textContent = error.message || 'ユーザー情報の取得に失敗しました。';
+        elements.errorState.classList.remove('hidden');
+      } finally {
+        setLoadingState(false);
+      }
+    };
+
+    const submitBlockRequest = async () => {
+      if (!blockTarget) return;
+      const reason = elements.blockReason.value.trim();
+      elements.blockError.textContent = '';
+      elements.blockStatus.textContent = '';
+
+      if (!reason) {
+        elements.blockError.textContent = 'ブロック理由を記入してください。';
+        return;
+      }
+
+      elements.blockSubmit.disabled = true;
+      elements.blockStatus.textContent = 'ブロックリクエストを送信中';
+
+      try {
+        const payload = {
+          action: 'blockUserAccount',
+          targetPlayerId: blockTarget.playerId,
+          reason,
+          adminToken: moderatorContext?.adminToken || '',
+          email: moderatorContext?.email || '',
+          googleEmail: moderatorContext?.email || '',
+          playerId: moderatorContext?.playerId || '',
+          origin: window.location.origin,
+        };
+
+        const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json().catch(() => null);
+        if (!result || !result.success) {
+          throw new Error((result && result.message) || 'ブロック処理に失敗しました');
+        }
+
+        elements.blockError.textContent = '';
+        elements.blockStatus.textContent = 'ユーザーをブロックしました';
+        elements.blockStatus.classList.add('status-success');
+        elements.blockSubmit.disabled = true;
+        elements.blockCancel.textContent = '閉じる';
+        fetchUsers();
+      } catch (error) {
+        elements.blockStatus.textContent = 'ブロック処理に失敗しました';
+        elements.blockError.textContent = error.message || 'ブロック処理に失敗しました';
+      } finally {
+        elements.blockSubmit.disabled = false;
+      }
+    };
+
+    const initialize = async () => {
+      const loginState = getStoredLoginState();
+      if (!loginState?.user) {
+        showAuthorizationError('ログイン情報が見つかりません。編集画面からログインしてください。');
+        return;
+      }
+
+      try {
+        const access = await fetchModerationAccess(loginState);
+        const authority = parseAuthority(access.authority);
+        if (authority === null || authority < MODERATOR_AUTHORITY_VALUE) {
+          showAuthorizationError('権限がありません。');
+          return;
+        }
+
+        moderatorContext = access;
+        elements.moderatorInfo.textContent = `${access.username || access.email || ''} / Authority: ${formatAuthorityLabel(access.authority)}`;
+        elements.status.textContent = 'モデレーター権限が確認されました。';
+        showCard();
+        fetchUsers();
+      } catch (error) {
+        console.error(error);
+        showAuthorizationError(error.message || '権限確認に失敗しました。');
+      }
+    };
+
+    elements.reload.addEventListener('click', fetchUsers);
+    elements.blockClose.addEventListener('click', closeBlockModal);
+    elements.blockCancel.addEventListener('click', closeBlockModal);
+    elements.blockSubmit.addEventListener('click', submitBlockRequest);
+    if (elements.linkClose) {
+      elements.linkClose.addEventListener('click', closeLinkDialog);
+    }
+    if (elements.linkDialog) {
+      elements.linkDialog.addEventListener('click', (event) => {
+        if (event.target === elements.linkDialog) {
+          closeLinkDialog();
+        }
+      });
+    }
+    if (elements.linkCopy) {
+      elements.linkCopy.addEventListener('click', copyLinkValue);
+    }
+
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.member-row-actions')) {
+        closeAllActionMenus();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeAllActionMenus();
+        if (!elements.blockModal.classList.contains('hidden')) {
+          closeBlockModal();
+        }
+        if (elements.linkDialog && !elements.linkDialog.hidden) {
+          closeLinkDialog();
+        }
+      }
+    });
+
+    initialize();
+  </script>
+</body>
+</html>
