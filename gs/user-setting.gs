@@ -1073,9 +1073,21 @@ function handleBlockUserAccount(sheet, request) {
     };
   }
 
-  // ★ authority と updatedAt をまとめて更新
-  const updateRange = sheet.getRange(record.rowNumber, columns.authority, 1, 2);
-  updateRange.setValues([[BLOCKED_AUTHORITY_VALUE, new Date()]]);
+  // ★ authority、updatedAt、comment をまとめて更新
+  const updates = [];
+  updates[0] = BLOCKED_AUTHORITY_VALUE;
+
+  if (columns.updatedAt) {
+    updates[columns.updatedAt - columns.authority] = new Date();
+  }
+
+  if (columns.comment) {
+    updates[columns.comment - columns.authority] = reason;
+  }
+
+  const updateWidth = Math.max(1, updates.length);
+  const updateRange = sheet.getRange(record.rowNumber, columns.authority, 1, updateWidth);
+  updateRange.setValues([updates]);
 
   return {
     success: true,
