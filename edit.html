@@ -1592,6 +1592,7 @@
                     <div class="login-actions">
                         <button id="login-button" class="btn btn-primary" type="button">ログイン</button>
                         <button id="logout-button" class="btn" type="button" hidden>ログアウト</button>
+                        <button id="moderation-button" class="btn btn-secondary" type="button" hidden>ユーザー管理</button>
                         <button id="settings-button" class="btn btn-secondary" type="button" hidden>設定</button>
                         <button id="wiki-settings-button" class="btn btn-secondary" type="button" hidden>Wiki設定</button>
                     </div>
@@ -2053,6 +2054,7 @@
         const loginButton = document.getElementById('login-button');
         const logoutButton = document.getElementById('logout-button');
         const settingsButton = document.getElementById('settings-button');
+        const moderationButton = document.getElementById('moderation-button');
         const wikiSettingsButton = document.getElementById('wiki-settings-button');
         const userSettingsOverlay = document.getElementById('user-settings-overlay');
         const userSettingsForm = document.getElementById('user-settings-form');
@@ -2879,6 +2881,10 @@
                     logoutButton.hidden = false;
                     settingsButton.hidden = true;
                     settingsButton.disabled = true;
+                    if (moderationButton) {
+                        moderationButton.hidden = true;
+                        moderationButton.disabled = true;
+                    }
                     if (wikiSettingsButton) {
                         wikiSettingsButton.hidden = true;
                         wikiSettingsButton.disabled = true;
@@ -2897,6 +2903,11 @@
                 logoutButton.hidden = false;
                 settingsButton.hidden = false;
                 settingsButton.disabled = false;
+                const canModerate = authorityValue !== null && authorityValue >= MODERATOR_AUTHORITY_VALUE && authorityValue < ADMIN_AUTHORITY_VALUE;
+                if (moderationButton) {
+                    moderationButton.hidden = !canModerate;
+                    moderationButton.disabled = !canModerate;
+                }
                 const isAdmin = authorityValue !== null && authorityValue >= ADMIN_AUTHORITY_VALUE;
                 if (wikiSettingsButton) {
                     wikiSettingsButton.hidden = !isAdmin;
@@ -2917,6 +2928,10 @@
                 logoutButton.hidden = true;
                 settingsButton.hidden = true;
                 settingsButton.disabled = true;
+                if (moderationButton) {
+                    moderationButton.hidden = true;
+                    moderationButton.disabled = true;
+                }
                 if (wikiSettingsButton) {
                     wikiSettingsButton.hidden = true;
                     wikiSettingsButton.disabled = true;
@@ -2972,9 +2987,14 @@
             window.location.href = buildWikiSettingsUrl();
         };
 
+        const handleModerationNavigation = () => {
+            window.location.href = './moderation.html';
+        };
+
         loginButton?.addEventListener('click', handleLoginNavigation);
         logoutButton?.addEventListener('click', handleLogout);
         settingsButton?.addEventListener('click', openUserSettingsDialog);
+        moderationButton?.addEventListener('click', handleModerationNavigation);
         wikiSettingsButton?.addEventListener('click', handleWikiSettingsNavigation);
         userSettingsCancel?.addEventListener('click', () => {
             closeUserSettingsDialog();
