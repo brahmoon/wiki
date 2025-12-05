@@ -118,6 +118,8 @@ const ADMIN_AUTHORITY_THRESHOLD = (function resolveAdminThreshold() {
 })();
 
 const EDITOR_AUTHORITY_VALUE = 2;
+const MODERATOR_AUTHORITY_VALUE = 3;
+const BLOCKED_AUTHORITY_VALUE = -1;
 
   function doGet(e) {
     return createUserSettingsJsonOutput({
@@ -144,6 +146,8 @@ function doPost(e) {
     switch (action) {
       case 'listMembers':
         return buildResponse(handleListMembers(sheet, request), origin);
+      case 'listModerationAccounts':
+        return buildResponse(handleListModerationAccounts(sheet, request), origin);
       case 'getUserSettings':
         return buildResponse(handleGetUserSettings(sheet, request), origin);
       case 'updateUserSettings':
@@ -156,6 +160,10 @@ function doPost(e) {
         return buildResponse(handleCancelEditorRequest(sheet, request), origin);
       case 'autoApproveEditorRequest':
         return buildResponse(handleAutoApproveEditorRequest(sheet, request), origin);
+      case 'verifyModeratorAccess':
+        return buildResponse(requireModeratorAuthority(sheet, request), origin);
+      case 'blockUserAccount':
+        return buildResponse(handleBlockUserAccount(sheet, request), origin);
         default:
           return buildResponse({
             success: false,
@@ -196,6 +204,61 @@ function resolveAdminVerification(sheet, request) {
     request.__adminVerification = verification;
   }
   return verification;
+}
+
+function requireModeratorAuthority(sheet, request) {
+  const verification = runModeratorVerification(sheet, request);
+  if (verification && verification.success && request) {
+    request.__moderatorVerification = verification;
+  }
+  return verification;
+}
+
+function runModeratorVerification(sheet, request) {
+  if (request && request.__moderatorVerification && request.__moderatorVerification.success) {
+    return request.__moderatorVerification;
+  }
+
+  if (typeof verifyModeratorAccess === 'function') {
+    return verifyModeratorAccess(sheet, request);
+  }
+
+  const lookupEmail = (request && (request.googleEmail || request.email)) || '';
+  if (!lookupEmail) {
+    return {
+      success: false,
+      message: 'Googleアカウントのメールアドレスが確認できませんでした。',
+      requiresReauthentication: true,
+    };
+  }
+
+  const account = findAccount(sheet, { email: lookupEmail, playerId: request && request.playerId });
+  if (!account) {
+    return {
+      success: false,
+      message: 'アカウントが登録されていません。',
+      requiresReauthentication: true,
+    };
+  }
+
+  const authorityValue = parseAuthorityValue(account.authority);
+  if (authorityValue === null || authorityValue < MODERATOR_AUTHORITY_VALUE) {
+    return {
+      success: false,
+      message: 'モデレーター権限がありません。',
+      authority: authorityValue,
+    };
+  }
+
+  return {
+    success: true,
+    message: 'モデレーター権限が確認されました。',
+    playerId: account.playerId || '',
+    username: account.username || '',
+    email: account.email || '',
+    authority: authorityValue,
+    adminToken: request && request.adminToken,
+  };
 }
 
 function runAdminVerification(sheet, request) {
@@ -396,6 +459,52 @@ function handleListMembers(sheet, request) {
     limit: limit,
     offset: start,
   }, adminVerification);
+}
+
+function handleListModerationAccounts(sheet, request) {
+  const verification = requireModeratorAuthority(sheet, request);
+  if (!verification || !verification.success) {
+    return verification;
+  }
+
+  const firstDataRow = CONFIG.HEADER_ROW_INDEX + 1;
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < firstDataRow) {
+    return {
+      success: true,
+      message: 'メンバーが見つかりませんでした。',
+      members: [],
+      total: 0,
+      limit: request.limit,
+      offset: request.offset,
+    };
+  }
+
+  const totalRows = lastRow - CONFIG.HEADER_ROW_INDEX;
+  const range = sheet.getRange(firstDataRow, 1, totalRows, sheet.getLastColumn());
+  const values = range.getValues();
+  const columns = CONFIG.COLUMNS;
+
+  const members = values.map(function (row) {
+    return {
+      playerId: getColumnValue(row, columns.playerId),
+      username: getColumnValue(row, columns.username),
+      kingdom: sanitizeKingdom(getColumnValue(row, columns.kingdom)),
+      language: sanitizeLanguage(getColumnValue(row, columns.language)),
+      authority: sanitizeAuthority(getColumnValue(row, columns.authority)),
+      updatedAt: formatDateValue(getColumnValue(row, columns.updatedAt)),
+    };
+  });
+
+  return {
+    success: true,
+    message: 'モデレーター用のメンバー一覧を取得しました。',
+    members: members,
+    total: members.length,
+    limit: request.limit,
+    offset: request.offset,
+  };
 }
 
 function handleGetUserSettings(sheet, request) {
@@ -919,6 +1028,58 @@ function handleAutoApproveEditorRequest(sheet, request) {
   }, context);
 }
 
+function handleBlockUserAccount(sheet, request) {
+  const verification = requireModeratorAuthority(sheet, request);
+  if (!verification || !verification.success) {
+    return verification;
+  }
+
+  const targetPlayerId = (request.targetPlayerId || '').toString();
+  if (!targetPlayerId) {
+    return {
+      success: false,
+      message: '対象ユーザーが指定されていません。',
+    };
+  }
+
+  const columns = CONFIG.COLUMNS;
+  const record = findAccount(sheet, { playerId: targetPlayerId });
+  if (!record || !record.rowNumber) {
+    return {
+      success: false,
+      message: '対象のユーザーが見つかりませんでした。',
+    };
+  }
+
+  const reason = (request.reason || '').toString();
+  if (!reason) {
+    return {
+      success: false,
+      message: 'ブロック理由を指定してください。',
+    };
+  }
+
+  const authorityValue = parseAuthorityValue(record.authority);
+  if (authorityValue !== null && authorityValue >= MODERATOR_AUTHORITY_VALUE) {
+    return {
+      success: false,
+      message: 'モデレーター以上のユーザーはブロックできません。',
+    };
+  }
+
+  const updateRange = sheet.getRange(record.rowNumber, columns.authority, 1, 2);
+  updateRange.setValues([[BLOCKED_AUTHORITY_VALUE, new Date()]]);
+
+  return {
+    success: true,
+    message: 'ユーザーをブロックしました。',
+    playerId: record.playerId,
+    updatedAuthority: BLOCKED_AUTHORITY_VALUE,
+    updatedAt: new Date().toISOString(),
+    reason: reason,
+  };
+}
+
 function findMatchingPlayerIdCell(sheet, playerId) {
   const columns = CONFIG.COLUMNS;
   if (!columns.playerId) {
@@ -960,6 +1121,7 @@ function parseRequest(e) {
     playerId: data.playerId || '',
     currentPlayerId: data.currentPlayerId || '',
     requestedPlayerId: data.requestedPlayerId || data.pendingPlayerId || '',
+    targetPlayerId: data.targetPlayerId || data.targetId || '',
     email: data.email || '',
     googleEmail: data.googleEmail || data.googleAccountEmail || '',
     adminToken: data.adminToken || data.adminSessionToken || data.token || '',
@@ -968,6 +1130,7 @@ function parseRequest(e) {
     language: data.language,
     charId: data.charId || '',
     code: data.code || '',
+    reason: data.reason || data.blockReason || '',
   };
 }
 

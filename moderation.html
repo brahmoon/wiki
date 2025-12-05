@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モデレーター管理</title>
+  <link rel="stylesheet" href="./styles/editor.css">
+  <script src="./scripts/appsScriptEndpoints.js"></script>
+  <style>
+    :root {
+      --muted-text: #55534e;
+      --primary: #2383e2;
+      --danger: #d32f2f;
+      --border: #e0dfdc;
+      --bg: #f7f6f3;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #f5f5f5;
+      color: #37352f;
+    }
+
+    .page-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .status-text {
+      color: var(--muted-text);
+      margin: 0;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    button:hover {
+      background: #f0f6ff;
+      border-color: #c5d9f8;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #1f74cb;
+      border-color: #1f74cb;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      background: #b71c1c;
+      border-color: #b71c1c;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 820px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    thead th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+
+    tbody tr:hover {
+      background: #f9fbff;
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eef5ff;
+      color: #1f5fad;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .chip.pending {
+      background: #fff5e6;
+      color: #bf6d00;
+    }
+
+    .muted {
+      color: var(--muted-text);
+    }
+
+    .error {
+      color: var(--danger);
+      margin: 8px 0 0;
+    }
+
+    .loading,
+    .empty,
+    .error-state {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted-text);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 12px;
+      max-width: 520px;
+      width: 100%;
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .modal-close {
+      border: none;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--muted-text);
+    }
+
+    .modal-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      resize: vertical;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-container">
+    <header>
+      <h1>ユーザー管理（モデレーター）</h1>
+      <p id="page-status" class="status-text">権限を確認しています…</p>
+    </header>
+
+    <div id="authorization-error" class="error-state hidden" role="alert" aria-live="polite"></div>
+
+    <section id="moderation-card" class="card hidden" aria-hidden="true">
+      <div class="toolbar">
+        <div>
+          <div id="user-count" class="muted"></div>
+          <div id="moderator-info" class="muted"></div>
+        </div>
+        <div class="toolbar-actions">
+          <button id="reload-button" type="button">再読み込み</button>
+        </div>
+      </div>
+
+      <div id="loading-state" class="loading">ユーザー情報を取得しています…</div>
+      <div id="empty-state" class="empty hidden">ユーザーが見つかりませんでした。</div>
+      <div id="error-state" class="error-state hidden"></div>
+
+      <div id="table-wrapper" class="table-wrapper hidden" aria-hidden="true">
+        <table>
+          <thead>
+            <tr>
+              <th>Login ID</th>
+              <th>ユーザー名</th>
+              <th>Kingdom</th>
+              <th>言語</th>
+              <th>Authority</th>
+              <th>承認状態</th>
+              <th>更新日時</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="block-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="block-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="block-modal-title" class="modal-title">ユーザーをブロック</h2>
+        <button id="block-modal-close" class="modal-close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <div class="muted" id="block-target"></div>
+        </div>
+        <label for="block-reason">ブロック理由：</label>
+        <textarea id="block-reason" aria-describedby="block-error"></textarea>
+        <div id="block-error" class="error" role="alert"></div>
+        <div id="block-status" class="muted" aria-live="polite"></div>
+        <div class="modal-actions">
+          <button id="block-cancel" type="button">キャンセル</button>
+          <button id="block-submit" class="btn-danger" type="button">ブロック</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
+    const MODERATOR_AUTHORITY_VALUE = 3;
+    const ADMIN_AUTHORITY_VALUE = 99;
+    const BLOCKED_AUTHORITY_VALUE = -1;
+
+    const elements = {
+      status: document.getElementById('page-status'),
+      error: document.getElementById('authorization-error'),
+      card: document.getElementById('moderation-card'),
+      count: document.getElementById('user-count'),
+      moderatorInfo: document.getElementById('moderator-info'),
+      loading: document.getElementById('loading-state'),
+      empty: document.getElementById('empty-state'),
+      errorState: document.getElementById('error-state'),
+      tableWrapper: document.getElementById('table-wrapper'),
+      tableBody: document.getElementById('user-table-body'),
+      reload: document.getElementById('reload-button'),
+      blockModal: document.getElementById('block-modal'),
+      blockClose: document.getElementById('block-modal-close'),
+      blockCancel: document.getElementById('block-cancel'),
+      blockSubmit: document.getElementById('block-submit'),
+      blockReason: document.getElementById('block-reason'),
+      blockError: document.getElementById('block-error'),
+      blockStatus: document.getElementById('block-status'),
+      blockTarget: document.getElementById('block-target'),
+    };
+
+    let moderatorContext = null;
+    let blockTarget = null;
+
+    const getStoredLoginState = () => {
+      try {
+        const raw = localStorage.getItem('loginState');
+        return raw ? JSON.parse(raw) : null;
+      } catch (error) {
+        console.error('loginStateの読み込みに失敗しました', error);
+        return null;
+      }
+    };
+
+    const parseAuthority = (value) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : null;
+    };
+
+    const shouldShowUserManagement = (authority) => {
+      if (authority === null) return false;
+      if (authority >= ADMIN_AUTHORITY_VALUE) return false;
+      return authority >= MODERATOR_AUTHORITY_VALUE;
+    };
+
+    const formatDateTime = (value) => {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '-';
+      return date.toLocaleString('ja-JP', { hour12: false });
+    };
+
+    const formatLanguage = (value) => {
+      if (!value) return '-';
+      const normalized = String(value).toLowerCase();
+      if (normalized === 'en') return 'English';
+      if (normalized === 'ja') return '日本語';
+      return value;
+    };
+
+    const isPending = (playerId) => {
+      return typeof playerId === 'string' && playerId.toUpperCase().startsWith('PENDING');
+    };
+
+    const buildAuthorizationLink = (playerId) => {
+      const origin = window.location.origin;
+      const params = new URLSearchParams({ playerId });
+      return `${origin}/authorize.html?${params.toString()}`;
+    };
+
+    const showBlockModal = (user) => {
+      blockTarget = user;
+      elements.blockReason.value = '';
+      elements.blockError.textContent = '';
+      elements.blockStatus.textContent = '';
+      elements.blockTarget.textContent = `${user.playerId || '-'} / ${user.username || '名無し'}`;
+      elements.blockModal.classList.remove('hidden');
+    };
+
+    const closeBlockModal = () => {
+      blockTarget = null;
+      elements.blockModal.classList.add('hidden');
+    };
+
+    const setLoadingState = (isLoading) => {
+      elements.loading.classList.toggle('hidden', !isLoading);
+    };
+
+    const showTable = () => {
+      elements.tableWrapper.classList.remove('hidden');
+      elements.tableWrapper.setAttribute('aria-hidden', 'false');
+    };
+
+    const hideTable = () => {
+      elements.tableWrapper.classList.add('hidden');
+      elements.tableWrapper.setAttribute('aria-hidden', 'true');
+    };
+
+    const renderUsers = (users = []) => {
+      elements.tableBody.textContent = '';
+
+      if (!Array.isArray(users) || users.length === 0) {
+        hideTable();
+        elements.empty.classList.remove('hidden');
+        elements.count.textContent = '';
+        return;
+      }
+
+      elements.empty.classList.add('hidden');
+      const fragment = document.createDocumentFragment();
+
+      users.forEach((user) => {
+        const row = document.createElement('tr');
+
+        const loginCell = document.createElement('td');
+        loginCell.textContent = user.playerId || '-';
+        row.appendChild(loginCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = user.username || '-';
+        row.appendChild(nameCell);
+
+        const kingdomCell = document.createElement('td');
+        kingdomCell.textContent = user.kingdom || '-';
+        row.appendChild(kingdomCell);
+
+        const languageCell = document.createElement('td');
+        languageCell.textContent = formatLanguage(user.language);
+        row.appendChild(languageCell);
+
+        const authorityCell = document.createElement('td');
+        authorityCell.textContent = user.authority ?? '-';
+        row.appendChild(authorityCell);
+
+        const approvalCell = document.createElement('td');
+        if (isPending(user.playerId)) {
+          const badge = document.createElement('span');
+          badge.className = 'chip pending';
+          badge.textContent = '承認待ち';
+          approvalCell.appendChild(badge);
+        } else {
+          approvalCell.textContent = '-';
+        }
+        row.appendChild(approvalCell);
+
+        const updatedCell = document.createElement('td');
+        updatedCell.textContent = formatDateTime(user.updatedAt);
+        row.appendChild(updatedCell);
+
+        const actionsCell = document.createElement('td');
+        const actions = document.createElement('div');
+        actions.className = 'toolbar-actions';
+
+        if (isPending(user.playerId)) {
+          const issueButton = document.createElement('button');
+          issueButton.textContent = '申請URLを発行';
+          issueButton.addEventListener('click', () => {
+            const link = buildAuthorizationLink(user.playerId);
+            navigator.clipboard?.writeText(link).catch(() => {});
+            alert(`申請URL:\n${link}`);
+          });
+          actions.appendChild(issueButton);
+        }
+
+        const authorityValue = parseAuthority(user.authority);
+        if (authorityValue !== null && authorityValue <= 2) {
+          const blockButton = document.createElement('button');
+          blockButton.className = 'btn-danger';
+          blockButton.textContent = 'ユーザーをブロック';
+          blockButton.addEventListener('click', () => showBlockModal(user));
+          actions.appendChild(blockButton);
+        }
+
+        if (actions.children.length === 0) {
+          const placeholder = document.createElement('span');
+          placeholder.className = 'muted';
+          placeholder.textContent = '操作なし';
+          actions.appendChild(placeholder);
+        }
+
+        actionsCell.appendChild(actions);
+        row.appendChild(actionsCell);
+
+        fragment.appendChild(row);
+      });
+
+      elements.tableBody.appendChild(fragment);
+      elements.count.textContent = `${users.length}件のユーザー`;
+      showTable();
+    };
+
+    const showAuthorizationError = (message) => {
+      elements.error.textContent = message;
+      elements.error.classList.remove('hidden');
+      elements.card.classList.add('hidden');
+      elements.card.setAttribute('aria-hidden', 'true');
+      elements.status.textContent = '権限がありません。';
+    };
+
+    const showCard = () => {
+      elements.card.classList.remove('hidden');
+      elements.card.setAttribute('aria-hidden', 'false');
+    };
+
+    const fetchModerationAccess = async (loginState) => {
+      if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS) {
+        throw new Error('Apps Script エンドポイントが設定されていません。');
+      }
+
+      const payload = {
+        action: 'verifyModeratorAccess',
+        email: loginState?.user?.email || '',
+        googleEmail: loginState?.user?.email || '',
+        playerId: loginState?.user?.playerId || '',
+        origin: window.location.origin,
+      };
+
+      const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || `権限確認に失敗しました (HTTP ${response.status})`);
+      }
+
+      const result = await response.json().catch(() => null);
+      if (!result || !result.success) {
+        throw new Error((result && result.message) || '権限を確認できませんでした。');
+      }
+
+      return result;
+    };
+
+    const fetchUsers = async () => {
+      setLoadingState(true);
+      hideTable();
+      elements.empty.classList.add('hidden');
+      elements.errorState.classList.add('hidden');
+
+      try {
+        const payload = {
+          action: 'listModerationAccounts',
+          adminToken: moderatorContext?.adminToken || '',
+          email: moderatorContext?.email || '',
+          googleEmail: moderatorContext?.email || '',
+          playerId: moderatorContext?.playerId || '',
+          origin: window.location.origin,
+        };
+
+        const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(text || `ユーザー一覧の取得に失敗しました (HTTP ${response.status})`);
+        }
+
+        const result = await response.json().catch(() => null);
+        if (!result || !result.success) {
+          throw new Error((result && result.message) || 'ユーザー情報を取得できませんでした。');
+        }
+
+        renderUsers(Array.isArray(result.members) ? result.members : []);
+      } catch (error) {
+        elements.errorState.textContent = error.message || 'ユーザー情報の取得に失敗しました。';
+        elements.errorState.classList.remove('hidden');
+      } finally {
+        setLoadingState(false);
+      }
+    };
+
+    const submitBlockRequest = async () => {
+      if (!blockTarget) return;
+      const reason = elements.blockReason.value.trim();
+      elements.blockError.textContent = '';
+      elements.blockStatus.textContent = '';
+
+      if (!reason) {
+        elements.blockError.textContent = 'ブロック理由を記入してください。';
+        return;
+      }
+
+      elements.blockSubmit.disabled = true;
+      elements.blockStatus.textContent = 'ブロックリクエストを送信中';
+
+      try {
+        const payload = {
+          action: 'blockUserAccount',
+          targetPlayerId: blockTarget.playerId,
+          reason,
+          adminToken: moderatorContext?.adminToken || '',
+          email: moderatorContext?.email || '',
+          googleEmail: moderatorContext?.email || '',
+          playerId: moderatorContext?.playerId || '',
+          origin: window.location.origin,
+        };
+
+        const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(text || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json().catch(() => null);
+        if (!result || !result.success) {
+          throw new Error((result && result.message) || 'ブロック処理に失敗しました');
+        }
+
+        elements.blockStatus.textContent = 'ユーザーをブロックしました';
+        closeBlockModal();
+        fetchUsers();
+      } catch (error) {
+        elements.blockStatus.textContent = 'ブロック処理に失敗しました';
+        elements.blockError.textContent = error.message || 'ブロック処理に失敗しました';
+      } finally {
+        elements.blockSubmit.disabled = false;
+      }
+    };
+
+    const initialize = async () => {
+      const loginState = getStoredLoginState();
+      if (!loginState?.user) {
+        showAuthorizationError('ログイン情報が見つかりません。編集画面からログインしてください。');
+        return;
+      }
+
+      try {
+        const access = await fetchModerationAccess(loginState);
+        const authority = parseAuthority(access.authority);
+        if (authority === null || authority < MODERATOR_AUTHORITY_VALUE) {
+          showAuthorizationError('権限がありません。');
+          return;
+        }
+
+        moderatorContext = access;
+        elements.moderatorInfo.textContent = `${access.username || access.email || ''} / Authority: ${access.authority}`;
+        elements.status.textContent = 'モデレーター権限が確認されました。';
+        showCard();
+        fetchUsers();
+      } catch (error) {
+        console.error(error);
+        showAuthorizationError(error.message || '権限確認に失敗しました。');
+      }
+    };
+
+    elements.reload.addEventListener('click', fetchUsers);
+    elements.blockClose.addEventListener('click', closeBlockModal);
+    elements.blockCancel.addEventListener('click', closeBlockModal);
+    elements.blockSubmit.addEventListener('click', submitBlockRequest);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !elements.blockModal.classList.contains('hidden')) {
+        closeBlockModal();
+      }
+    });
+
+    initialize();
+  </script>
+</body>
+</html>
