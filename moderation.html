@@ -536,7 +536,9 @@
     };
 
     const isPending = (playerId) => {
-      return typeof playerId === 'string' && playerId.toUpperCase().startsWith('PENDING');
+      if (typeof playerId !== 'string') return false;
+      const normalized = playerId.trim();
+      return normalized.startsWith('!') || normalized.toUpperCase().startsWith('PENDING');
     };
 
     const buildAuthorizationLink = (playerId) => {
@@ -676,7 +678,7 @@
           menu.appendChild(issueButton);
         }
 
-        if (authorityValue !== null && authorityValue <= 2) {
+        if (authorityValue !== null && authorityValue <= 2 && authorityValue !== BLOCKED_AUTHORITY_VALUE) {
           const blockButton = document.createElement('button');
           blockButton.className = 'member-actions-menu-item';
           blockButton.type = 'button';

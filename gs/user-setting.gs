@@ -94,6 +94,7 @@ const CONFIG = {
     language: 5,
     authority: 6,
     updatedAt: 7,
+    comment: 8,
   },
   ALLOWED_ORIGINS: [
     'https://brahmoon.github.io',
@@ -1067,8 +1068,8 @@ function handleBlockUserAccount(sheet, request) {
     };
   }
 
-  const updateRange = sheet.getRange(record.rowNumber, columns.authority, 1, 2);
-  updateRange.setValues([[BLOCKED_AUTHORITY_VALUE, new Date()]]);
+  const updateRange = sheet.getRange(record.rowNumber, columns.authority, 1, 3);
+  updateRange.setValues([[BLOCKED_AUTHORITY_VALUE, new Date(), reason]]);
 
   return {
     success: true,
