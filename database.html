@@ -781,7 +781,7 @@
 
     function getGalleryType(target = state.galleryTarget) {
       const targetType = target?.type;
-      if (targetType === 'uniqueSkill') return 'skill';
+      if (targetType === 'uniqueSkill') return 'heroSkill';
       return dataType === 'hero' ? 'hero' : 'skill';
     }
 
@@ -1333,8 +1333,10 @@
           debug: false,
         });
         const folders = (result?.folders || []).filter((folder) => {
-          const label = (folder.displayName || folder.name || '').toLowerCase();
-          return galleryType === 'hero' ? label.includes('hero') : label.includes('skill');
+          const label = (folder.displayName || folder.name || '').trim().toLowerCase();
+          if (galleryType === 'hero') return label === 'hero';
+          if (galleryType === 'heroSkill') return label === 'heroskill';
+          return label === 'skill';
         });
         saveGalleryCache(galleryType, folders);
         state.galleryFolders = folders;
@@ -1391,7 +1393,7 @@
         return;
       }
       const target = state.galleryTarget || { type: 'record' };
-      const uploadFolderType = target?.type === 'uniqueSkill' ? 'Skill' : dataType === 'hero' ? 'Hero' : 'Skill';
+      const uploadFolderType = target?.type === 'uniqueSkill' ? 'HeroSkill' : dataType === 'hero' ? 'Hero' : 'Skill';
       setStatus('アップロード中...');
       try {
         const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
