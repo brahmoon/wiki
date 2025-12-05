@@ -1333,10 +1333,10 @@
           debug: false,
         });
         const folders = (result?.folders || []).filter((folder) => {
-          const label = (folder.displayName || folder.name || '').toLowerCase();
-          if (galleryType === 'hero') return label.includes('hero');
-          if (galleryType === 'heroSkill') return label.includes('heroskill');
-          return label.includes('skill');
+          const label = (folder.displayName || folder.name || '').trim().toLowerCase();
+          if (galleryType === 'hero') return label === 'hero';
+          if (galleryType === 'heroSkill') return label === 'heroskill';
+          return label === 'skill';
         });
         saveGalleryCache(galleryType, folders);
         state.galleryFolders = folders;
