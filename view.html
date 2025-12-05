@@ -1227,14 +1227,13 @@
             fallback.textContent = fallbackText;
             body.appendChild(fallback);
           }
-          const validUrl = (typeof url === 'string' && url.trim().length > 0);
-          if (validUrl) {
+          if (url && url.trim()) {
             link.href = url.trim();
             link.hidden = false;
           } else {
-            link.hidden = true;
-            link.removeAttribute('href');
+            link.remove();
           }
+
           currentAnchor = anchor || null;
           popup.classList.add('is-visible');
           positionRelativeToAnchor(currentAnchor);
