@@ -1035,24 +1035,29 @@ function handleBlockUserAccount(sheet, request) {
     return verification;
   }
 
-  const targetPlayerId = (request.targetPlayerId || '').toString();
-  if (!targetPlayerId) {
+  const rawTargetPid = (request.targetPlayerId || '').toString().trim();
+  if (!rawTargetPid) {
     return {
       success: false,
       message: '対象ユーザーが指定されていません。',
     };
   }
 
+  // ★ pending / !xxx / PENDINGxxx を normalize して検索可能にする
+  const targetPid = normalizePlayerId(rawTargetPid);
+
   const columns = CONFIG.COLUMNS;
-  const record = findAccount(sheet, { playerId: targetPlayerId });
+
+  const record = findAccount(sheet, { playerId: targetPid });
   if (!record || !record.rowNumber) {
     return {
       success: false,
       message: '対象のユーザーが見つかりませんでした。',
+      debug: { rawTargetPid, targetPid }  // デバッグに役立つ
     };
   }
 
-  const reason = (request.reason || '').toString();
+  const reason = (request.reason || '').toString().trim();
   if (!reason) {
     return {
       success: false,
@@ -1068,8 +1073,9 @@ function handleBlockUserAccount(sheet, request) {
     };
   }
 
-  const updateRange = sheet.getRange(record.rowNumber, columns.authority, 1, 3);
-  updateRange.setValues([[BLOCKED_AUTHORITY_VALUE, new Date(), reason]]);
+  // ★ authority と updatedAt をまとめて更新
+  const updateRange = sheet.getRange(record.rowNumber, columns.authority, 1, 2);
+  updateRange.setValues([[BLOCKED_AUTHORITY_VALUE, new Date()]]);
 
   return {
     success: true,
@@ -1294,6 +1300,11 @@ function parseAuthorizationCodeValue(code) {
   }
 }
 
+function normalizePlayerId(pid) {
+  if (!pid) return '';
+  return pid.toString().trim().replace(/^!+/, '').replace(/^PENDING/i, '');
+}
+
 function findAccount(sheet, identifiers) {
   const lastRow = sheet.getLastRow();
   const firstDataRow = CONFIG.HEADER_ROW_INDEX + 1;
@@ -1307,34 +1318,42 @@ function findAccount(sheet, identifiers) {
 
   const columns = CONFIG.COLUMNS;
 
+  const lookupPidRaw = identifiers.playerId || '';
+  const lookupPid = normalizePlayerId(lookupPidRaw);
+  const lookupEmail = identifiers.email ? identifiers.email.toString().trim() : '';
+
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
-    const rawRowPlayerId = columns.playerId ? row[columns.playerId - 1] : '';
-    const rowEmail = columns.email ? row[columns.email - 1] : '';
 
-    const playerMatch =
-      identifiers.playerId !== undefined && identifiers.playerId !== null && rawRowPlayerId === identifiers.playerId;
-    const emailMatch = identifiers.email && rowEmail && rowEmail === identifiers.email;
+    const rawPid = columns.playerId ? row[columns.playerId - 1] : '';
+    const rowPidNormalized = normalizePlayerId(rawPid);
+
+    const rowEmail = columns.email ? (row[columns.email - 1] || '').toString().trim() : '';
+
+    const playerMatch = lookupPid && rowPidNormalized === lookupPid;
+    const emailMatch =
+      lookupEmail &&
+      rowEmail &&
+      rowEmail.toLowerCase() === lookupEmail.toLowerCase();
 
     if (playerMatch || emailMatch) {
       return {
         rowNumber: firstDataRow + i,
         values: row,
-        playerId: columns.playerId ? row[columns.playerId - 1] : identifiers.playerId || '',
+        playerId: rawPid || lookupPidRaw || '',
         username: columns.username ? row[columns.username - 1] || '' : '',
-        email:
-          columns.email && row[columns.email - 1]
-          ? row[columns.email - 1]
-          : (identifiers.email || ''),
+        email: rowEmail || lookupEmail,
         kingdom: columns.kingdom ? row[columns.kingdom - 1] || '' : '',
         language: columns.language ? sanitizeLanguage(row[columns.language - 1]) : 'ja',
         authority: columns.authority ? sanitizeAuthority(row[columns.authority - 1]) : null,
+        updatedAt: columns.updatedAt ? row[columns.updatedAt - 1] : null,
       };
     }
   }
 
   return null;
 }
+
 
 function parseAuthorityValue(value) {
   if (value === null || value === undefined || value === '') {
