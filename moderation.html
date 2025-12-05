@@ -690,6 +690,7 @@
       elements.blockError.textContent = '';
       elements.blockStatus.textContent = '';
       elements.blockStatus.classList.remove('status-success');
+      elements.blockSubmit.classList.remove('hidden');
       elements.blockSubmit.disabled = false;
       elements.blockCancel.textContent = 'キャンセル';
       elements.blockTarget.textContent = `${user.playerId || '-'} / ${user.username || '名無し'}`;
@@ -704,6 +705,7 @@
       elements.blockStatus.textContent = '';
       elements.blockStatus.classList.remove('status-success');
       elements.blockSubmit.disabled = false;
+      elements.blockSubmit.classList.remove('hidden');
       elements.blockCancel.textContent = 'キャンセル';
     };
 
@@ -1045,6 +1047,7 @@
       elements.blockSubmit.disabled = true;
       elements.blockStatus.textContent = 'ブロックリクエストを送信中';
 
+      let blockSucceeded = false;
       try {
         const payload = {
           action: 'blockUserAccount',
@@ -1078,14 +1081,17 @@
         elements.blockError.textContent = '';
         elements.blockStatus.textContent = 'ユーザーをブロックしました';
         elements.blockStatus.classList.add('status-success');
-        elements.blockSubmit.disabled = true;
+        elements.blockSubmit.classList.add('hidden');
+        blockSucceeded = true;
         elements.blockCancel.textContent = '閉じる';
         fetchUsers();
       } catch (error) {
         elements.blockStatus.textContent = 'ブロック処理に失敗しました';
         elements.blockError.textContent = error.message || 'ブロック処理に失敗しました';
       } finally {
-        elements.blockSubmit.disabled = false;
+        if (!blockSucceeded) {
+          elements.blockSubmit.disabled = false;
+        }
       }
     };
 
