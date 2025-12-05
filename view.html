@@ -7,6 +7,10 @@
   <link rel="stylesheet" href="./styles/editor.css">
   <script src="./scripts/appsScriptEndpoints.js"></script>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -18,6 +22,7 @@
       display: grid;
       grid-template-columns: 260px 1fr;
       min-height: 100vh;
+      width: 100vw;
       background: inherit;
       transition: grid-template-columns 0.3s ease;
     }
