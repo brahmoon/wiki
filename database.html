@@ -1391,7 +1391,7 @@
         return;
       }
       const target = state.galleryTarget || { type: 'record' };
-      const uploadFolderType = target?.type === 'uniqueSkill' ? 'Skill' : dataType === 'hero' ? 'Hero' : 'Skill';
+      const uploadFolderType = target?.type === 'uniqueSkill' ? 'HeroSkill' : dataType === 'hero' ? 'Hero' : 'Skill';
       setStatus('アップロード中...');
       try {
         const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
