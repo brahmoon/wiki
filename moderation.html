@@ -273,17 +273,16 @@
     }
 
     .member-approval-cell {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      text-align: center;
+      vertical-align: middle;
     }
 
     .member-approval-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 10px;
+      justify-content: center;
+      padding: 4px 12px;
+      border-radius: 999px;
       background: #fff5e6;
       color: #bf6d00;
       font-weight: 700;
@@ -386,6 +385,87 @@
       color: #1f5fad;
       font-weight: 700;
     }
+
+    .member-link-dialog {
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 17, 17, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 3000;
+    }
+
+    .member-link-dialog[hidden] {
+      display: none;
+    }
+
+    .member-link-dialog__card {
+      width: min(520px, 100%);
+      background: #fff;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 30px 80px rgba(15, 15, 15, 0.35);
+    }
+
+    .member-link-dialog__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .member-link-dialog__header h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .member-link-dialog__close {
+      border: none;
+      background: transparent;
+      font-size: 20px;
+      cursor: pointer;
+      color: #6b6a67;
+    }
+
+    .member-link-dialog__player {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: #6b6a67;
+    }
+
+    .member-link-dialog__input-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .member-link-dialog__input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid #d0d0cc;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #f7f6f3;
+    }
+
+    .member-link-dialog__status {
+      margin: 12px 0 0;
+      font-size: 13px;
+      color: #6b6a67;
+    }
+
+    .member-link-dialog__status.is-error {
+      color: #b91c1c;
+    }
+
+    .member-link-dialog__status.is-success {
+      color: #15803d;
+    }
   </style>
 </head>
 <body>
@@ -452,6 +532,28 @@
     </div>
   </div>
 
+  <div id="member-link-dialog" class="member-link-dialog" hidden aria-hidden="true">
+    <div class="member-link-dialog__card" role="dialog" aria-modal="true" aria-labelledby="member-link-dialog-title">
+      <div class="member-link-dialog__header">
+        <h2 id="member-link-dialog-title">申請URLを発行</h2>
+        <button id="member-link-dialog-close" class="member-link-dialog__close" type="button" aria-label="閉じる">×</button>
+      </div>
+      <p id="member-link-dialog-player" class="member-link-dialog__player"></p>
+      <p id="member-link-dialog-description">以下のURLをコピーして対象のプレイヤーに送信してください。</p>
+      <div class="member-link-dialog__input-group">
+        <input
+          id="member-link-dialog-input"
+          class="member-link-dialog__input"
+          type="text"
+          readonly
+          aria-describedby="member-link-dialog-description"
+        />
+        <button id="member-link-dialog-copy" class="btn btn-primary" type="button">コピー</button>
+      </div>
+      <p id="member-link-dialog-status" class="member-link-dialog__status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
   <script>
     const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
     const MODERATOR_AUTHORITY_VALUE = 3;
@@ -486,6 +588,12 @@
       blockError: document.getElementById('block-error'),
       blockStatus: document.getElementById('block-status'),
       blockTarget: document.getElementById('block-target'),
+      linkDialog: document.getElementById('member-link-dialog'),
+      linkInput: document.getElementById('member-link-dialog-input'),
+      linkCopy: document.getElementById('member-link-dialog-copy'),
+      linkStatus: document.getElementById('member-link-dialog-status'),
+      linkPlayer: document.getElementById('member-link-dialog-player'),
+      linkClose: document.getElementById('member-link-dialog-close'),
     };
 
     let moderatorContext = null;
@@ -541,10 +649,39 @@
       return normalized.startsWith('!') || normalized.toUpperCase().startsWith('PENDING');
     };
 
+    const stripPendingPlayerId = (value) => {
+      if (!value) return '';
+      return value.toString().replace(/^!+/, '');
+    };
+
+    const safeBase64Encode = (value) => {
+      if (value === undefined || value === null) {
+        return '';
+      }
+      const stringValue = value.toString();
+      try {
+        return window.btoa(unescape(encodeURIComponent(stringValue)));
+      } catch (error) {
+        try {
+          return window.btoa(stringValue);
+        } catch (encodeError) {
+          console.error('Failed to encode base64 value', encodeError);
+          return '';
+        }
+      }
+    };
+
     const buildAuthorizationLink = (playerId) => {
-      const origin = window.location.origin;
-      const params = new URLSearchParams({ playerId });
-      return `${origin}/authorize.html?${params.toString()}`;
+      const strippedPlayerId = stripPendingPlayerId(playerId || '');
+      if (!strippedPlayerId) {
+        return '';
+      }
+      const encodedPlayerId = safeBase64Encode(strippedPlayerId);
+      if (!encodedPlayerId) {
+        return '';
+      }
+      const encodedCode = encodeURIComponent(encodedPlayerId);
+      return `https://brahmoon.github.io/wiki/authorize.html?code=${encodedCode}`;
     };
 
     const showBlockModal = (user) => {
@@ -562,10 +699,91 @@
     const closeBlockModal = () => {
       blockTarget = null;
       elements.blockModal.classList.add('hidden');
+      elements.blockReason.value = '';
+      elements.blockError.textContent = '';
       elements.blockStatus.textContent = '';
       elements.blockStatus.classList.remove('status-success');
       elements.blockSubmit.disabled = false;
       elements.blockCancel.textContent = 'キャンセル';
+    };
+
+    const setLinkDialogStatus = (message, state = '') => {
+      if (!elements.linkStatus) return;
+      elements.linkStatus.textContent = message || '';
+      elements.linkStatus.classList.remove('is-error', 'is-success');
+      if (state === 'error') {
+        elements.linkStatus.classList.add('is-error');
+      } else if (state === 'success') {
+        elements.linkStatus.classList.add('is-success');
+      }
+    };
+
+    const closeLinkDialog = () => {
+      if (elements.linkDialog) {
+        elements.linkDialog.hidden = true;
+        elements.linkDialog.setAttribute('aria-hidden', 'true');
+      }
+      if (elements.linkInput) {
+        elements.linkInput.value = '';
+      }
+      if (elements.linkPlayer) {
+        elements.linkPlayer.textContent = '';
+      }
+      setLinkDialogStatus('');
+    };
+
+    const openLinkDialog = (user) => {
+      const linkValue = buildAuthorizationLink(user?.playerId);
+      if (!linkValue) {
+        elements.errorState.textContent = '申請URLを生成できませんでした。対象ユーザーの情報を確認してください。';
+        elements.errorState.classList.remove('hidden');
+        return;
+      }
+
+      if (elements.linkInput) {
+        elements.linkInput.value = linkValue;
+        elements.linkInput.focus();
+        elements.linkInput.select();
+      }
+
+      if (elements.linkPlayer) {
+        const stripped = stripPendingPlayerId(user?.playerId || '');
+        const kingdom = user?.kingdom || '-';
+        elements.linkPlayer.textContent = `Player ID: ${stripped || '-'} / Kingdom: ${kingdom || '-'}`;
+      }
+
+      setLinkDialogStatus('コピーしてゲーム内で送信してください。');
+      if (elements.linkDialog) {
+        elements.linkDialog.hidden = false;
+        elements.linkDialog.setAttribute('aria-hidden', 'false');
+      }
+    };
+
+    const copyLinkValue = async () => {
+      const linkValue = elements.linkInput?.value || '';
+      if (!linkValue) {
+        setLinkDialogStatus('コピーするURLがありません。', 'error');
+        return;
+      }
+
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(linkValue);
+        } else if (document.queryCommandSupported && document.queryCommandSupported('copy')) {
+          elements.linkInput?.focus();
+          elements.linkInput?.select();
+          const succeeded = document.execCommand('copy');
+          if (!succeeded) {
+            throw new Error('コピーに失敗しました。');
+          }
+        } else {
+          throw new Error('コピー機能が利用できません。');
+        }
+        setLinkDialogStatus('コピーしました。', 'success');
+      } catch (error) {
+        console.error('Failed to copy authorization link', error);
+        setLinkDialogStatus('コピーに失敗しました。手動でコピーしてください。', 'error');
+      }
     };
 
     const setLoadingState = (isLoading) => {
@@ -670,9 +888,7 @@
           issueButton.type = 'button';
           issueButton.textContent = '申請URLを発行';
           issueButton.addEventListener('click', () => {
-            const link = buildAuthorizationLink(user.playerId);
-            navigator.clipboard?.writeText(link).catch(() => {});
-            alert(`申請URL:\n${link}`);
+            openLinkDialog(user);
             closeAllActionMenus();
           });
           menu.appendChild(issueButton);
@@ -903,6 +1119,19 @@
     elements.blockClose.addEventListener('click', closeBlockModal);
     elements.blockCancel.addEventListener('click', closeBlockModal);
     elements.blockSubmit.addEventListener('click', submitBlockRequest);
+    if (elements.linkClose) {
+      elements.linkClose.addEventListener('click', closeLinkDialog);
+    }
+    if (elements.linkDialog) {
+      elements.linkDialog.addEventListener('click', (event) => {
+        if (event.target === elements.linkDialog) {
+          closeLinkDialog();
+        }
+      });
+    }
+    if (elements.linkCopy) {
+      elements.linkCopy.addEventListener('click', copyLinkValue);
+    }
 
     document.addEventListener('click', (event) => {
       if (!event.target.closest('.member-row-actions')) {
@@ -915,6 +1144,9 @@
         closeAllActionMenus();
         if (!elements.blockModal.classList.contains('hidden')) {
           closeBlockModal();
+        }
+        if (elements.linkDialog && !elements.linkDialog.hidden) {
+          closeLinkDialog();
         }
       }
     });
