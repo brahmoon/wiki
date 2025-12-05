@@ -18,6 +18,51 @@
       min-height: 100vh;
     }
 
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(247, 246, 243, 0.9);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      padding: 24px 28px;
+      border-radius: 16px;
+      border: 1px solid #e9e9e7;
+      box-shadow: 0 18px 46px rgba(0, 0, 0, 0.12);
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 5px solid #e9e9e7;
+      border-top-color: #2383e2;
+      animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+      font-weight: 700;
+      color: #37352f;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
     .app-shell {
       display: grid;
       grid-template-columns: 280px 1fr;
@@ -444,6 +489,13 @@
   </style>
 </head>
 <body>
+  <div id="loadingOverlay" class="loading-overlay active">
+    <div class="loading-content">
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <div class="loading-text" id="loadingText">ページを準備中...</div>
+    </div>
+  </div>
+
   <div class="app-shell">
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -675,6 +727,8 @@
       talentGrid: document.getElementById('talentGrid'),
       heroGradeRadios: document.querySelectorAll('input[name="heroGrade"]'),
       skillGradeRadios: document.querySelectorAll('input[name="skillGrade"]'),
+      loadingOverlay: document.getElementById('loadingOverlay'),
+      loadingText: document.getElementById('loadingText'),
     };
 
     const state = {
@@ -686,12 +740,23 @@
       galleryFolders: [],
       uniqueSkillImages: Array.from({ length: 3 }, () => ''),
       galleryTarget: { type: 'record' },
+      galleryCache: {},
     };
 
     function setStatus(message, type = '') {
       elements.statusArea.textContent = message || '';
       elements.statusArea.classList.toggle('error', type === 'error');
       elements.statusArea.classList.toggle('success', type === 'success');
+    }
+
+    function setLoading(isLoading, message = '読み込み中...') {
+      const overlay = elements.loadingOverlay;
+      const text = elements.loadingText;
+      if (!overlay || !text) return;
+      if (message) {
+        text.textContent = message;
+      }
+      overlay.classList.toggle('active', !!isLoading);
     }
 
     function getLoginState() {
@@ -712,6 +777,12 @@
         /\/folders\/([\w-]+)/.exec(value);
       const fileId = idMatch?.[1];
       return fileId ? `https://drive.google.com/thumbnail?sz=w100&id=${fileId}` : value;
+    }
+
+    function getGalleryType(target = state.galleryTarget) {
+      const targetType = target?.type;
+      if (targetType === 'uniqueSkill') return 'skill';
+      return dataType === 'hero' ? 'hero' : 'skill';
     }
 
     function generateRandomFilename(length = 12, originalName = '') {
@@ -1137,6 +1208,7 @@
 
     async function loadRecords() {
       setStatus('データを読み込み中...');
+      setLoading(true, 'データを取得中...');
       try {
         const result = await callDatabaseApi(buildRequestPayload({
           action: 'listRecords',
@@ -1148,11 +1220,14 @@
       } catch (error) {
         console.error(error);
         setStatus(error.message, 'error');
+      } finally {
+        setLoading(false);
       }
     }
 
     async function loadRecord(id) {
       setStatus(`ID: ${id} を取得中...`);
+      setLoading(true, 'データを取得中...');
       try {
         const result = await callDatabaseApi(buildRequestPayload({
           action: 'getRecord',
@@ -1169,6 +1244,8 @@
       } catch (error) {
         console.error(error);
         setStatus(error.message, 'error');
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -1221,9 +1298,20 @@
       }
     }
 
+    function getCachedGallery(galleryType) {
+      return state.galleryCache?.[galleryType] || null;
+    }
+
+    function saveGalleryCache(galleryType, folders) {
+      state.galleryCache = {
+        ...state.galleryCache,
+        [galleryType]: folders,
+      };
+    }
+
     async function openGallery(target = { type: 'record' }) {
       state.galleryTarget = target || { type: 'record' };
-      const galleryType = state.galleryTarget?.type === 'uniqueSkill' ? 'skill' : dataType;
+      const galleryType = getGalleryType(state.galleryTarget);
       if (!DRIVE_ENDPOINT) {
         setStatus('DriveImageのWebApp URLが設定されていません。', 'error');
         return;
@@ -1232,6 +1320,13 @@
       elements.galleryModal.classList.add('active');
 
       try {
+        const cachedFolders = getCachedGallery(galleryType);
+        if (cachedFolders) {
+          state.galleryFolders = cachedFolders;
+          renderGallery();
+          return;
+        }
+
         const { DriveImageHandler } = await import('https://brahmoon.github.io/wiki/extensions/driveImage/DriveImageHandler.js');
         const result = await DriveImageHandler.loadGallery({
           webAppUrl: DRIVE_ENDPOINT,
@@ -1241,6 +1336,7 @@
           const label = (folder.displayName || folder.name || '').toLowerCase();
           return galleryType === 'hero' ? label.includes('hero') : label.includes('skill');
         });
+        saveGalleryCache(galleryType, folders);
         state.galleryFolders = folders;
         renderGallery();
       } catch (error) {
@@ -1310,6 +1406,31 @@
         if (result?.driveUrl) {
           setIconForTarget(target, result.driveUrl);
           setStatus('アップロードしました。', 'success');
+          const galleryType = getGalleryType(target);
+          const newImage = {
+            name: file.name,
+            url: result.driveUrl,
+            thumbnail: getDriveThumbnailUrl(result.driveUrl),
+          };
+          const cachedFolders = getCachedGallery(galleryType) || [];
+          let updatedFolders = [];
+          if (cachedFolders.length) {
+            updatedFolders = cachedFolders.map((folder, index) => {
+              if (index === 0) {
+                const images = Array.isArray(folder.images) ? folder.images : [];
+                return { ...folder, images: [newImage, ...images] };
+              }
+              return folder;
+            });
+          } else {
+            updatedFolders = [{
+              name: preferredFolder?.name || uploadFolderType,
+              displayName: preferredFolder?.displayName || preferredFolder?.name || uploadFolderType,
+              images: [newImage],
+            }];
+          }
+          saveGalleryCache(galleryType, updatedFolders);
+          state.galleryFolders = updatedFolders;
           await openGallery(target);
         }
       } catch (error) {
@@ -1326,6 +1447,7 @@
     }
 
     async function initialize() {
+      setLoading(true, 'ページを準備中...');
       renderTalentFields();
       renderUniqueSkillFields();
       updateUniqueSkillIconSlots();
@@ -1334,16 +1456,21 @@
       if (dataType !== 'hero' && dataType !== 'skill') {
         elements.blockedPanel.hidden = false;
         elements.blockedPanel.innerHTML = '<h2>不正なクエリ</h2><p>data=hero または data=skill を指定してください。</p>';
+        setLoading(false);
         return;
       }
 
-      const allowed = await verifyAuthority();
-      if (!allowed) return;
+      try {
+        const allowed = await verifyAuthority();
+        if (!allowed) return;
 
-      await loadRecords();
-      resetForm();
-      if (targetIdParam) {
-        loadRecord(targetIdParam);
+        await loadRecords();
+        resetForm();
+        if (targetIdParam) {
+          await loadRecord(targetIdParam);
+        }
+      } finally {
+        setLoading(false);
       }
     }
 
