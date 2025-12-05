@@ -1227,8 +1227,9 @@
             fallback.textContent = fallbackText;
             body.appendChild(fallback);
           }
-          if (url) {
-            link.href = url;
+          const validUrl = (typeof url === 'string' && url.trim().length > 0);
+          if (validUrl) {
+            link.href = url.trim();
             link.hidden = false;
           } else {
             link.hidden = true;
