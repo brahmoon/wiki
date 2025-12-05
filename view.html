@@ -1227,11 +1227,21 @@
             fallback.textContent = fallbackText;
             body.appendChild(fallback);
           }
-          if (url) {
-            link.href = url.trim();
-            link.hidden = false;
-          } else {
-            link.remove();
+
+          const oldLink = popup.querySelector('.hero-skillset-info-popup__link');
+          if (oldLink) {
+            oldLink.remove();
+          }
+
+          if (url && url.trim()) {
+            const newLink = document.createElement('a');
+            newLink.className = 'hero-skillset-info-popup__link';
+            newLink.target = '_blank';
+            newLink.rel = 'noopener noreferrer';
+            newLink.href = url.trim();
+            newLink.textContent = '詳細ページを開く';
+
+            popup.appendChild(newLink);
           }
 
           currentAnchor = anchor || null;
