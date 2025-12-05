@@ -1025,6 +1025,7 @@
           });
           return;
         }
+        const isHeroFixedSkill = trigger.dataset.skillOrigin === 'hero-fixed';
         heroSkillsetInfoPopup.show({
           anchor: trigger,
           titleText: info.name || '',
@@ -1034,7 +1035,7 @@
             ? [{ description: info.description }]
             : [],
           fallbackText: '説明が登録されていません。',
-          url: info.url || ''
+          url: isHeroFixedSkill ? '' : (info.url || '')
         });
       };
       card.addEventListener('click', handler);
@@ -1070,6 +1071,7 @@
           ? 'hero-skillset-cell--editable'
           : 'hero-skillset-cell--fixed'
       );
+      button.dataset.skillOrigin = isEditableSlot ? 'user' : 'hero-fixed';
       const placeholder = isEditableSlot ? '+' : '—';
       const figure = createHeroSkillsetFigure(skill?.image, skill?.name, placeholder);
       const label = document.createElement('span');
