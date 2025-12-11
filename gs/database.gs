@@ -552,7 +552,20 @@ function saveRecord(dataType, record) {
   }
 
   if (!targetRow) {
-    targetRow = lastRow >= headerRowIndex ? lastRow + 1 : firstDataRow;
+    if (lastRow < firstDataRow) {
+      targetRow = firstDataRow;
+    } else {
+      var insertionIndex = ids.findIndex(function(value) {
+        return compareIdValues(normalizedId, value) < 0;
+      });
+
+      if (insertionIndex === -1) {
+        targetRow = lastRow + 1;
+      } else {
+        targetRow = firstDataRow + insertionIndex;
+        sheet.insertRows(targetRow, 1);
+      }
+    }
   }
 
   const rowValues = headers.map(function(header) {
@@ -566,6 +579,21 @@ function saveRecord(dataType, record) {
     dataType,
     message: 'データを保存しました。'
   };
+}
+
+function compareIdValues(a, b) {
+  var aNumber = Number(a);
+  var bNumber = Number(b);
+  var aIsFinite = isFinite(aNumber);
+  var bIsFinite = isFinite(bNumber);
+
+  if (aIsFinite && bIsFinite) {
+    return aNumber - bNumber;
+  }
+
+  var aString = (a || '').toString();
+  var bString = (b || '').toString();
+  return aString.localeCompare(bString, 'ja');
 }
 
 function deleteRecord(dataType, id) {
