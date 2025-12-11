@@ -152,13 +152,25 @@ function createJsonOutput(data, requestOrigin) {
     return origin;
   });
 
-  if (allowedOrigins.length) {
-    if (allowedOrigins.indexOf('*') !== -1) {
-      output.setHeader('Access-Control-Allow-Origin', '*');
-    } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
-      output
-        .setHeader('Access-Control-Allow-Origin', requestOrigin)
-        .setHeader('Vary', 'Origin');
+  var allowOrigin = '';
+  if (allowedOrigins.indexOf('*') !== -1) {
+    allowOrigin = '*';
+  } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
+    allowOrigin = requestOrigin;
+  } else if (allowedOrigins.length) {
+    // Fallback to the first configured origin so that browsers receive a valid CORS header
+    // even if the request did not include an Origin header (which can happen on some Apps Script calls).
+    allowOrigin = allowedOrigins[0];
+  }
+
+  if (allowOrigin) {
+    output
+      .setHeader('Access-Control-Allow-Origin', allowOrigin)
+      .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+      .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (allowOrigin !== '*') {
+      output.setHeader('Vary', 'Origin');
     }
   }
 
@@ -537,10 +549,11 @@ function saveRecord(dataType, record) {
   const firstDataRow = headerRowIndex + 1;
   const lastRow = sheet.getLastRow();
   let targetRow = 0;
+  let ids = [];
 
   if (lastRow >= firstDataRow) {
     const rows = lastRow - headerRowIndex;
-    const ids = sheet.getRange(firstDataRow, 1, rows, 1).getValues().map(function(row) {
+    ids = sheet.getRange(firstDataRow, 1, rows, 1).getValues().map(function(row) {
       return (row[0] || '').toString();
     });
     const index = ids.findIndex(function(value) {
@@ -552,7 +565,20 @@ function saveRecord(dataType, record) {
   }
 
   if (!targetRow) {
-    targetRow = lastRow >= headerRowIndex ? lastRow + 1 : firstDataRow;
+    if (lastRow < firstDataRow) {
+      targetRow = firstDataRow;
+    } else {
+      var insertionIndex = ids.findIndex(function(value) {
+        return compareIdValues(normalizedId, value) < 0;
+      });
+
+      if (insertionIndex === -1) {
+        targetRow = lastRow + 1;
+      } else {
+        targetRow = firstDataRow + insertionIndex;
+        sheet.insertRows(targetRow, 1);
+      }
+    }
   }
 
   const rowValues = headers.map(function(header) {
@@ -566,6 +592,21 @@ function saveRecord(dataType, record) {
     dataType,
     message: 'データを保存しました。'
   };
+}
+
+function compareIdValues(a, b) {
+  var aNumber = Number(a);
+  var bNumber = Number(b);
+  var aIsFinite = isFinite(aNumber);
+  var bIsFinite = isFinite(bNumber);
+
+  if (aIsFinite && bIsFinite) {
+    return aNumber - bNumber;
+  }
+
+  var aString = (a || '').toString();
+  var bString = (b || '').toString();
+  return aString.localeCompare(bString, 'ja');
 }
 
 function deleteRecord(dataType, id) {
