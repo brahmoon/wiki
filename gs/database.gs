@@ -537,10 +537,11 @@ function saveRecord(dataType, record) {
   const firstDataRow = headerRowIndex + 1;
   const lastRow = sheet.getLastRow();
   let targetRow = 0;
+  let ids = [];
 
   if (lastRow >= firstDataRow) {
     const rows = lastRow - headerRowIndex;
-    const ids = sheet.getRange(firstDataRow, 1, rows, 1).getValues().map(function(row) {
+    ids = sheet.getRange(firstDataRow, 1, rows, 1).getValues().map(function(row) {
       return (row[0] || '').toString();
     });
     const index = ids.findIndex(function(value) {
