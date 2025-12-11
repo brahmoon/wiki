@@ -152,25 +152,13 @@ function createJsonOutput(data, requestOrigin) {
     return origin;
   });
 
-  var allowOrigin = '';
-  if (allowedOrigins.indexOf('*') !== -1) {
-    allowOrigin = '*';
-  } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
-    allowOrigin = requestOrigin;
-  } else if (allowedOrigins.length) {
-    // Fallback to the first configured origin so that browsers receive a valid CORS header
-    // even if the request did not include an Origin header (which can happen on some Apps Script calls).
-    allowOrigin = allowedOrigins[0];
-  }
-
-  if (allowOrigin) {
-    output
-      .setHeader('Access-Control-Allow-Origin', allowOrigin)
-      .setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-      .setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (allowOrigin !== '*') {
-      output.setHeader('Vary', 'Origin');
+  if (allowedOrigins.length) {
+    if (allowedOrigins.indexOf('*') !== -1) {
+      output.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (requestOrigin && allowedOrigins.indexOf(requestOrigin) !== -1) {
+      output
+        .setHeader('Access-Control-Allow-Origin', requestOrigin)
+        .setHeader('Vary', 'Origin');
     }
   }
 
