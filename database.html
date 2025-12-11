@@ -668,8 +668,17 @@
 
   <script type="module">
     const params = new URLSearchParams(window.location.search);
-    const dataType = (params.get('data') || '').toLowerCase();
+    const hasDataParam = params.has('data');
+    const dataParam = (params.get('data') || '').toLowerCase();
+    const normalizedDataType = dataParam === 'hero' || dataParam === 'skill' ? dataParam : '';
+    const dataType = normalizedDataType || (hasDataParam ? '' : 'hero');
     const targetIdParam = params.get('id') || '';
+
+    if (!hasDataParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('data', 'hero');
+      window.history.replaceState({}, '', url.toString());
+    }
 
     const ENDPOINT = window.APPS_SCRIPT_ENDPOINT_DATABASE;
     const DRIVE_ENDPOINT = window.APPS_SCRIPT_ENDPOINT_DRIVE_IMAGE;
@@ -766,6 +775,24 @@
       } catch (error) {
         console.error('Failed to parse login state', error);
         return null;
+      }
+    }
+
+    function showLoginRequiredPanel() {
+      elements.blockedPanel.hidden = false;
+      elements.editorArea.hidden = true;
+      elements.blockedPanel.innerHTML = `
+        <h2>ログインが必要です</h2>
+        <p>データベースを編集するにはログインしてください。</p>
+        <button class="btn btn-primary" id="loginRedirectButton">ログイン</button>
+      `;
+
+      const loginButton = document.getElementById('loginRedirectButton');
+      if (loginButton) {
+        loginButton.addEventListener('click', () => {
+          const redirectUrl = `${window.location.pathname}${window.location.search}`;
+          window.location.href = `login.html?redirect=${encodeURIComponent(redirectUrl)}`;
+        });
       }
     }
 
@@ -1463,6 +1490,12 @@
       }
 
       try {
+        const loginState = getLoginState();
+        if (!loginState || !loginState.user) {
+          showLoginRequiredPanel();
+          return;
+        }
+
         const allowed = await verifyAuthority();
         if (!allowed) return;
 
