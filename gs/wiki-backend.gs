@@ -302,16 +302,35 @@ function parseOrderValue(value) {
 
 function ensureSheetStructure(sheet) {
   const headers = WIKI_COLUMNS.HEADERS;
-  const current = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-  let needsUpdate = false;
-  for (let i = 0; i < headers.length; i++) {
-    if (current[i] !== headers[i]) {
-      needsUpdate = true;
-      break;
-    }
-  }
-  if (needsUpdate) {
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const lastColumn = Math.max(sheet.getLastColumn(), headers.length);
+  const currentHeader = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  const headerMatches = headers.every((header, index) => currentHeader[index] === header);
+
+  if (!headerMatches || lastColumn !== headers.length) {
+    const headerIndexMap = new Map();
+    currentHeader.forEach((value, index) => {
+      const key = (value || '').toString().trim();
+      if (key && !headerIndexMap.has(key)) {
+        headerIndexMap.set(key, index);
+      }
+    });
+
+    const dataRows = lastRow > 1
+      ? sheet.getRange(2, 1, lastRow - 1, lastColumn).getValues()
+      : [];
+    const normalizedRows = dataRows.map(row => headers.map(header => {
+      const sourceIndex = headerIndexMap.get(header);
+      return sourceIndex !== undefined ? row[sourceIndex] : '';
+    }));
+
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    if (normalizedRows.length) {
+      sheet.getRange(2, 1, normalizedRows.length, headers.length).setValues(normalizedRows);
+    }
+    if (lastColumn > headers.length) {
+      sheet.getRange(1, headers.length + 1, lastRow, lastColumn - headers.length).clearContent();
+    }
   }
   if (sheet.getFrozenRows() < 1) {
     sheet.setFrozenRows(1);
