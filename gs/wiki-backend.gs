@@ -682,6 +682,7 @@ function getPageHistory(id) {
     const versions = matches.map((row, index) => ({
       versionIndex: index + 1,
       updatedAt: row[WIKI_COLUMNS.UPDATED_AT - 1] || '',
+      updatedBy: row[WIKI_COLUMNS.UPDATED_BY - 1] || '',
       htmlContent: row[WIKI_COLUMNS.CONTENT - 1] || '',
       rowData: row.slice(0, width),
     }));
