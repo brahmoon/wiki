@@ -807,12 +807,41 @@
             margin: 10px 0;
             font-size: 12px;
             color: #3d3b34;
+            position: relative;
         }
 
         .hero-skillset-card__body {
             display: flex;
             flex-direction: column;
             gap: 12px;
+        }
+
+        .hero-skillset-card__remove {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid #c7c5bf;
+            background: #ffffff;
+            color: #6b6b67;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .hero-skillset-card__remove:hover {
+            background: #f3f2ee;
+            color: #3d3b34;
+        }
+
+        .hero-skillset-card__remove:focus-visible {
+            outline: 2px solid #2383e2;
+            outline-offset: 2px;
         }
 
         .hero-skillset-card__name {
@@ -822,11 +851,20 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            max-width: calc(100% - 40px);
+            padding-right: 40px;
         }
 
         .hero-skillset-card__name.ProseMirror {
             min-height: auto;
             padding: 0;
+            padding-right: 40px;
+        }
+
+        .hero-skillset-card__name.is-empty::before {
+            content: '構成名を入力';
+            color: #b0aea8;
+            font-weight: 500;
         }
 
         .hero-skillset-slot {
@@ -5680,7 +5718,4 @@
     </script>
 </body>
 </html>
-
-
-
 
