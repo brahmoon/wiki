@@ -2376,7 +2376,7 @@
 
                 const author = document.createElement('div');
                 author.className = 'version-author';
-                const updater = version.rowData?.[4] || '';
+                const updater = version.updatedBy || version.rowData?.[8] || '';
                 author.textContent = updater ? `保存者: ${updater}` : '保存者情報なし';
 
                 meta.appendChild(label);
