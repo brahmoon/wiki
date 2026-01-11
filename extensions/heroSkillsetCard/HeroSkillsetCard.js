@@ -611,6 +611,7 @@ class HeroSkillsetCardNodeView {
     if (this.nameField.textContent !== nameText) {
       this.nameField.textContent = nameText;
     }
+    this.nameField.classList.toggle('is-empty', !nameText);
 
     Array.from(this.body.children).forEach(child => {
       if (child !== this.nameField && child !== this.grid) {

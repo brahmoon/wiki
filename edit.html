@@ -851,11 +851,20 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            max-width: calc(100% - 40px);
+            padding-right: 40px;
         }
 
         .hero-skillset-card__name.ProseMirror {
             min-height: auto;
             padding: 0;
+            padding-right: 40px;
+        }
+
+        .hero-skillset-card__name.is-empty::before {
+            content: '構成名を入力';
+            color: #b0aea8;
+            font-weight: 500;
         }
 
         .hero-skillset-slot {
@@ -5709,6 +5718,4 @@
     </script>
 </body>
 </html>
-
-
 
