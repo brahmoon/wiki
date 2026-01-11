@@ -1617,10 +1617,10 @@
     <div class="app-container" id="appContainer">
         <aside class="sidebar" id="pageSidebar">
             <div class="sidebar-header">
-                <div class="sidebar-title">ページ一覧</div>
+                <div class="sidebar-title">カテゴリ一覧</div>
             </div>
             <div class="sidebar-actions">
-                <button id="create-root-page" class="btn">新規ページ</button>
+                <button id="create-root-page" class="btn">新規カテゴリ</button>
                 <button id="reload-pages" class="btn">再読み込み</button>
             </div>
             <div id="page-tree" class="page-tree"></div>
@@ -1641,7 +1641,7 @@
             <div class="page-header">
                 <div class="page-header-top">
                     <div class="page-header-left">
-                        <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="ページ一覧" aria-expanded="false" aria-controls="pageSidebar">
+                        <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="カテゴリ一覧" aria-expanded="false" aria-controls="pageSidebar">
                             <span></span>
                             <span></span>
                             <span></span>
@@ -1651,7 +1651,7 @@
                     <div class="page-header-row">
                         <div class="page-meta">
                             <button id="page-meta-toggle" class="page-meta-toggle" type="button" aria-expanded="false">
-                                <span class="sr-only">Page IDとページタイトルを開閉</span>
+                                <span class="sr-only">Page IDとカテゴリタイトルを開閉</span>
                                 <span class="page-meta-toggle-icon" aria-hidden="true"></span>
                             </button>
                         <div id="page-meta-fields" class="page-meta-fields" hidden>
@@ -1660,8 +1660,8 @@
                                 <input id="page-name" class="text-input" placeholder="sample-page" />
                             </div>
                             <div class="input-group" style="flex:1; min-width: 260px;">
-                                <label class="input-label" for="page-title">ページタイトル（表示）</label>
-                                <input id="page-title" class="text-input" placeholder="ページタイトル" />
+                                <label class="input-label" for="page-title">カテゴリタイトル（表示）</label>
+                                <input id="page-title" class="text-input" placeholder="カテゴリタイトル" />
                             </div>
                         </div>
                     </div>
@@ -4711,7 +4711,7 @@
             if (!state.pageTree.length) {
                 const empty = document.createElement('div');
                 empty.className = 'empty-state';
-                empty.textContent = 'ページがありません。「新規ページ」を押して作成してください。';
+                empty.textContent = 'カテゴリがありません。「新規カテゴリ」を押して作成してください。';
                 elements.pageTree.appendChild(empty);
                 return;
             }
@@ -4833,7 +4833,7 @@
                 return;
             }
             if (state.isNewPage && state.currentPageId === pageId) {
-                alert('新規ページは保存後に移動してください。');
+                alert('新規カテゴリは保存後に移動してください。');
                 return;
             }
             if (state.isDirty && state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
@@ -4886,7 +4886,7 @@
                 return;
             }
             if (state.isNewPage && state.currentPageId === pageId) {
-                alert('新規ページは保存後に移動してください。');
+                alert('新規カテゴリは保存後に移動してください。');
                 return;
             }
             if (state.isDirty && state.currentPageId && isDescendantId(state.currentPageId, pageId)) {
@@ -4963,7 +4963,7 @@
         }
 
         async function loadPages(selectId, options = {}) {
-            if (!ensureEditorAccess('ページ一覧を読み込む')) {
+            if (!ensureEditorAccess('カテゴリ一覧を読み込む')) {
                 return;
             }
             const {
@@ -4971,13 +4971,13 @@
                 updateHistory: shouldUpdateHistory = true
             } = options;
             try {
-                setStatus('ページ一覧を読み込み中...');
-                beginLoading('ページ一覧を読み込み中...');
+                setStatus('カテゴリ一覧を読み込み中...');
+                beginLoading('カテゴリ一覧を読み込み中...');
                 const pages = selectLatestPages(await dataService.getPages());
                 setPageLinkPages(pages);
                 buildPageTree(pages);
                 renderTree();
-                setStatus('ページ一覧を更新しました', 'success');
+                setStatus('カテゴリ一覧を更新しました', 'success');
                 if (selectId) {
                     await navigateToPage(selectId, {
                         prefetchedPage,
@@ -4989,8 +4989,8 @@
                     renderTree();
                 }
             } catch (error) {
-                console.error('ページ一覧の読み込みに失敗しました', error);
-                setStatus('ページ一覧の読み込みに失敗しました: ' + error.message, 'error');
+                console.error('カテゴリ一覧の読み込みに失敗しました', error);
+                setStatus('カテゴリ一覧の読み込みに失敗しました: ' + error.message, 'error');
             } finally {
                 endLoading();
             }
@@ -5083,7 +5083,7 @@
                 return;
             }
             if (!titleInput) {
-                alert('ページタイトルを入力してください。');
+                alert('カテゴリタイトルを入力してください。');
                 elements.pageTitle.focus();
                 return;
             }
@@ -5104,6 +5104,7 @@
 
             const updatedBy = getEditorPlayerId();
 
+            const pageType = state.isNewPage ? 'category' : (state.pageMeta.pageType || '');
             const payload = {
                 id,
                 title: titleInput,
@@ -5111,7 +5112,7 @@
                 description: state.pageMeta.description || '',
                 tags: state.pageMeta.tags || '',
                 isPinned: state.pageMeta.isPinned || '',
-                pageType: state.pageMeta.pageType || '',
+                pageType,
                 updatedBy
             };
 
@@ -5158,7 +5159,7 @@
         }
 
         function createNewPage(parentId = null) {
-            if (!ensureEditorAccess('新規ページを作成する')) {
+            if (!ensureEditorAccess('新規カテゴリを作成する')) {
                 return;
             }
             if (state.isNewPage && state.currentPageId) {
@@ -5180,7 +5181,7 @@
                 description: '',
                 tags: '',
                 isPinned: '',
-                pageType: ''
+                pageType: 'category'
             };
 
             elements.pageName.disabled = false;
@@ -5197,7 +5198,7 @@
 
             const node = {
                 id: tempId,
-                title: '新規ページ',
+                title: '新規カテゴリ',
                 updatedAt: '',
                 parentId: parentId || null,
                 slug: '',
@@ -5206,7 +5207,7 @@
             insertNode(node);
             updateBreadcrumb(tempId);
             setUpdatedAt('');
-            setStatus('新しいページを作成しました。保存して反映してください。');
+            setStatus('新しいカテゴリを作成しました。保存して反映してください。');
             renderTree();
 
             requestAnimationFrame(() => elements.pageName.focus());
