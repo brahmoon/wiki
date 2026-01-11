@@ -2216,6 +2216,12 @@
                 originalUpdatedAt: '',
                 originalDirty: false,
                 previewingLabel: ''
+            },
+            pageMeta: {
+                description: '',
+                tags: '',
+                isPinned: '',
+                pageType: ''
             }
         };
 
@@ -5010,6 +5016,12 @@
                 state.currentParentId = getParentId(page.id);
                 state.isNewPage = false;
                 state.isDirty = false;
+                state.pageMeta = {
+                    description: page.description || '',
+                    tags: page.tags || '',
+                    isPinned: page.isPinned || '',
+                    pageType: page.pageType || ''
+                };
                 if (state.pageMap.has(page.id)) {
                     const node = state.pageMap.get(page.id);
                     node.title = page.title || '無題';
@@ -5095,6 +5107,10 @@
                 id,
                 title: titleInput,
                 content: normalizedContent,
+                description: state.pageMeta.description || '',
+                tags: state.pageMeta.tags || '',
+                isPinned: state.pageMeta.isPinned || '',
+                pageType: state.pageMeta.pageType || '',
                 updatedBy
             };
 
@@ -5159,6 +5175,12 @@
             state.currentPageId = tempId;
             state.isNewPage = true;
             state.isDirty = true;
+            state.pageMeta = {
+                description: '',
+                tags: '',
+                isPinned: '',
+                pageType: ''
+            };
 
             elements.pageName.disabled = false;
             elements.pageName.value = '';
@@ -5718,4 +5740,3 @@
     </script>
 </body>
 </html>
-

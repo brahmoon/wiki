@@ -14,6 +14,31 @@ const CONFIG = {
   MAX_DATE_SHEETS: 30,
 };
 
+const WIKI_COLUMNS = {
+  ID: 1,
+  TITLE: 2,
+  DESCRIPTION: 3,
+  CONTENT: 4,
+  TAGS: 5,
+  IS_PINNED: 6,
+  PAGE_TYPE: 7,
+  UPDATED_AT: 8,
+  UPDATED_BY: 9,
+  ORDER: 10,
+  HEADERS: [
+    'ID',
+    'Title',
+    'Description',
+    'Content',
+    'Tags',
+    'IsPinned',
+    'PageType',
+    'UpdatedAt',
+    'UpdatedBy',
+    'Order',
+  ],
+};
+
 const ACCOUNT_CONFIG = {
   SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
   SHEET_NAME: 'Accounts',
@@ -121,7 +146,11 @@ function routeAction(data) {
       return executeWithEditorAuthority(data.playerId, () => savePage({
         id: data.id,
         title: data.title,
+        description: data.description,
         content: data.content,
+        tags: data.tags,
+        isPinned: data.isPinned,
+        pageType: data.pageType,
         updatedBy: data.updatedBy,
         order: data.order,
       }));
@@ -272,17 +301,36 @@ function parseOrderValue(value) {
 }
 
 function ensureSheetStructure(sheet) {
-  const headers = ['ID', 'Title', 'Content', 'UpdatedAt', 'UpdatedBy', 'Order'];
-  const current = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-  let needsUpdate = false;
-  for (let i = 0; i < headers.length; i++) {
-    if (current[i] !== headers[i]) {
-      needsUpdate = true;
-      break;
-    }
-  }
-  if (needsUpdate) {
+  const headers = WIKI_COLUMNS.HEADERS;
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const lastColumn = Math.max(sheet.getLastColumn(), headers.length);
+  const currentHeader = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+  const headerMatches = headers.every((header, index) => currentHeader[index] === header);
+
+  if (!headerMatches || lastColumn !== headers.length) {
+    const headerIndexMap = new Map();
+    currentHeader.forEach((value, index) => {
+      const key = (value || '').toString().trim();
+      if (key && !headerIndexMap.has(key)) {
+        headerIndexMap.set(key, index);
+      }
+    });
+
+    const dataRows = lastRow > 1
+      ? sheet.getRange(2, 1, lastRow - 1, lastColumn).getValues()
+      : [];
+    const normalizedRows = dataRows.map(row => headers.map(header => {
+      const sourceIndex = headerIndexMap.get(header);
+      return sourceIndex !== undefined ? row[sourceIndex] : '';
+    }));
+
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    if (normalizedRows.length) {
+      sheet.getRange(2, 1, normalizedRows.length, headers.length).setValues(normalizedRows);
+    }
+    if (lastColumn > headers.length) {
+      sheet.getRange(1, headers.length + 1, lastRow, lastColumn - headers.length).clearContent();
+    }
   }
   if (sheet.getFrozenRows() < 1) {
     sheet.setFrozenRows(1);
@@ -415,17 +463,17 @@ function getPages() {
       return { success: true, pages: [] };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), WIKI_COLUMNS.HEADERS.length);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const latestById = new Map();
     data.forEach(row => {
-      const id = row[0];
+      const id = row[WIKI_COLUMNS.ID - 1];
       if (!id) {
         return;
       }
       const idString = id.toString();
       const current = latestById.get(idString);
-      const updatedAt = row[3] || '';
+      const updatedAt = row[WIKI_COLUMNS.UPDATED_AT - 1] || '';
       if (!current || updatedAt > current.updatedAt) {
         latestById.set(idString, {
           row,
@@ -435,11 +483,16 @@ function getPages() {
     });
 
     const pages = Array.from(latestById.values()).map(({ row }) => ({
-      id: row[0],
-      title: row[1] || '無題',
-      updatedAt: row[3] || '',
-      updatedBy: row[4] || '',
-      order: parseOrderValue(row[5])
+      id: row[WIKI_COLUMNS.ID - 1],
+      title: row[WIKI_COLUMNS.TITLE - 1] || '無題',
+      description: row[WIKI_COLUMNS.DESCRIPTION - 1] || '',
+      content: row[WIKI_COLUMNS.CONTENT - 1] || '',
+      tags: row[WIKI_COLUMNS.TAGS - 1] || '',
+      isPinned: row[WIKI_COLUMNS.IS_PINNED - 1] || '',
+      pageType: row[WIKI_COLUMNS.PAGE_TYPE - 1] || '',
+      updatedAt: row[WIKI_COLUMNS.UPDATED_AT - 1] || '',
+      updatedBy: row[WIKI_COLUMNS.UPDATED_BY - 1] || '',
+      order: parseOrderValue(row[WIKI_COLUMNS.ORDER - 1])
     }));
 
     return { success: true, pages };
@@ -460,30 +513,34 @@ function getPage(id) {
       return { success: false, message: 'No pages found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), WIKI_COLUMNS.HEADERS.length);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
-    const matches = data.filter(r => r[0] && r[0].toString() === id.toString());
+    const matches = data.filter(r => r[WIKI_COLUMNS.ID - 1] && r[WIKI_COLUMNS.ID - 1].toString() === id.toString());
     if (!matches.length) {
       return { success: false, message: 'Page not found' };
     }
 
     const row = matches.reduce((latest, current) => {
-      const currentUpdated = current[3] || '';
+      const currentUpdated = current[WIKI_COLUMNS.UPDATED_AT - 1] || '';
       if (!latest) {
         return current;
       }
-      return currentUpdated > (latest[3] || '') ? current : latest;
+      return currentUpdated > (latest[WIKI_COLUMNS.UPDATED_AT - 1] || '') ? current : latest;
     }, null);
 
     return {
       success: true,
       page: {
-        id: row[0],
-        title: row[1] || '無題',
-        content: row[2] || '',
-        updatedAt: row[3] || '',
-        updatedBy: row[4] || '',
-        order: parseOrderValue(row[5])
+        id: row[WIKI_COLUMNS.ID - 1],
+        title: row[WIKI_COLUMNS.TITLE - 1] || '無題',
+        description: row[WIKI_COLUMNS.DESCRIPTION - 1] || '',
+        content: row[WIKI_COLUMNS.CONTENT - 1] || '',
+        tags: row[WIKI_COLUMNS.TAGS - 1] || '',
+        isPinned: row[WIKI_COLUMNS.IS_PINNED - 1] || '',
+        pageType: row[WIKI_COLUMNS.PAGE_TYPE - 1] || '',
+        updatedAt: row[WIKI_COLUMNS.UPDATED_AT - 1] || '',
+        updatedBy: row[WIKI_COLUMNS.UPDATED_BY - 1] || '',
+        order: parseOrderValue(row[WIKI_COLUMNS.ORDER - 1])
       }
     };
   } catch (error) {
@@ -502,16 +559,25 @@ function savePage(page) {
     const lastRow = sheet.getLastRow();
     const updatedAt = new Date().toISOString();
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), WIKI_COLUMNS.HEADERS.length);
     const data = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, width).getValues() : [];
 
     let lastMatchedRow = -1;
     let existingOrder = null;
+    let existingMeta = null;
     data.forEach((row, index) => {
-      if (row[0] && row[0].toString() === page.id.toString()) {
+      if (row[WIKI_COLUMNS.ID - 1] && row[WIKI_COLUMNS.ID - 1].toString() === page.id.toString()) {
         lastMatchedRow = index + 2;
         if (existingOrder === null) {
-          existingOrder = parseOrderValue(row[5]);
+          existingOrder = parseOrderValue(row[WIKI_COLUMNS.ORDER - 1]);
+        }
+        if (!existingMeta) {
+          existingMeta = {
+            description: row[WIKI_COLUMNS.DESCRIPTION - 1],
+            tags: row[WIKI_COLUMNS.TAGS - 1],
+            isPinned: row[WIKI_COLUMNS.IS_PINNED - 1],
+            pageType: row[WIKI_COLUMNS.PAGE_TYPE - 1],
+          };
         }
       }
     });
@@ -525,13 +591,13 @@ function savePage(page) {
       const parentId = getParentIdFromPageId(page.id);
       let maxOrder = 0;
       data.forEach(row => {
-        const rowId = row[0];
+        const rowId = row[WIKI_COLUMNS.ID - 1];
         if (!rowId) {
           return;
         }
         const rowParent = getParentIdFromPageId(rowId.toString());
         if (rowParent === parentId) {
-          const parsed = parseOrderValue(row[5]);
+          const parsed = parseOrderValue(row[WIKI_COLUMNS.ORDER - 1]);
           if (parsed !== null && parsed > maxOrder) {
             maxOrder = parsed;
           }
@@ -546,10 +612,27 @@ function savePage(page) {
 
     orderValue = Math.max(1, Math.round(orderValue));
 
+    const description = Object.prototype.hasOwnProperty.call(page, 'description')
+      ? page.description
+      : (existingMeta ? existingMeta.description : '');
+    const tags = Object.prototype.hasOwnProperty.call(page, 'tags')
+      ? page.tags
+      : (existingMeta ? existingMeta.tags : '');
+    const isPinned = Object.prototype.hasOwnProperty.call(page, 'isPinned')
+      ? page.isPinned
+      : (existingMeta ? existingMeta.isPinned : '');
+    const pageType = Object.prototype.hasOwnProperty.call(page, 'pageType')
+      ? page.pageType
+      : (existingMeta ? existingMeta.pageType : '');
+
     const rowData = [
       page.id,
       page.title || '無題',
+      description || '',
       page.content || '',
+      tags || '',
+      isPinned || '',
+      pageType || '',
       updatedAt,
       page.updatedBy || '',
       orderValue
@@ -557,7 +640,7 @@ function savePage(page) {
 
     if (lastMatchedRow > 0) {
       sheet.insertRows(lastMatchedRow + 1, 1);
-      sheet.getRange(lastMatchedRow + 1, 1, 1, 6).setValues([rowData]);
+      sheet.getRange(lastMatchedRow + 1, 1, 1, WIKI_COLUMNS.HEADERS.length).setValues([rowData]);
     } else {
       sheet.appendRow(rowData);
     }
@@ -582,24 +665,24 @@ function getPageHistory(id) {
       return { success: true, versions: [] };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), WIKI_COLUMNS.HEADERS.length);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
-    const matches = data.filter(row => row[0] && row[0].toString() === id.toString());
+    const matches = data.filter(row => row[WIKI_COLUMNS.ID - 1] && row[WIKI_COLUMNS.ID - 1].toString() === id.toString());
 
     if (!matches.length) {
       return { success: true, versions: [] };
     }
 
     matches.sort((a, b) => {
-      const aDate = a[3] || '';
-      const bDate = b[3] || '';
+      const aDate = a[WIKI_COLUMNS.UPDATED_AT - 1] || '';
+      const bDate = b[WIKI_COLUMNS.UPDATED_AT - 1] || '';
       return bDate > aDate ? 1 : bDate < aDate ? -1 : 0;
     });
 
     const versions = matches.map((row, index) => ({
       versionIndex: index + 1,
-      updatedAt: row[3] || '',
-      htmlContent: row[2] || '',
+      updatedAt: row[WIKI_COLUMNS.UPDATED_AT - 1] || '',
+      htmlContent: row[WIKI_COLUMNS.CONTENT - 1] || '',
       rowData: row.slice(0, width),
     }));
 
@@ -629,13 +712,13 @@ function renamePageTree(params) {
       return { success: false, message: 'Page not found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), WIKI_COLUMNS.HEADERS.length);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
     const updates = [];
     const prefix = originalId + '/';
 
     data.forEach((row, index) => {
-      const id = row[0];
+      const id = row[WIKI_COLUMNS.ID - 1];
       if (!id) {
         return;
       }
@@ -654,7 +737,7 @@ function renamePageTree(params) {
     const updatedRows = new Set(updates.map(item => item.rowIndex));
     const existingIds = new Set();
     data.forEach((row, index) => {
-      const id = row[0];
+      const id = row[WIKI_COLUMNS.ID - 1];
       if (!id) {
         return;
       }
@@ -707,15 +790,15 @@ function reorderPages(params) {
       return { success: false, message: 'No pages found' };
     }
 
-    const width = Math.max(sheet.getLastColumn(), 6);
+    const width = Math.max(sheet.getLastColumn(), WIKI_COLUMNS.HEADERS.length);
     const data = sheet.getRange(2, 1, lastRow - 1, width).getValues();
 
     const entries = data.map((row, index) => {
-      const id = row[0] ? row[0].toString() : '';
+      const id = row[WIKI_COLUMNS.ID - 1] ? row[WIKI_COLUMNS.ID - 1].toString() : '';
       return {
         id,
         parent: getParentIdFromPageId(id),
-        order: parseOrderValue(row[5]),
+        order: parseOrderValue(row[WIKI_COLUMNS.ORDER - 1]),
         index,
       };
     });
@@ -790,7 +873,7 @@ function reorderPages(params) {
     }
 
     updates.forEach(update => {
-      sheet.getRange(update.rowIndex, 6).setValue(update.order);
+      sheet.getRange(update.rowIndex, WIKI_COLUMNS.ORDER).setValue(update.order);
     });
 
     return { success: true, message: 'Order updated' };
@@ -798,4 +881,3 @@ function reorderPages(params) {
     return { success: false, message: 'Failed to reorder pages: ' + error };
   }
 }
-
