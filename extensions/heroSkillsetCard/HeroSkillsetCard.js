@@ -322,6 +322,13 @@ class HeroSkillsetCardNodeView {
     this.dom.setAttribute('data-config', this.serializedConfig);
     this.dom.contentEditable = 'false';
 
+    this.removeButton = document.createElement('button');
+    this.removeButton.type = 'button';
+    this.removeButton.className = 'hero-skillset-card__remove';
+    this.removeButton.setAttribute('aria-label', 'カードを削除');
+    this.removeButton.setAttribute('title', 'カードを削除');
+    this.removeButton.textContent = '✕';
+
     this.body = document.createElement('div');
     this.body.className = 'hero-skillset-card__body hero-skillset-slot';
     this.nameField = document.createElement('div');
@@ -334,14 +341,17 @@ class HeroSkillsetCardNodeView {
     this.handleNameInput = this.handleNameInput.bind(this);
     this.handleNameKeyDown = this.handleNameKeyDown.bind(this);
     this.handleNamePaste = this.handleNamePaste.bind(this);
+    this.handleRemoveClick = this.handleRemoveClick.bind(this);
 
     this.nameField.addEventListener('input', this.handleNameInput);
     this.nameField.addEventListener('keydown', this.handleNameKeyDown);
     this.nameField.addEventListener('paste', this.handleNamePaste);
+    this.removeButton.addEventListener('click', this.handleRemoveClick);
 
     this.grid = document.createElement('div');
     this.grid.className = 'hero-skillset-card__grid';
 
+    this.dom.appendChild(this.removeButton);
     this.dom.appendChild(this.body);
 
     this.handleClick = this.handleClick.bind(this);
@@ -354,6 +364,10 @@ class HeroSkillsetCardNodeView {
   stopEvent(event) {
     // スロットをタップしたときは IME を開かせない
     if (event.target.closest('[data-hero-slot], [data-skill-slot]')) {
+      event.preventDefault();
+      return true;
+    }
+    if (event.target.closest('.hero-skillset-card__remove')) {
       event.preventDefault();
       return true;
     }
@@ -405,6 +419,18 @@ class HeroSkillsetCardNodeView {
     const text = event.clipboardData.getData('text/plain');
     const sanitized = this.sanitizeNameText(text);
     document.execCommand('insertText', false, sanitized);
+  }
+
+  handleRemoveClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const pos = typeof this.getPos === 'function' ? this.getPos() : null;
+    if (typeof pos !== 'number') return;
+    this.editor
+      .chain()
+      .focus()
+      .deleteRange({ from: pos, to: pos + this.node.nodeSize })
+      .run();
   }
   
   async loadData() {
@@ -713,6 +739,7 @@ class HeroSkillsetCardNodeView {
     this.nameField.removeEventListener('input', this.handleNameInput);
     this.nameField.removeEventListener('keydown', this.handleNameKeyDown);
     this.nameField.removeEventListener('paste', this.handleNamePaste);
+    this.removeButton.removeEventListener('click', this.handleRemoveClick);
   }
 }
 
