@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wikiページ表示</title>
+  <link rel="stylesheet" href="./styles/editor.css">
+  <script src="./scripts/appsScriptEndpoints.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: light;
+      --bg: #f3f5fb;
+      --bg-soft: #edf1f9;
+      --panel: #ffffff;
+      --panel-strong: #f8fafc;
+      --border: #e2e8f0;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-strong: #1d4ed8;
+      --accent: #7c3aed;
+      --shadow-sm: 0 6px 16px rgba(15, 23, 42, 0.08);
+      --shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.12);
+      --radius-md: 12px;
+      --radius-lg: 18px;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: radial-gradient(circle at top, #fefefe 0%, var(--bg) 55%, #eef2ff 100%);
+      color: var(--text);
+    }
+
+    .view-app {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+      width: 100vw;
+      background: inherit;
+      transition: grid-template-columns 0.3s ease;
+    }
+
+    .view-app.sidebar-closed {
+      grid-template-columns: 0 1fr;
+    }
+
+    .view-app.sidebar-closed .sidebar {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .sidebar {
+      background: rgba(255, 255, 255, 0.92);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      transition: opacity 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      max-height: 100vh;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
+
+    .sidebar-header {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px 24px 20px;
+      border-top: 1px solid var(--border);
+      background: rgba(248, 250, 252, 0.92);
+    }
+
+    .login-status {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .login-status-text {
+      line-height: 1.4;
+    }
+
+    .login-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .login-actions .btn {
+      flex: 1;
+    }
+
+    .settings-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      backdrop-filter: blur(4px);
+    }
+
+    .settings-overlay.visible {
+      display: flex;
+    }
+
+    .settings-dialog {
+      width: min(420px, 90vw);
+      background: var(--panel);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .settings-dialog h2 {
+      margin: 0;
+      font-size: 20px;
+      color: var(--text);
+    }
+
+    .settings-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .settings-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .settings-field label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .settings-field input,
+    .settings-field select {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      background: #fff;
+    }
+
+    .settings-message {
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 18px;
+    }
+
+    .settings-message.error {
+      color: #c0352b;
+    }
+
+    .settings-message.success {
+      color: #0f7b6c;
+    }
+
+    .settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .sidebar-list,
+    .sidebar-sublist {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 0 24px;
+      min-height: 0;
+    }
+
+    .sidebar-item {
+      padding: 0;
+      margin: 2px 0;
+    }
+
+    .sidebar-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      font-size: 14px;
+      padding: 6px 12px;
+      padding-left: calc(12px + var(--sidebar-indent-level, 0) * 16px);
+      border-radius: 6px;
+      transition: background 0.1s ease;
+      margin: 0 12px;
+    }
+
+    .sidebar-link:hover {
+      background: rgba(37, 99, 235, 0.08);
+    }
+
+    .sidebar-item.active > .sidebar-link {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: #fff;
+    }
+
+    .sidebar-item.active-ancestor > .sidebar-link {
+      background: rgba(37, 99, 235, 0.08);
+      font-weight: 600;
+    }
+
+    .sidebar-sublist {
+      margin-top: 4px;
+    }
+
+    .view-main {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .view-container {
+      flex: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+      width: 100%;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sidebar-toggle {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      transition: background 0.2s, border 0.2s, box-shadow 0.2s, transform 0.2s;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    }
+
+    .sidebar-toggle:hover {
+      background: #f8fafc;
+      border-color: #cbd5f5;
+      transform: translateY(-1px);
+    }
+
+    .sidebar-toggle span {
+      width: 18px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 99px;
+    }
+
+    .breadcrumb {
+      font-size: 14px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+
+    .edit-button {
+      padding: 9px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s, border 0.2s, box-shadow 0.2s, transform 0.2s;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    }
+
+    .edit-button:hover {
+      background: #f8fafc;
+      border-color: #cbd5f5;
+      transform: translateY(-1px);
+    }
+
+    .edit-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 14px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    }
+
+    .btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5f5;
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--primary-strong), var(--accent));
+    }
+
+    .btn[hidden] {
+      display: none !important;
+    }
+
+    .breadcrumb a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+
+    .page-card {
+      background: var(--panel);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      padding: 40px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    .page-title {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 16px;
+      line-height: 1.3;
+    }
+
+    .page-updated {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .page-content {
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .page-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+    }
+
+    .status-message {
+      margin-top: 24px;
+      padding: 16px 20px;
+      border-radius: 8px;
+      background: #fff8e6;
+      border: 1px solid #f3d29b;
+      color: #9b6b2f;
+      font-size: 14px;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .status-message.error {
+      background: #ffecec;
+      border-color: #f2a7a7;
+      color: #b14242;
+    }
+
+    .page-link-card {
+      display: block;
+      text-decoration: none;
+      border: 1px solid #e2e1de;
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #fdfdfc;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease;
+      color: inherit;
+      margin: 16px 0;
+    }
+
+    .page-link-card:hover {
+      border-color: #c7d2fe;
+    }
+
+    .page-link-card__title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .page-link-card__meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .hero-skillset-card {
+      margin: 10px 0;
+      font-size: 12px;
+      color: #3f3f46;
+    }
+
+    .hero-skillset-card__body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hero-skillset-card__name {
+      font-weight: bold;
+      font-size: 1.2em;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hero-skillset-slot {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #f8fafc;
+      padding: 12px;
+    }
+
+    .hero-skillset-card__grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .hero-skillset-card__row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-skillset-card__row-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .hero-skillset-card__skills {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(56px, 1fr));
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .hero-skillset-cell {
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      padding: 4px 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 56px;
+      font-family: inherit;
+      text-align: left;
+      color: #3f3d37;
+    }
+
+    .hero-skillset-cell:is(button) {
+      cursor: pointer;
+    }
+
+    .hero-skillset-cell--hero {
+      flex: 0 0 auto;
+      min-width: 160px;
+      max-width: 220px;
+      justify-content: flex-start;
+    }
+
+    .hero-skillset-cell--skill {
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .hero-skillset-card--view .hero-skillset-cell--skill.hero-skillset-cell--fixed {
+      background: #f7f6f2;
+    }
+
+    .hero-skillset-cell__figure {
+      width: 46px;
+      height: 46px;
+      border-radius: 10px;
+      background: #f2f1ed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .hero-skillset-card--view .hero-skillset-cell__figure {
+      background: #f1f0ec;
+    }
+
+    .hero-skillset-card__skills .hero-skillset-cell__figure {
+      margin: 0 auto;
+    }
+
+    .hero-skillset-cell__figure img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hero-skillset-cell__placeholder {
+      font-size: 18px;
+      color: #b0aea8;
+    }
+
+    .hero-skillset-cell__label {
+      font-size: 12px;
+      line-height: 1.3;
+      font-weight: 600;
+      color: inherit;
+      display: inline-block;
+    }
+
+    .hero-skillset-cell--skill .hero-skillset-cell__label {
+      width: 100%;
+      font-size: 11px;
+    }
+
+    .hero-skillset-cell.is-empty .hero-skillset-cell__label {
+      color: #9a9892;
+      font-weight: 500;
+    }
+
+    .hero-skillset-card--view [data-info-type] {
+      cursor: pointer;
+    }
+
+    .hero-skillset-info-popup {
+      position: absolute;
+      min-width: 240px;
+      max-width: 280px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+      padding: 16px;
+      z-index: 100;
+      display: none;
+    }
+
+    .hero-skillset-info-popup.is-visible {
+      display: block;
+    }
+
+    .hero-skillset-info-popup__close {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      border: none;
+      background: transparent;
+      font-size: 16px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .hero-skillset-info-popup__title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 24px 6px 0;
+    }
+
+    .hero-skillset-info-popup__title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .hero-skillset-info-popup__body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-skillset-info-popup__description {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .hero-skillset-info-popup__badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #edece7;
+      color: #56534d;
+    }
+
+    .hero-skillset-info-popup__badge--troop {
+      background: #e4f2ff;
+      color: #1465a3;
+    }
+
+    .hero-skillset-info-popup__badge--type {
+      background: #f0ebff;
+      color: #5a36a3;
+    }
+
+    .hero-skillset-info-popup__lines {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .hero-skillset-info-popup__line {
+      font-size: 13px;
+      color: #474540;
+    }
+
+    .hero-skillset-info-popup__line-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .hero-skillset-info-popup__line-title {
+      font-size: 13px;
+    }
+
+    .hero-skillset-info-popup__line-description {
+      margin-top: 2px;
+      line-height: 1.5;
+      color: #5a5752;
+    }
+
+    .hero-skillset-info-popup__link {
+      display: inline-flex;
+      margin-top: 10px;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #2383e2;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    
+    @media (max-width: 600px) {
+      .view-container {
+        max-width: 100%;
+        width: 100%;
+        padding: 20px 12px;
+        overflow-x: hidden;
+      }
+
+      .page-card {
+        padding: 24px 16px;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .hero-skillset-card__body {
+        gap: 10px;
+      }
+
+      .hero-skillset-card__name {
+        font-size: 1.05em;
+      }
+
+      .hero-skillset-card__grid {
+        gap: 10px;
+      }
+
+      .hero-skillset-card__row {
+        gap: 6px;
+      }
+
+      .hero-skillset-card__row-content {
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .hero-skillset-card__skills {
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: repeat(5, minmax(34px, 1fr));
+        gap: 4px;
+      }
+
+      .hero-skillset-cell {
+        padding: 2px;
+        min-height: 44px;
+        gap: 4px;
+      }
+
+      .hero-skillset-cell--hero {
+        width: auto;
+        min-width: 0;
+        flex: 0 0 auto;
+      }
+
+      .hero-skillset-card__skills .hero-skillset-cell__figure {
+        width: 34px;
+        height: 34px;
+      }
+
+      .hero-skillset-cell__figure {
+        width: 40px;
+        height: 40px;
+      }
+
+      .hero-skillset-cell__label {
+        display: none;
+      }
+    }
+
+    .loading-spinner {
+      margin: 120px auto;
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.3);
+      z-index: 80;
+    }
+
+    @media (max-width: 960px) {
+      .view-app {
+        display: block;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100dvh;
+        max-height: 100dvh;
+        width: 260px;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 90;
+      }
+
+      .view-app.sidebar-open .sidebar {
+        transform: translateX(0);
+      }
+
+      .view-app.sidebar-closed .sidebar {
+        transform: translateX(-100%);
+      }
+
+      .view-app.sidebar-closed {
+        grid-template-columns: 0 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="view-app" id="viewApp">
+    <aside class="sidebar" id="pageSidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">カテゴリ一覧</div>
+      </div>
+      <ul class="sidebar-list" id="sidebarPageList"></ul>
+      <div class="sidebar-footer">
+        <div class="login-status" role="status" aria-live="polite">
+          <div id="sidebarLoginStatusText" class="login-status-text">未ログイン</div>
+          <div class="login-actions">
+            <button id="sidebarLoginButton" class="btn btn-primary" type="button">ログイン</button>
+            <button id="sidebarLogoutButton" class="btn" type="button" hidden>ログアウト</button>
+            <button id="sidebarSettingsButton" class="btn btn-secondary" type="button" hidden>設定</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="view-main">
+      <div class="view-container">
+        <div class="view-header">
+          <div class="header-left">
+            <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="カテゴリ一覧" aria-expanded="false">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <nav class="breadcrumb" id="breadcrumb"></nav>
+          </div>
+          <button id="editPageButton" class="edit-button" type="button" disabled>編集</button>
+        </div>
+        <div id="loader" class="loading-spinner"></div>
+        <section class="page-card hidden" id="pageCard">
+          <h1 class="page-title" id="pageTitle"></h1>
+          <div class="page-updated" id="pageUpdated"></div>
+          <article class="page-content ProseMirror" id="pageContent"></article>
+          <div class="status-message hidden" id="statusMessage"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
+  <div id="user-settings-overlay" class="settings-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="settings-dialog" role="document">
+      <h2>ユーザー設定</h2>
+      <form id="user-settings-form" class="settings-form">
+        <div class="settings-field">
+          <label for="settings-username">ユーザーネーム</label>
+          <input id="settings-username" name="username" type="text" autocomplete="name" required />
+        </div>
+        <div class="settings-field">
+          <label for="settings-kingdom">所属王国</label>
+          <input id="settings-kingdom" name="kingdom" type="number" inputmode="numeric" pattern="\\d*" min="0" step="1" placeholder="0" />
+        </div>
+        <div class="settings-field">
+          <label for="settings-language">言語</label>
+          <select id="settings-language" name="language">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div id="user-settings-message" class="settings-message" aria-live="polite"></div>
+        <div class="settings-actions">
+          <button id="user-settings-cancel" class="btn" type="button">キャンセル</button>
+          <button id="user-settings-submit" class="btn btn-primary" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import {
+      loadHeroSkillsetData,
+      normalizeHeroSkillsetConfig,
+      encodeHeroSkillsetConfig,
+      getHeroTalents,
+      ROW_KEYS as HERO_SKILLSET_ROWS,
+      USER_SKILL_KEYS as HERO_SKILLSET_USER_SLOTS
+    } from './scripts/heroSkillsetService.js';
+    const DEFAULT_TIMEOUT = 25000;
+    const LOGIN_STORAGE_KEY = 'wikiLoginState';
+    const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
+    const VIEWER_AUTHORITY_VALUE = 1;
+    const BLOCKED_AUTHORITY_VALUE = -1;
+
+    const APPS_SCRIPT_ENDPOINT_WIKI = window.APPS_SCRIPT_ENDPOINT_WIKI;
+    const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
+
+    const heroSkillsetInfoPopup = createHeroSkillsetInfoPopup();
+
+    async function hydrateHeroSkillsetCards(root) {
+      if (!root) {
+        return;
+      }
+      const cards = Array.from(root.querySelectorAll('[data-hero-skillset-card]'));
+      if (!cards.length) {
+        return;
+      }
+      let data;
+      try {
+        data = await loadHeroSkillsetData();
+      } catch (error) {
+        console.error('英雄・スキルデータの読み込みに失敗しました。', error);
+        return;
+      }
+      cards.forEach(card => {
+        const config = normalizeHeroSkillsetConfig(card.getAttribute('data-config'));
+        card.setAttribute('data-config', encodeHeroSkillsetConfig(config));
+        renderHeroSkillsetCardView(card, config, data);
+      });
+    }
+
+    function renderHeroSkillsetCardView(card, config, data) {
+      card.classList.add('hero-skillset-card', 'hero-skillset-card--view');
+      const body = document.createElement('div');
+      body.className = 'hero-skillset-card__body hero-skillset-slot';
+      const name = document.createElement('div');
+      name.className = 'hero-skillset-card__name';
+      name.textContent = config.name || '';
+      const grid = document.createElement('div');
+      grid.className = 'hero-skillset-card__grid';
+      HERO_SKILLSET_ROWS.forEach(rowKey => {
+        const rowWrapper = document.createElement('div');
+        rowWrapper.className = 'hero-skillset-card__row';
+        const content = document.createElement('div');
+        content.className = 'hero-skillset-card__row-content';
+        const rowData = config.rows?.[rowKey] || {};
+        const heroId = rowData.heroId || null;
+        const hero = heroId ? data.heroMap.get(heroId) : null;
+        const heroSlot = createViewHeroSlot(hero);
+        const skills = document.createElement('div');
+        skills.className = 'hero-skillset-card__skills';
+
+        const fixedSkillEntries = Array.isArray(hero?.fixedSkills)
+          ? hero.fixedSkills
+          : Array.isArray(hero?.fixedSkillIds)
+            ? hero.fixedSkillIds
+                .map(entry =>
+                  typeof entry === 'string' ? data.skillMap.get(entry) : entry
+                )
+                .filter(Boolean)
+            : [];
+
+        const wrapFixedSkill = entry =>
+          entry
+            ? {
+                id: entry.id || entry.name || '',
+                name: entry.name || '',
+                type: entry.type || '',
+                description: entry.description || '',
+                image: entry.image || ''
+              }
+            : null;
+
+        const slotMap = {
+          skill1: wrapFixedSkill(fixedSkillEntries[0]),
+          skill2: wrapFixedSkill(fixedSkillEntries[1]),
+          skill3: rowData.userSkills?.skill3 ? data.skillMap.get(rowData.userSkills.skill3) : null,
+          skill4: rowData.userSkills?.skill4 ? data.skillMap.get(rowData.userSkills.skill4) : null,
+          skill5: wrapFixedSkill(fixedSkillEntries[2])
+        };
+        Object.entries(slotMap).forEach(([slotKey, skill]) => {
+          const slot = createViewSkillSlot(slotKey, skill);
+          skills.appendChild(slot);
+        });
+        content.append(heroSlot, skills);
+        rowWrapper.append(content);
+        grid.appendChild(rowWrapper);
+      });
+      body.append(name, grid);
+      card.innerHTML = '';
+      card.appendChild(body);
+      if (card.__heroSkillsetInfoHandler) {
+        card.removeEventListener('click', card.__heroSkillsetInfoHandler);
+      }
+      const handler = event => {
+        const trigger = event.target.closest('[data-info-type]');
+        if (!trigger) {
+          return;
+        }
+        event.stopPropagation();
+        const infoType = trigger.dataset.infoType;
+        const infoId = trigger.dataset.infoId;
+        if (!infoType || !infoId) {
+          return;
+        }
+        const info = infoType === 'hero'
+          ? data.heroMap.get(infoId)
+          : data.skillMap.get(infoId);
+        if (!info) {
+          return;
+        }
+        if (infoType === 'hero') {
+          const talents = getHeroTalents(info);
+          heroSkillsetInfoPopup.show({
+            anchor: trigger,
+            titleText: info.name || '',
+            badgeText: info.troopType || '',
+            badgeVariant: 'troop',
+            lines: talents.map(talent => ({
+              title: talent.name,
+              badgeText: talent.type,
+              badgeVariant: 'type',
+              description: talent.description
+            })),
+            fallbackText: '才能情報が登録されていません。',
+            url: info.url || ''
+          });
+          return;
+        }
+        const isHeroFixedSkill = trigger.dataset.skillOrigin === 'hero-fixed';
+        heroSkillsetInfoPopup.show({
+          anchor: trigger,
+          titleText: info.name || '',
+          badgeText: info.skillType || info.type || '',
+          badgeVariant: 'type',
+          lines: info.description
+            ? [{ description: info.description }]
+            : [],
+          fallbackText: '説明が登録されていません。',
+          url: isHeroFixedSkill ? '' : (info.url || '')
+        });
+      };
+      card.addEventListener('click', handler);
+      card.__heroSkillsetInfoHandler = handler;
+    }
+
+    function createViewHeroSlot(hero) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'hero-skillset-cell hero-skillset-cell--hero';
+      const figure = createHeroSkillsetFigure(hero?.image, hero?.name, '+');
+      const label = document.createElement('span');
+      label.className = 'hero-skillset-cell__label';
+      if (hero?.id) {
+        label.textContent = hero.name;
+        button.dataset.infoType = 'hero';
+        button.dataset.infoId = hero.id;
+      } else {
+        label.textContent = '英雄未選択';
+        button.classList.add('is-empty');
+      }
+      button.append(figure, label);
+      return button;
+    }
+
+    function createViewSkillSlot(slotKey, skill) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'hero-skillset-cell hero-skillset-cell--skill';
+      const isEditableSlot = slotKey === 'skill3' || slotKey === 'skill4';
+      button.classList.add(
+        isEditableSlot
+          ? 'hero-skillset-cell--editable'
+          : 'hero-skillset-cell--fixed'
+      );
+      button.dataset.skillOrigin = isEditableSlot ? 'user' : 'hero-fixed';
+      const placeholder = isEditableSlot ? '+' : '—';
+      const figure = createHeroSkillsetFigure(skill?.image, skill?.name, placeholder);
+      const label = document.createElement('span');
+      label.className = 'hero-skillset-cell__label';
+      if (skill?.id) {
+        label.textContent = skill.name;
+        button.dataset.infoType = 'skill';
+        button.dataset.infoId = skill.id;
+      } else {
+        label.textContent = isEditableSlot ? 'スキル未設定' : '英雄未選択';
+        button.classList.add('is-empty');
+      }
+      button.append(figure, label);
+      return button;
+    }
+
+    function createHeroSkillsetFigure(imageUrl, alt, placeholder) {
+      const figure = document.createElement('div');
+      figure.className = 'hero-skillset-cell__figure';
+      if (imageUrl) {
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = alt || '';
+        figure.appendChild(img);
+      } else {
+        const span = document.createElement('span');
+        span.className = 'hero-skillset-cell__placeholder';
+        span.textContent = placeholder;
+        figure.appendChild(span);
+      }
+      return figure;
+    }
+
+    function createHeroSkillsetInfoPopup() {
+      const popup = document.createElement('div');
+      popup.className = 'hero-skillset-info-popup';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'hero-skillset-info-popup__close';
+      close.textContent = '×';
+      const titleRow = document.createElement('div');
+      titleRow.className = 'hero-skillset-info-popup__title-row';
+      const title = document.createElement('div');
+      title.className = 'hero-skillset-info-popup__title';
+      const badge = document.createElement('span');
+      badge.className = 'hero-skillset-info-popup__badge';
+      badge.hidden = true;
+      titleRow.append(title, badge);
+      const body = document.createElement('div');
+      body.className = 'hero-skillset-info-popup__body';
+      const link = document.createElement('a');
+      link.className = 'hero-skillset-info-popup__link';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = '説明ページを開く';
+      popup.append(close, titleRow, body, link);
+      document.body.appendChild(popup);
+
+      let currentAnchor = null;
+
+      function hide() {
+        popup.classList.remove('is-visible');
+        currentAnchor = null;
+      }
+
+      close.addEventListener('click', hide);
+      document.addEventListener('click', event => {
+        if (!popup.contains(event.target) && !event.target.closest('[data-info-type]')) {
+          hide();
+        }
+      });
+
+      function positionRelativeToAnchor(anchor) {
+        if (!anchor) {
+          return;
+        }
+        const rect = anchor.getBoundingClientRect();
+        popup.style.top = `${window.scrollY + rect.bottom + 8}px`;
+        popup.style.left = `${window.scrollX + rect.left}px`;
+        const popupRect = popup.getBoundingClientRect();
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        const overflowRight = popupRect.right > viewportWidth - 8;
+        if (overflowRight) {
+          const adjustedLeft = window.scrollX + rect.right - popupRect.width;
+          popup.style.left = `${Math.max(adjustedLeft, window.scrollX + 8)}px`;
+        }
+        const updatedRect = popup.getBoundingClientRect();
+        if (updatedRect.left < 8) {
+          popup.style.left = `${window.scrollX + 8}px`;
+        }
+      }
+
+      function buildLineElements(lines = []) {
+        if (!lines.length) {
+          return null;
+        }
+        const container = document.createElement('div');
+        container.className = 'hero-skillset-info-popup__lines';
+        lines.forEach(line => {
+          const lineEl = document.createElement('div');
+          lineEl.className = 'hero-skillset-info-popup__line';
+          if (line.title) {
+            const header = document.createElement('div');
+            header.className = 'hero-skillset-info-popup__line-header';
+            const lineTitle = document.createElement('span');
+            lineTitle.className = 'hero-skillset-info-popup__line-title';
+            lineTitle.textContent = line.title;
+            header.appendChild(lineTitle);
+            if (line.badgeText) {
+              const lineBadge = document.createElement('span');
+              lineBadge.className = `hero-skillset-info-popup__badge hero-skillset-info-popup__badge--${line.badgeVariant || 'type'}`;
+              lineBadge.textContent = line.badgeText;
+              header.appendChild(lineBadge);
+            }
+            lineEl.appendChild(header);
+          }
+          if (line.description) {
+            const desc = document.createElement('div');
+            desc.className = 'hero-skillset-info-popup__line-description';
+            desc.textContent = `${line.description}`;
+            lineEl.appendChild(desc);
+          }
+          if (!line.title && !line.description && line.badgeText) {
+            const fallback = document.createElement('div');
+            fallback.className = 'hero-skillset-info-popup__description';
+            fallback.textContent = line.badgeText;
+            lineEl.appendChild(fallback);
+          }
+          container.appendChild(lineEl);
+        });
+        return container;
+      }
+
+      return {
+        show({ anchor, titleText, badgeText, badgeVariant = 'default', lines = [], fallbackText = '説明が登録されていません。', url }) {
+          title.textContent = titleText || '';
+          if (badgeText) {
+            badge.textContent = badgeText;
+            badge.hidden = false;
+            badge.className = `hero-skillset-info-popup__badge hero-skillset-info-popup__badge--${badgeVariant}`;
+          } else {
+            badge.textContent = '';
+            badge.className = 'hero-skillset-info-popup__badge';
+            badge.hidden = true;
+          }
+          body.innerHTML = '';
+          const lineElements = buildLineElements(lines);
+          if (lineElements) {
+            body.appendChild(lineElements);
+          } else {
+            const fallback = document.createElement('div');
+            fallback.className = 'hero-skillset-info-popup__description';
+            fallback.textContent = fallbackText;
+            body.appendChild(fallback);
+          }
+
+          const oldLink = popup.querySelector('.hero-skillset-info-popup__link');
+          if (oldLink) {
+            oldLink.remove();
+          }
+
+          if (url && url.trim()) {
+            const newLink = document.createElement('a');
+            newLink.className = 'hero-skillset-info-popup__link';
+            newLink.target = '_blank';
+            newLink.rel = 'noopener noreferrer';
+            newLink.href = url.trim();
+            newLink.textContent = '詳細ページを開く';
+
+            popup.appendChild(newLink);
+          }
+
+          currentAnchor = anchor || null;
+          popup.classList.add('is-visible');
+          positionRelativeToAnchor(currentAnchor);
+        },
+        hide
+      };
+    }
+
+    function fetchWithoutPreflight(url, options = {}, timeout = DEFAULT_TIMEOUT) {
+      return new Promise((resolve, reject) => {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => {
+          controller.abort();
+          reject(new Error(`Request timeout after ${timeout}ms`));
+        }, timeout);
+
+        const fetchOptions = {
+          mode: 'cors',
+          credentials: 'omit',
+          ...options,
+          headers: {
+            'Content-Type': 'text/plain',
+            ...(options.headers || {}),
+          },
+          signal: controller.signal,
+        };
+
+        fetch(url, fetchOptions)
+          .then(response => {
+            window.clearTimeout(timer);
+            resolve(response);
+          })
+          .catch(error => {
+            window.clearTimeout(timer);
+            if (error.name === 'AbortError') {
+              reject(new Error(`Request timeout after ${timeout}ms`));
+            } else {
+              reject(error);
+            }
+          });
+      });
+    }
+
+    async function apiCall(action, data = {}) {
+      const payload = { action, ...data };
+
+      let response;
+      try {
+        response = await fetchWithoutPreflight(
+          APPS_SCRIPT_ENDPOINT_WIKI,
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }
+        );
+      } catch (error) {
+        throw new Error(`Failed to reach Apps Script endpoint: ${error.message || error}`);
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${errorText ? `\n${errorText}` : ''}`);
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        throw new Error('Failed to parse JSON response from Apps Script');
+      }
+
+      if (!result?.success) {
+        throw new Error(result?.message || 'Apps Script reported an error');
+      }
+
+      return result;
+    }
+
+    const pageCache = { value: null };
+
+    function selectLatestPages(pages = []) {
+      const latest = new Map();
+      pages.forEach(page => {
+        if (!page || !page.id) {
+          return;
+        }
+        const key = page.id.toString();
+        const existing = latest.get(key);
+        const updatedAt = page.updatedAt || '';
+        if (!existing || updatedAt > (existing.updatedAt || '')) {
+          latest.set(key, page);
+        }
+      });
+      return Array.from(latest.values());
+    }
+
+    const dataService = {
+      async getPages() {
+        if (Array.isArray(pageCache.value)) {
+          return pageCache.value;
+        }
+
+        const response = await apiCall('getPages');
+        const pages = selectLatestPages(response.pages || []);
+        pageCache.value = pages;
+        return pages;
+      },
+      async getPage(id) {
+        if (!id) {
+          throw new Error('Page ID is required');
+        }
+        const response = await apiCall('getPage', { id });
+        const pages = selectLatestPages([response.page].filter(Boolean));
+        const page = pages[0];
+        if (!page) {
+          throw new Error('Page not found');
+        }
+        return page;
+      },
+      getCachedPages() {
+        return pageCache.value;
+      },
+    };
+
+    const elements = {
+      app: document.getElementById('viewApp'),
+      loader: document.getElementById('loader'),
+      card: document.getElementById('pageCard'),
+      title: document.getElementById('pageTitle'),
+      updated: document.getElementById('pageUpdated'),
+      content: document.getElementById('pageContent'),
+      breadcrumb: document.getElementById('breadcrumb'),
+      status: document.getElementById('statusMessage'),
+      editButton: document.getElementById('editPageButton'),
+      sidebar: document.getElementById('pageSidebar'),
+      sidebarList: document.getElementById('sidebarPageList'),
+      sidebarToggle: document.getElementById('sidebarToggle'),
+      sidebarOverlay: document.getElementById('sidebarOverlay'),
+    };
+
+    const loginElements = {
+      statusText: document.getElementById('sidebarLoginStatusText'),
+      loginButton: document.getElementById('sidebarLoginButton'),
+      logoutButton: document.getElementById('sidebarLogoutButton'),
+      settingsButton: document.getElementById('sidebarSettingsButton'),
+    };
+
+    const userSettingsOverlay = document.getElementById('user-settings-overlay');
+    const userSettingsForm = document.getElementById('user-settings-form');
+    const settingsUsernameInput = document.getElementById('settings-username');
+    const settingsKingdomInput = document.getElementById('settings-kingdom');
+    const settingsLanguageSelect = document.getElementById('settings-language');
+    const userSettingsMessage = document.getElementById('user-settings-message');
+    const userSettingsCancel = document.getElementById('user-settings-cancel');
+    const userSettingsSubmit = document.getElementById('user-settings-submit');
+
+    const normalizePageId = (pageId) => {
+      const trimmed = (pageId || '').trim();
+      return trimmed || 'top';
+    };
+
+    let currentPageId = getPageIdFromQuery();
+
+    const userSettingsState = {
+      isOpen: false,
+      isSaving: false,
+      isLoading: false,
+      playerId: null,
+      data: null,
+    };
+
+    let lastLoginIdentifier = null;
+
+    function getStoredLoginState() {
+      try {
+        const value = localStorage.getItem(LOGIN_STORAGE_KEY);
+        return value ? JSON.parse(value) : null;
+      } catch (error) {
+        console.error('Failed to parse login state', error);
+        return null;
+      }
+    }
+
+    function getDisplayName(user) {
+      if (!user) {
+        return '';
+      }
+      const username = (user.username || '').trim();
+      if (username) {
+        return username;
+      }
+      const name = (user.name || '').trim();
+      if (name) {
+        return name;
+      }
+      const email = (user.email || '').trim();
+      if (email) {
+        return email;
+      }
+      return '';
+    }
+
+    function resolveAdminToken(loginState) {
+      const directToken = (loginState?.adminToken || loginState?.user?.adminToken || '').toString().trim();
+      if (directToken) {
+        return directToken;
+      }
+
+      if (typeof window !== 'undefined' && 'sessionStorage' in window) {
+        const possibleKeys = ['wikiAdminToken', 'wikiAdminSession'];
+        for (const key of possibleKeys) {
+          let storedValue = null;
+          try {
+            storedValue = window.sessionStorage.getItem(key);
+          } catch (error) {
+            console.warn('Failed to access sessionStorage for admin token lookup.', error);
+            break;
+          }
+
+          if (!storedValue) {
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(storedValue);
+            const token = (parsed && (parsed.adminToken || parsed.token)) || '';
+            if (token) {
+              return token.toString().trim();
+            }
+          } catch (parseError) {
+            if (typeof storedValue === 'string' && storedValue.trim()) {
+              return storedValue.trim();
+            }
+          }
+        }
+      }
+
+      return '';
+    }
+
+    function resolveUserIdentity() {
+      const loginState = getStoredLoginState();
+      const user = loginState?.user || {};
+      const identity = {};
+
+      const email = (user.email || '').toString().trim();
+      const googleEmail = (user.googleEmail || email).toString().trim();
+      const adminToken = resolveAdminToken(loginState);
+
+      if (email) {
+        identity.email = email;
+      }
+      if (googleEmail) {
+        identity.googleEmail = googleEmail;
+      }
+      if (adminToken) {
+        identity.adminToken = adminToken;
+      }
+
+      return identity;
+    }
+
+    function buildUserSettingsRequest(basePayload = {}) {
+      const identity = resolveUserIdentity();
+      return Object.assign({}, basePayload || {}, identity);
+    }
+
+    async function callUserSettingsApi(payload) {
+      if (!APPS_SCRIPT_ENDPOINT_USER_SETTINGS || APPS_SCRIPT_ENDPOINT_USER_SETTINGS.includes('YOUR_DEPLOYMENT_ID')) {
+        throw new Error('ユーザー設定APIのエンドポイントが設定されていません。');
+      }
+
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), USER_SETTINGS_REQUEST_TIMEOUT);
+      const requestPayload = buildUserSettingsRequest(payload);
+
+      try {
+        const response = await fetch(APPS_SCRIPT_ENDPOINT_USER_SETTINGS, {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            'Content-Type': 'text/plain',
+          },
+          body: JSON.stringify(requestPayload),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '');
+          throw new Error(`ユーザー設定の更新に失敗しました (HTTP ${response.status})${errorText ? `: ${errorText}` : ''}`);
+        }
+
+        const result = await response.json().catch(() => null);
+        if (!result) {
+          throw new Error('ユーザー設定の応答解析に失敗しました。');
+        }
+
+        return result;
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw new Error('ユーザー設定のリクエストがタイムアウトしました。');
+        }
+        if (error instanceof TypeError) {
+          throw new Error('ユーザー設定サービスに接続できませんでした。ネットワークまたはCORS設定を確認してください。');
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+    }
+
+    function updateStoredLoginStateUser(updates) {
+      if (!updates || typeof updates !== 'object') {
+        return null;
+      }
+      const stored = getStoredLoginState();
+      if (!stored?.user) {
+        return null;
+      }
+      const updatedState = {
+        ...stored,
+        user: {
+          ...stored.user,
+          ...updates,
+        },
+      };
+      localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(updatedState));
+      return updatedState;
+    }
+
+    function sanitizeLanguage(value) {
+      return value === 'en' ? 'en' : 'ja';
+    }
+
+    function parseAuthority(value) {
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    async function revokeAccessToken(token) {
+      if (!token) {
+        return;
+      }
+      try {
+        await fetch('https://oauth2.googleapis.com/revoke', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `token=${encodeURIComponent(token)}`,
+        });
+      } catch (error) {
+        console.warn('Failed to revoke token', error);
+      }
+    }
+
+    function buildLoginUrl(pageId) {
+      const url = new URL('./login.html', window.location.href);
+      url.searchParams.set('redirect', 'edit.html');
+      if (pageId) {
+        url.searchParams.set('page', pageId);
+      }
+      return url.toString();
+    }
+
+    function updateLoginRedirectTarget() {
+      if (loginElements.loginButton) {
+        loginElements.loginButton.dataset.pageId = currentPageId;
+      }
+    }
+
+    function setUserSettingsMessage(message, type = '') {
+      if (!userSettingsMessage) {
+        return;
+      }
+      userSettingsMessage.textContent = message || '';
+      userSettingsMessage.classList.remove('error', 'success');
+      if (type) {
+        userSettingsMessage.classList.add(type);
+      }
+    }
+
+    function fillUserSettingsForm(settings) {
+      const storedState = getStoredLoginState();
+      const storedUser = storedState?.user || {};
+      const effectiveSettings = {
+        username: settings?.username ?? storedUser.username ?? storedUser.name ?? '',
+        kingdom: settings?.kingdom ?? storedUser.kingdom ?? '',
+        language: sanitizeLanguage(settings?.language || storedUser.language || 'ja'),
+      };
+
+      if (settingsUsernameInput) {
+        settingsUsernameInput.value = effectiveSettings.username || '';
+      }
+      if (settingsKingdomInput) {
+        settingsKingdomInput.value = effectiveSettings.kingdom != null ? effectiveSettings.kingdom : '';
+      }
+      if (settingsLanguageSelect) {
+        settingsLanguageSelect.value = sanitizeLanguage(effectiveSettings.language);
+      }
+    }
+
+    function openUserSettingsDialog() {
+      if (!userSettingsOverlay) {
+        return;
+      }
+      const loginState = getStoredLoginState();
+      if (!loginState?.user) {
+        handleLoginClick();
+        return;
+      }
+      const authorityValue = parseAuthority(loginState.user.authority);
+      if (
+        authorityValue === null ||
+        authorityValue < VIEWER_AUTHORITY_VALUE ||
+        authorityValue === BLOCKED_AUTHORITY_VALUE
+      ) {
+        return;
+      }
+      fillUserSettingsForm(userSettingsState.data);
+      setUserSettingsMessage('');
+      userSettingsOverlay.classList.add('visible');
+      userSettingsOverlay.setAttribute('aria-hidden', 'false');
+      userSettingsState.isOpen = true;
+      window.setTimeout(() => {
+        settingsUsernameInput?.focus();
+      }, 0);
+    }
+
+    function closeUserSettingsDialog() {
+      if (!userSettingsOverlay) {
+        return;
+      }
+      userSettingsOverlay.classList.remove('visible');
+      userSettingsOverlay.setAttribute('aria-hidden', 'true');
+      userSettingsState.isOpen = false;
+      if (userSettingsState.isSaving) {
+        userSettingsState.isSaving = false;
+        userSettingsSubmit?.removeAttribute('disabled');
+      }
+    }
+
+    async function fetchAndApplyUserSettings(playerId, email, fallbackName) {
+      if (!playerId && !email) {
+        return;
+      }
+      if (userSettingsState.isLoading) {
+        return;
+      }
+      userSettingsState.isLoading = true;
+      try {
+        const result = await callUserSettingsApi(
+          buildUserSettingsRequest({
+            action: 'getUserSettings',
+            playerId: playerId || '',
+            email: email || '',
+          })
+        );
+
+        if (!result.success) {
+          throw new Error(result.message || 'ユーザー設定の取得に失敗しました。');
+        }
+
+        const settings = {
+          playerId: result.playerId || playerId || '',
+          username: result.username || fallbackName || '',
+          email: result.email || email,
+          kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : '',
+          language: sanitizeLanguage((result.language || '').trim().toLowerCase()),
+          authority: parseAuthority(result.authority),
+        };
+
+        userSettingsState.data = settings;
+        userSettingsState.playerId = settings.playerId;
+        if (!userSettingsState.isOpen) {
+          fillUserSettingsForm(settings);
+        }
+        updateStoredLoginStateUser({
+          username: settings.username,
+          playerId: settings.playerId,
+          email: settings.email,
+          kingdom: settings.kingdom,
+          language: settings.language,
+          authority: settings.authority,
+        });
+        updateLoginUI();
+      } catch (error) {
+        console.error('ユーザー設定の取得中にエラーが発生しました。', error);
+        if (userSettingsState.isOpen) {
+          setUserSettingsMessage(error.message || 'ユーザー設定の取得に失敗しました。', 'error');
+        }
+      } finally {
+        userSettingsState.isLoading = false;
+      }
+    }
+
+    function maybeLoadUserSettings(user, fallbackName) {
+      const currentPlayerId = user?.playerId || '';
+      const playerIdentifier = currentPlayerId || user?.email || '';
+      if (playerIdentifier && playerIdentifier !== lastLoginIdentifier) {
+        lastLoginIdentifier = playerIdentifier;
+        fetchAndApplyUserSettings(currentPlayerId, user?.email || '', fallbackName);
+      } else if (!playerIdentifier && lastLoginIdentifier) {
+        lastLoginIdentifier = null;
+      }
+    }
+
+    function resetUserSettingsState() {
+      userSettingsState.data = null;
+      userSettingsState.playerId = null;
+      lastLoginIdentifier = null;
+      if (userSettingsState.isOpen) {
+        closeUserSettingsDialog();
+      }
+      setUserSettingsMessage('');
+    }
+
+    const handleUserSettingsSubmit = async (event) => {
+      event.preventDefault();
+      if (userSettingsState.isSaving) {
+        return;
+      }
+
+      const loginState = getStoredLoginState();
+      const user = loginState?.user;
+      if (!user) {
+        setUserSettingsMessage('ログインが必要です。', 'error');
+        return;
+      }
+
+      const username = (settingsUsernameInput?.value || '').trim();
+      if (!username) {
+        setUserSettingsMessage('ユーザーネームを入力してください。', 'error');
+        settingsUsernameInput?.focus();
+        return;
+      }
+
+      const rawKingdom = (settingsKingdomInput?.value || '').trim();
+      const normalizedKingdom = rawKingdom ? rawKingdom.replace(/[^0-9]/g, '') : '';
+      const language = sanitizeLanguage(settingsLanguageSelect?.value || 'ja');
+
+      userSettingsState.isSaving = true;
+      userSettingsSubmit?.setAttribute('disabled', 'true');
+      setUserSettingsMessage('保存しています...');
+
+      try {
+        const payload = buildUserSettingsRequest({
+          action: 'updateUserSettings',
+          playerId: user.playerId || '',
+          email: user.email || '',
+          username,
+          kingdom: normalizedKingdom,
+          language,
+        });
+
+        const result = await callUserSettingsApi(payload);
+        if (!result.success) {
+          throw new Error(result.message || 'ユーザー設定の保存に失敗しました。');
+        }
+
+        const updatedSettings = {
+          playerId: result.playerId || payload.playerId,
+          username: result.username || username,
+          email: result.email || payload.email,
+          kingdom: result.kingdom != null && result.kingdom !== '' ? String(result.kingdom) : normalizedKingdom,
+          language: sanitizeLanguage((result.language || language).toLowerCase()),
+          authority: parseAuthority(result.authority),
+        };
+
+        userSettingsState.data = updatedSettings;
+        userSettingsState.playerId = updatedSettings.playerId;
+        fillUserSettingsForm(updatedSettings);
+        updateStoredLoginStateUser({
+          username: updatedSettings.username,
+          playerId: updatedSettings.playerId,
+          email: updatedSettings.email,
+          language: updatedSettings.language,
+          kingdom: updatedSettings.kingdom,
+          authority: updatedSettings.authority,
+        });
+        setUserSettingsMessage('保存しました。', 'success');
+        updateLoginUI();
+      } catch (error) {
+        console.error('ユーザー設定の保存中にエラーが発生しました。', error);
+        setUserSettingsMessage(error.message || 'ユーザー設定の保存に失敗しました。', 'error');
+      } finally {
+        userSettingsState.isSaving = false;
+        userSettingsSubmit?.removeAttribute('disabled');
+      }
+    };
+
+    function updateLoginUI() {
+      const loginState = getStoredLoginState();
+      const user = loginState?.user;
+      const displayName = getDisplayName(user);
+      const authorityValue = parseAuthority(user?.authority);
+      const isBlockedUser = authorityValue === BLOCKED_AUTHORITY_VALUE;
+      const canUseSettings =
+        Boolean(displayName) &&
+        !isBlockedUser &&
+        authorityValue !== null &&
+        authorityValue >= VIEWER_AUTHORITY_VALUE;
+
+      if (loginElements.statusText) {
+        if (displayName && isBlockedUser) {
+          loginElements.statusText.textContent = 'このアカウントには権限がありません';
+        } else if (displayName) {
+          loginElements.statusText.textContent = `${displayName} としてログイン中`;
+        } else {
+          loginElements.statusText.textContent = '未ログイン';
+        }
+      }
+
+      if (loginElements.loginButton) {
+        const isLoggedIn = Boolean(displayName);
+        loginElements.loginButton.hidden = isLoggedIn;
+        loginElements.loginButton.disabled = false;
+      }
+      if (loginElements.logoutButton) {
+        loginElements.logoutButton.hidden = !Boolean(displayName);
+      }
+      if (loginElements.settingsButton) {
+        loginElements.settingsButton.hidden = !canUseSettings;
+        loginElements.settingsButton.disabled = !canUseSettings;
+      }
+
+      if (!displayName) {
+        resetUserSettingsState();
+      } else if (isBlockedUser || !canUseSettings) {
+        resetUserSettingsState();
+      } else {
+        maybeLoadUserSettings(user, displayName);
+      }
+
+      updateLoginRedirectTarget();
+    }
+
+    function handleLoginClick() {
+      if (!loginElements.loginButton) {
+        return;
+      }
+      const targetPage = loginElements.loginButton.dataset.pageId || currentPageId || 'top';
+      window.location.href = buildLoginUrl(targetPage);
+    }
+
+    async function handleLogoutClick() {
+      const loginState = getStoredLoginState();
+      await revokeAccessToken(loginState?.accessToken);
+      localStorage.removeItem(LOGIN_STORAGE_KEY);
+      resetUserSettingsState();
+      updateLoginUI();
+    }
+
+    loginElements.loginButton?.addEventListener('click', handleLoginClick);
+    loginElements.logoutButton?.addEventListener('click', handleLogoutClick);
+    loginElements.settingsButton?.addEventListener('click', openUserSettingsDialog);
+    userSettingsCancel?.addEventListener('click', () => {
+      closeUserSettingsDialog();
+    });
+    userSettingsOverlay?.addEventListener('click', (event) => {
+      if (event.target === userSettingsOverlay) {
+        closeUserSettingsDialog();
+      }
+    });
+    userSettingsForm?.addEventListener('submit', handleUserSettingsSubmit);
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === LOGIN_STORAGE_KEY) {
+        resetUserSettingsState();
+        updateLoginUI();
+      }
+    });
+
+    updateLoginUI();
+
+    function getParentId(pageId) {
+      if (!pageId || pageId === 'top') {
+        return null;
+      }
+      const parts = pageId.split('/').filter(Boolean);
+      if (parts.length <= 1) {
+        return null;
+      }
+      parts.pop();
+      return parts.join('/');
+    }
+
+    function getSlug(pageId) {
+      if (!pageId) {
+        return '';
+      }
+      const parts = pageId.split('/').filter(Boolean);
+      return parts[parts.length - 1] || '';
+    }
+
+    function isDescendantId(targetId, ancestorId) {
+      if (!targetId || !ancestorId || targetId === ancestorId) {
+        return false;
+      }
+      return targetId.startsWith(`${ancestorId}/`);
+    }
+
+    function normalizeOrderValue(orderValue) {
+      if (typeof orderValue === 'number' && Number.isFinite(orderValue)) {
+        return orderValue;
+      }
+      if (typeof orderValue === 'string') {
+        const trimmed = orderValue.trim();
+        if (trimmed) {
+          const numeric = Number(trimmed);
+          if (Number.isFinite(numeric)) {
+            return numeric;
+          }
+        }
+      }
+      return null;
+    }
+
+    function buildSidebarTree(pages) {
+      const nodes = [];
+      (pages || []).forEach((page, index) => {
+        if (!page?.id) {
+          return;
+        }
+        const normalizedId = normalizePageId(page.id);
+        const parentId = getParentId(normalizedId);
+        const parsedOrder = normalizeOrderValue(page.order);
+        nodes.push({
+          id: normalizedId,
+          title: page.title || getSlug(normalizedId) || '無題',
+          parentId: parentId ? normalizePageId(parentId) : null,
+          order: parsedOrder !== null ? parsedOrder : index + 1,
+          children: [],
+        });
+      });
+
+      const map = new Map();
+      nodes.forEach(node => map.set(node.id, node));
+
+      const roots = [];
+      nodes.forEach(node => {
+        if (node.parentId && map.has(node.parentId)) {
+          map.get(node.parentId).children.push(node);
+        } else {
+          node.parentId = null;
+          roots.push(node);
+        }
+      });
+
+      if (!map.has('top')) {
+        const topChildren = [];
+        const remainingRoots = [];
+        roots.forEach(node => {
+          if (node.id !== 'top' && node.id.startsWith('top/')) {
+            node.parentId = 'top';
+            topChildren.push(node);
+          } else if (node.id !== 'top') {
+            remainingRoots.push(node);
+          }
+        });
+        const topNode = {
+          id: 'top',
+          title: 'top',
+          parentId: null,
+          order: Number.MIN_SAFE_INTEGER,
+          children: topChildren,
+        };
+        map.set('top', topNode);
+        roots.length = 0;
+        roots.push(topNode, ...remainingRoots);
+      } else {
+        const topNode = map.get('top');
+        if (topNode) {
+          const topIndex = roots.indexOf(topNode);
+          if (topIndex === -1) {
+            roots.unshift(topNode);
+          } else if (topIndex > 0) {
+            roots.splice(0, 0, roots.splice(topIndex, 1)[0]);
+          }
+        }
+      }
+
+      const sortNodes = (list) => {
+        list.sort((a, b) => {
+          if (a.id === 'top') {
+            return -1;
+          }
+          if (b.id === 'top') {
+            return 1;
+          }
+          const orderA = Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER;
+          const orderB = Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER;
+          if (orderA !== orderB) {
+            return orderA - orderB;
+          }
+          return (a.title || '').localeCompare(b.title || '', 'ja');
+        });
+        list.forEach(child => sortNodes(child.children));
+      };
+
+      sortNodes(roots);
+      return roots;
+    }
+
+    function createSidebarNode(node, activePageId, level) {
+      const li = document.createElement('li');
+      li.className = 'sidebar-item';
+      li.style.setProperty('--sidebar-indent-level', level);
+
+      const link = document.createElement('a');
+      link.className = 'sidebar-link';
+      link.href = `./view.html?page=${encodeURIComponent(node.id)}`;
+      link.dataset.pageId = node.id;
+      link.textContent = node.title || node.id || '無題';
+
+      if (node.id === activePageId) {
+        li.classList.add('active');
+        link.setAttribute('aria-current', 'page');
+      } else if (isDescendantId(activePageId, node.id)) {
+        li.classList.add('active-ancestor');
+      }
+
+      li.appendChild(link);
+
+      if (Array.isArray(node.children) && node.children.length) {
+        const childList = document.createElement('ul');
+        childList.className = 'sidebar-sublist';
+        node.children.forEach(child => {
+          childList.appendChild(createSidebarNode(child, activePageId, level + 1));
+        });
+        li.appendChild(childList);
+      }
+
+      return li;
+    }
+
+    const SIDEBAR_BREAKPOINT = 960;
+    const sidebarState = {
+      open: window.innerWidth >= SIDEBAR_BREAKPOINT,
+    };
+
+    function isDesktop() {
+      return window.innerWidth >= SIDEBAR_BREAKPOINT;
+    }
+
+    function setSidebar(open) {
+      sidebarState.open = open;
+      if (elements.app) {
+        elements.app.classList.toggle('sidebar-open', open);
+        elements.app.classList.toggle('sidebar-closed', !open);
+      }
+
+      if (elements.sidebarOverlay) {
+        if (!isDesktop()) {
+          elements.sidebarOverlay.classList.toggle('hidden', !open);
+        } else {
+          elements.sidebarOverlay.classList.add('hidden');
+        }
+      }
+
+      if (elements.sidebarToggle) {
+        elements.sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+    }
+
+    function renderSidebarPages(pages, activePageId) {
+      if (!elements.sidebarList) {
+        return;
+      }
+
+      const normalizedActiveId = normalizePageId(activePageId);
+      const tree = buildSidebarTree(pages);
+      const fragment = document.createDocumentFragment();
+
+      tree.forEach(node => {
+        fragment.appendChild(createSidebarNode(node, normalizedActiveId, 0));
+      });
+
+      elements.sidebarList.innerHTML = '';
+      elements.sidebarList.appendChild(fragment);
+    }
+
+    function getPageIdFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const value = (params.get('page') || '').trim();
+      return normalizePageId(value);
+    }
+
+    function showStatus(message, isError = false) {
+      if (!message) {
+        elements.status.classList.add('hidden');
+        elements.status.textContent = '';
+        elements.status.classList.remove('error');
+        return;
+      }
+      elements.status.textContent = message;
+      elements.status.classList.toggle('error', isError);
+      elements.status.classList.remove('hidden');
+    }
+
+    function renderBreadcrumb(pageId) {
+      const parts = pageId.split('/').filter(Boolean);
+      let pathAccumulator = '';
+      elements.breadcrumb.innerHTML = '';
+
+      if (!parts.length) {
+        const span = document.createElement('span');
+        span.textContent = 'top';
+        elements.breadcrumb.appendChild(span);
+        return;
+      }
+
+      parts.forEach((part, index) => {
+        pathAccumulator = index === 0 ? part : `${pathAccumulator}/${part}`;
+        if (index > 0) {
+          const separator = document.createElement('span');
+          separator.textContent = '›';
+          elements.breadcrumb.appendChild(separator);
+        }
+        const link = document.createElement('a');
+        link.href = `./view.html?page=${encodeURIComponent(pathAccumulator)}`;
+        link.dataset.pageId = pathAccumulator;
+        link.textContent = part;
+        elements.breadcrumb.appendChild(link);
+      });
+    }
+
+    async function displayPage(pageId) {
+      const normalizedId = normalizePageId(pageId);
+      currentPageId = normalizedId;
+      heroSkillsetInfoPopup.hide();
+      updateLoginRedirectTarget();
+      renderBreadcrumb(normalizedId);
+      renderSidebarPages(dataService.getCachedPages() || [], normalizedId);
+      elements.editButton.dataset.pageId = normalizedId;
+      elements.editButton.disabled = false;
+      showStatus('');
+      elements.loader.classList.remove('hidden');
+      elements.card.classList.add('hidden');
+
+      try {
+        const [page, pages] = await Promise.all([
+          dataService.getPage(normalizedId),
+          dataService.getPages(),
+        ]);
+
+        document.title = `${page.title || normalizedId} | Wikiビュー`;
+        elements.title.textContent = page.title || normalizedId;
+        elements.updated.textContent = page.updatedAt
+          ? `最終更新: ${new Date(page.updatedAt).toLocaleString('ja-JP')}`
+          : '';
+        elements.content.innerHTML = page.content || '';
+        await hydrateHeroSkillsetCards(elements.content);
+        renderSidebarPages(pages, normalizedId);
+        showStatus('');
+      } catch (error) {
+        document.title = 'ページを表示できません';
+        elements.title.textContent = 'ページを表示できません';
+        elements.updated.textContent = '';
+        elements.content.innerHTML = '';
+        showStatus(error.message || 'ページの取得に失敗しました。', true);
+        elements.editButton.disabled = true;
+      } finally {
+        elements.loader.classList.add('hidden');
+        elements.card.classList.remove('hidden');
+      }
+    }
+
+    function navigateTo(pageId, { replace = false } = {}) {
+      const normalizedId = normalizePageId(pageId);
+      const url = `?page=${encodeURIComponent(normalizedId)}`;
+
+      if (replace) {
+        history.replaceState({ pageId: normalizedId }, '', url);
+      } else {
+        history.pushState({ pageId: normalizedId }, '', url);
+      }
+
+      void displayPage(normalizedId);
+    }
+
+    setSidebar(sidebarState.open);
+
+    if (elements.sidebarToggle) {
+      elements.sidebarToggle.addEventListener('click', () => {
+        setSidebar(!sidebarState.open);
+      });
+    }
+
+    if (elements.sidebarOverlay) {
+      elements.sidebarOverlay.addEventListener('click', () => {
+        setSidebar(false);
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      setSidebar(sidebarState.open);
+    });
+
+    document.addEventListener('click', (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      const anchor = event.target.closest('a[data-page-id]');
+      if (!anchor) {
+        return;
+      }
+
+      event.preventDefault();
+      navigateTo(anchor.dataset.pageId);
+
+      if (anchor.closest('.sidebar') && !isDesktop()) {
+        setSidebar(false);
+      }
+    });
+
+    window.addEventListener('popstate', (event) => {
+      const pageId = normalizePageId(event.state?.pageId || getPageIdFromQuery());
+      void displayPage(pageId);
+    });
+
+    elements.editButton.addEventListener('click', () => {
+      const pageId = elements.editButton.dataset.pageId;
+      if (!pageId) {
+        return;
+      }
+      const url = `./edit.html?page=${encodeURIComponent(pageId)}`;
+      window.location.href = url;
+    });
+
+    navigateTo(getPageIdFromQuery(), { replace: true });
+  </script>
+</body>
+</html>
