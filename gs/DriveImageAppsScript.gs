@@ -6,7 +6,7 @@
  * preflight checks, so the body must be parsed manually.
  */
 
-const DRIVE_IMAGE_FOLDER_PROPERTY = '1RiX0j4Dh33wQETm1OIjcXWuxcYd9xHx6';
+const DRIVE_IMAGE_FOLDER_PROPERTY = PropertiesService.getScriptProperties().getProperty("DRIVE_IMAGE_FOLDER_PROPERTY");
 const DEFAULT_UPLOAD_FOLDER_NAME = 'Image';
 const ROOT_FOLDER_KEY = '__root__';
 const ADMINISTRATOR_ROLE = 'Administrator';

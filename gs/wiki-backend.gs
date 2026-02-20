@@ -7,7 +7,7 @@
  * 呼び出してください。GitHub 上で直接実行することはありません。
  */
 const CONFIG = {
-  SHEET_ID: '1ZN1LQdk2TDNmtMOdx6mXBNe3jQjFfM6CXWYc2Z4vXDk',
+  SHEET_ID: PropertiesService.getScriptProperties().getProperty("SHEET_ID"),
   SHEET_NAME: 'Wiki_Pages',
   ALLOWED_ORIGINS: ['https://brahmoon.github.io'],
   TIMEZONE: 'Asia/Tokyo',
@@ -40,7 +40,7 @@ const WIKI_COLUMNS = {
 };
 
 const ACCOUNT_CONFIG = {
-  SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
+  SHEET_ID: PropertiesService.getScriptProperties().getProperty("SHEET_ID2"),
   SHEET_NAME: 'Accounts',
   HEADER_ROW_INDEX: 1,
   PLAYER_ID_COLUMN: 1,
