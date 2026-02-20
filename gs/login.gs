@@ -1,5 +1,5 @@
 const CONFIG = {
-  SHEET_ID: '1mVVuS5bS50-YoVQyDIOM09Oi2YIpRIyIAfXDeBcw6N8',
+  SHEET_ID: PropertiesService.getScriptProperties().getProperty("SHEET_ID"),
   SHEET_NAME: 'Accounts',
   HEADER_ROW_INDEX: 1,
   COLUMNS: {
