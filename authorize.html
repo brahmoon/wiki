@@ -507,6 +507,7 @@
     </div>
     <script>
         const LOGIN_STORAGE_KEY = 'wikiLoginState';
+        const LOGIN_BRIDGE_KEY = 'wikiLoginStateBridge';
         const APPS_SCRIPT_ENDPOINT_USER_SETTINGS = window.APPS_SCRIPT_ENDPOINT_USER_SETTINGS;
         const USER_SETTINGS_REQUEST_TIMEOUT = 20000;
         const EDITOR_AUTHORITY_VALUE = 2;
@@ -604,6 +605,24 @@
                 return value ? JSON.parse(value) : null;
             } catch (error) {
                 console.error('Failed to parse login state', error);
+                return null;
+            }
+        };
+
+        const restoreLoginStateFromBridge = () => {
+            try {
+                const bridgeValue = sessionStorage.getItem(LOGIN_BRIDGE_KEY);
+                if (!bridgeValue) {
+                    return null;
+                }
+                const bridgeState = JSON.parse(bridgeValue);
+                if (!bridgeState?.user) {
+                    return null;
+                }
+                localStorage.setItem(LOGIN_STORAGE_KEY, JSON.stringify(bridgeState));
+                return bridgeState;
+            } catch (error) {
+                console.error('Failed to restore login bridge state', error);
                 return null;
             }
         };
@@ -845,7 +864,7 @@
         };
 
         const initializeAuthorizePage = async () => {
-            const loginState = getStoredLoginState();
+            const loginState = getStoredLoginState() || restoreLoginStateFromBridge();
             if (!loginState?.user) {
                 requireLogin();
                 return;

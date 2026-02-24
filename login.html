@@ -187,6 +187,7 @@
         const CONFIG = {
             CLIENT_ID: '680055548295-hv2bpt4untk1agai47l5c33p7hdp6hro.apps.googleusercontent.com',
             LOGIN_STORAGE_KEY: 'wikiLoginState',
+            LOGIN_BRIDGE_KEY: 'wikiLoginStateBridge',
             DEFAULT_REDIRECT_PATH: 'edit.html',
             APPS_SCRIPT_ENDPOINT_LOGIN
         };
@@ -355,6 +356,11 @@
                 user
             };
             localStorage.setItem(CONFIG.LOGIN_STORAGE_KEY, JSON.stringify(loginState));
+            try {
+                sessionStorage.setItem(CONFIG.LOGIN_BRIDGE_KEY, JSON.stringify(loginState));
+            } catch (error) {
+                console.warn('Failed to store login bridge state', error);
+            }
         };
 
         const verifyPlayerId = async (user) => {
@@ -448,6 +454,11 @@
                 setStatus(error.message || 'ログイン処理でエラーが発生しました。', 'status-error');
                 await revokeAccessToken(tokenResponse?.access_token);
                 localStorage.removeItem(CONFIG.LOGIN_STORAGE_KEY);
+                try {
+                    sessionStorage.removeItem(CONFIG.LOGIN_BRIDGE_KEY);
+                } catch (storageError) {
+                    console.warn('Failed to clear login bridge state', storageError);
+                }
             } finally {
                 state.isRequesting = false;
                 updateUI();
@@ -480,6 +491,11 @@
             const loginState = getStoredLoginState();
             await revokeAccessToken(loginState?.accessToken);
             localStorage.removeItem(CONFIG.LOGIN_STORAGE_KEY);
+            try {
+                sessionStorage.removeItem(CONFIG.LOGIN_BRIDGE_KEY);
+            } catch (error) {
+                console.warn('Failed to clear login bridge state', error);
+            }
             setStatus('ログアウトしました。', 'status-success');
             updateUI();
         };
