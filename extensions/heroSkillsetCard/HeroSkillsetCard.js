@@ -167,10 +167,27 @@ function getSelectionOverlay() {
   const title = document.createElement('h3');
   title.className = 'hero-skillset-overlay__title';
 
-  const viewModeButton = document.createElement('button');
-  viewModeButton.type = 'button';
-  viewModeButton.className = 'hero-skillset-overlay__view-mode';
-  viewModeButton.hidden = true;
+  const viewModeToggle = document.createElement('div');
+  viewModeToggle.className = 'hero-skillset-overlay__view-mode-toggle';
+  viewModeToggle.hidden = true;
+
+  const tileModeButton = document.createElement('button');
+  tileModeButton.type = 'button';
+  tileModeButton.className = 'hero-skillset-overlay__view-mode';
+  tileModeButton.dataset.mode = 'tile';
+  tileModeButton.setAttribute('aria-label', '簡易表示');
+  tileModeButton.setAttribute('title', '簡易表示');
+  tileModeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h8V3H3m0 18h8v-8H3m10 8h8v-8h-8m0-10v8h8V3"/></svg>';
+
+  const detailModeButton = document.createElement('button');
+  detailModeButton.type = 'button';
+  detailModeButton.className = 'hero-skillset-overlay__view-mode';
+  detailModeButton.dataset.mode = 'detail';
+  detailModeButton.setAttribute('aria-label', '詳細表示');
+  detailModeButton.setAttribute('title', '詳細表示');
+  detailModeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v4h12V5M9 19h12v-4H9m0-1h12v-4H9M4 9h4V5H4m0 14h4v-4H4m0-1h4v-4H4v4Z"/></svg>';
+
+  viewModeToggle.append(tileModeButton, detailModeButton);
 
   const message = document.createElement('div');
   message.className = 'hero-skillset-overlay__message';
@@ -195,7 +212,7 @@ function getSelectionOverlay() {
   closeButton.textContent = '閉じる';
 
   footer.append(databaseButton, closeButton);
-  header.append(title, viewModeButton);
+  header.append(title, viewModeToggle);
   panel.append(header, message, grid, footer);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
@@ -206,12 +223,12 @@ function getSelectionOverlay() {
     message.textContent = '';
     databaseButton.hidden = true;
     databaseButton.onclick = null;
-    viewModeButton.hidden = true;
-    viewModeButton.onclick = null;
+    viewModeToggle.hidden = true;
   }
 
-  function getViewModeText() {
-    return skillPickerDisplayMode === 'tile' ? '🟦 簡易（タイル表示）' : '🟦 詳細';
+  function updateViewModeToggleState() {
+    tileModeButton.classList.toggle('is-active', skillPickerDisplayMode === 'tile');
+    detailModeButton.classList.toggle('is-active', skillPickerDisplayMode === 'detail');
   }
 
   closeButton.addEventListener('click', hide);
@@ -241,13 +258,32 @@ function getSelectionOverlay() {
       message.textContent = '';
       databaseButton.hidden = true;
       databaseButton.onclick = null;
-      viewModeButton.hidden = true;
-      viewModeButton.onclick = null;
+      viewModeToggle.hidden = true;
 
       const isSkillPicker = databaseType === 'skill';
-      grid.classList.toggle('hero-skillset-overlay__grid--tile', isSkillPicker);
 
       const renderItems = () => {
+        grid.classList.toggle(
+          'hero-skillset-overlay__grid--tile',
+          isSkillPicker && skillPickerDisplayMode === 'tile'
+        );
+
+        if (allowClear) {
+          const clearButton = document.createElement('button');
+          clearButton.type = 'button';
+          clearButton.className = 'hero-skillset-overlay__clear';
+          clearButton.textContent = '選択を解除';
+          clearButton.addEventListener(
+            'click',
+            () => {
+              onClear?.();
+              hide();
+            },
+            { once: true }
+          );
+          grid.appendChild(clearButton);
+        }
+
         items.forEach(item => {
           const option = document.createElement('button');
           option.type = 'button';
@@ -313,29 +349,20 @@ function getSelectionOverlay() {
         };
       }
 
-      if (allowClear) {
-        const clearButton = document.createElement('button');
-        clearButton.type = 'button';
-        clearButton.className = 'hero-skillset-overlay__clear';
-        clearButton.textContent = '選択を解除';
-        clearButton.addEventListener(
-          'click',
-          () => {
-            onClear?.();
-            hide();
-          },
-          { once: true }
-        );
-        grid.appendChild(clearButton);
-      }
-
       if (isSkillPicker) {
-        viewModeButton.hidden = false;
-        viewModeButton.textContent = getViewModeText();
-        viewModeButton.onclick = () => {
-          skillPickerDisplayMode =
-            skillPickerDisplayMode === 'tile' ? 'detail' : 'tile';
-          viewModeButton.textContent = getViewModeText();
+        viewModeToggle.hidden = false;
+        updateViewModeToggleState();
+        tileModeButton.onclick = () => {
+          if (skillPickerDisplayMode === 'tile') return;
+          skillPickerDisplayMode = 'tile';
+          updateViewModeToggleState();
+          grid.innerHTML = '';
+          renderItems();
+        };
+        detailModeButton.onclick = () => {
+          if (skillPickerDisplayMode === 'detail') return;
+          skillPickerDisplayMode = 'detail';
+          updateViewModeToggleState();
           grid.innerHTML = '';
           renderItems();
         };
