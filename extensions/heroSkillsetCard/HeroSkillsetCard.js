@@ -10,6 +10,7 @@ import {
 } from '../../scripts/heroSkillsetService.js';
 
 let selectionOverlayInstance = null;
+let skillPickerDisplayMode = 'tile';
 const LOGIN_STORAGE_KEY = 'wikiLoginState';
 const DEVELOPER_AUTHORITY_VALUE = 4;
 
@@ -160,8 +161,33 @@ function getSelectionOverlay() {
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
 
+  const header = document.createElement('div');
+  header.className = 'hero-skillset-overlay__header';
+
   const title = document.createElement('h3');
   title.className = 'hero-skillset-overlay__title';
+
+  const viewModeToggle = document.createElement('div');
+  viewModeToggle.className = 'hero-skillset-overlay__view-mode-toggle';
+  viewModeToggle.hidden = true;
+
+  const tileModeButton = document.createElement('button');
+  tileModeButton.type = 'button';
+  tileModeButton.className = 'hero-skillset-overlay__view-mode';
+  tileModeButton.dataset.mode = 'tile';
+  tileModeButton.setAttribute('aria-label', '簡易表示');
+  tileModeButton.setAttribute('title', '簡易表示');
+  tileModeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h8V3H3m0 18h8v-8H3m10 8h8v-8h-8m0-10v8h8V3"/></svg>';
+
+  const detailModeButton = document.createElement('button');
+  detailModeButton.type = 'button';
+  detailModeButton.className = 'hero-skillset-overlay__view-mode';
+  detailModeButton.dataset.mode = 'detail';
+  detailModeButton.setAttribute('aria-label', '詳細表示');
+  detailModeButton.setAttribute('title', '詳細表示');
+  detailModeButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v4h12V5M9 19h12v-4H9m0-1h12v-4H9M4 9h4V5H4m0 14h4v-4H4m0-1h4v-4H4v4Z"/></svg>';
+
+  viewModeToggle.append(tileModeButton, detailModeButton);
 
   const message = document.createElement('div');
   message.className = 'hero-skillset-overlay__message';
@@ -186,7 +212,8 @@ function getSelectionOverlay() {
   closeButton.textContent = '閉じる';
 
   footer.append(databaseButton, closeButton);
-  panel.append(title, message, grid, footer);
+  header.append(title, viewModeToggle);
+  panel.append(header, message, grid, footer);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
@@ -196,6 +223,12 @@ function getSelectionOverlay() {
     message.textContent = '';
     databaseButton.hidden = true;
     databaseButton.onclick = null;
+    viewModeToggle.hidden = true;
+  }
+
+  function updateViewModeToggleState() {
+    tileModeButton.classList.toggle('is-active', skillPickerDisplayMode === 'tile');
+    detailModeButton.classList.toggle('is-active', skillPickerDisplayMode === 'detail');
   }
 
   closeButton.addEventListener('click', hide);
@@ -225,6 +258,82 @@ function getSelectionOverlay() {
       message.textContent = '';
       databaseButton.hidden = true;
       databaseButton.onclick = null;
+      viewModeToggle.hidden = true;
+
+      const isSkillPicker = databaseType === 'skill';
+
+      const renderItems = () => {
+        grid.classList.toggle(
+          'hero-skillset-overlay__grid--tile',
+          isSkillPicker && skillPickerDisplayMode === 'tile'
+        );
+
+        if (allowClear) {
+          const clearButton = document.createElement('button');
+          clearButton.type = 'button';
+          clearButton.className = 'hero-skillset-overlay__clear';
+          clearButton.textContent = '選択を解除';
+          clearButton.addEventListener(
+            'click',
+            () => {
+              onClear?.();
+              hide();
+            },
+            { once: true }
+          );
+          grid.appendChild(clearButton);
+        }
+
+        items.forEach(item => {
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'hero-skillset-overlay__option';
+
+          if (isSkillPicker && skillPickerDisplayMode === 'tile') {
+            option.classList.add('hero-skillset-overlay__option--tile');
+            option.setAttribute('aria-label', item.name || 'スキル');
+            option.setAttribute('title', item.name || '');
+          }
+
+          const imgWrapper = document.createElement('div');
+          imgWrapper.className = 'hero-skillset-overlay__option-figure';
+
+          if (item.image) {
+            const img = document.createElement('img');
+            img.src = item.image;
+            img.alt = item.name || '';
+            imgWrapper.appendChild(img);
+          }
+
+          option.appendChild(imgWrapper);
+
+          const showDetail = !isSkillPicker || skillPickerDisplayMode === 'detail';
+          if (showDetail) {
+            const label = document.createElement('div');
+            label.className = 'hero-skillset-overlay__option-label';
+            label.textContent = item.name || '';
+            option.appendChild(label);
+
+            if (item.description) {
+              const desc = document.createElement('div');
+              desc.className = 'hero-skillset-overlay__option-description';
+              desc.textContent = item.description;
+              option.appendChild(desc);
+            }
+          }
+
+          option.addEventListener(
+            'click',
+            () => {
+              onSelect?.(item.id);
+              hide();
+            },
+            { once: true }
+          );
+
+          grid.appendChild(option);
+        });
+      };
 
       const authority = getUserAuthorityLevel();
       const canEditDatabase =
@@ -240,64 +349,29 @@ function getSelectionOverlay() {
         };
       }
 
-      if (allowClear) {
-        const clearButton = document.createElement('button');
-        clearButton.type = 'button';
-        clearButton.className = 'hero-skillset-overlay__clear';
-        clearButton.textContent = '選択を解除';
-        clearButton.addEventListener(
-          'click',
-          () => {
-            onClear?.();
-            hide();
-          },
-          { once: true }
-        );
-        grid.appendChild(clearButton);
+      if (isSkillPicker) {
+        viewModeToggle.hidden = false;
+        updateViewModeToggleState();
+        tileModeButton.onclick = () => {
+          if (skillPickerDisplayMode === 'tile') return;
+          skillPickerDisplayMode = 'tile';
+          updateViewModeToggleState();
+          grid.innerHTML = '';
+          renderItems();
+        };
+        detailModeButton.onclick = () => {
+          if (skillPickerDisplayMode === 'detail') return;
+          skillPickerDisplayMode = 'detail';
+          updateViewModeToggleState();
+          grid.innerHTML = '';
+          renderItems();
+        };
       }
 
       if (!items.length) {
         message.textContent = emptyMessage || '選択肢がありません。';
       } else {
-        items.forEach(item => {
-          const option = document.createElement('button');
-          option.type = 'button';
-          option.className = 'hero-skillset-overlay__option';
-
-          const imgWrapper = document.createElement('div');
-          imgWrapper.className = 'hero-skillset-overlay__option-figure';
-
-          if (item.image) {
-            const img = document.createElement('img');
-            img.src = item.image;
-            img.alt = item.name || '';
-            imgWrapper.appendChild(img);
-          }
-
-          const label = document.createElement('div');
-          label.className = 'hero-skillset-overlay__option-label';
-          label.textContent = item.name || '';
-
-          option.append(imgWrapper, label);
-
-          if (item.description) {
-            const desc = document.createElement('div');
-            desc.className = 'hero-skillset-overlay__option-description';
-            desc.textContent = item.description;
-            option.appendChild(desc);
-          }
-
-          option.addEventListener(
-            'click',
-            () => {
-              onSelect?.(item.id);
-              hide();
-            },
-            { once: true }
-          );
-
-          grid.appendChild(option);
-        });
+        renderItems();
       }
 
       overlay.classList.add('is-visible');
