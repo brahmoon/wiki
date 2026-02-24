@@ -1061,6 +1061,25 @@
             font-size: 18px;
         }
 
+        .hero-skillset-overlay__header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .hero-skillset-overlay__view-mode {
+            border: 1px solid #7dd3fc;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
         .hero-skillset-overlay__message {
             margin-top: 12px;
             font-size: 14px;
@@ -1072,6 +1091,11 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 12px;
+        }
+
+        .hero-skillset-overlay__grid--tile {
+            grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+            gap: 8px;
         }
 
         .hero-skillset-overlay__option,
@@ -1095,8 +1119,8 @@
         }
 
         .hero-skillset-overlay__option-figure {
-            width: 80px;
-            height: 80px;
+            width: 50px;
+            height: 50px;
             margin: 0 auto 8px;
             border-radius: 12px;
             overflow: hidden;
@@ -1115,6 +1139,18 @@
         .hero-skillset-overlay__option-label {
             font-weight: 600;
             font-size: 14px;
+        }
+
+        .hero-skillset-overlay__option--tile {
+            padding: 6px;
+            min-height: 62px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-skillset-overlay__option--tile .hero-skillset-overlay__option-figure {
+            margin: 0;
         }
 
         .hero-skillset-overlay__option-description {
